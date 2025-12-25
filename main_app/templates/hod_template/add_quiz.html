@@ -1,0 +1,182 @@
+{% extends 'main_app/base.html' %}
+
+{% block content %}
+  <div class="container mt-5">
+    <h1>Add Quiz</h1>
+    <form method="POST" action="{% url 'add_quiz'  %}">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="title">Title:</label>
+        <input type="text" name="title" id="title" class="form-control" value="{{ quiz.title }}">
+      </div>
+      <div class="form-group">
+        <label for="description">Description:</label>
+        <textarea name="description" id="description" class="form-control">{{ quiz.description }}</textarea>
+      </div>
+      <div class="form-group">
+        <label for="subject">Subject:</label>
+        <select name="subject" id="subject" class="form-control">
+          {% for subject in subjects %}
+            <option value="{{ subject.id }}" {% if quiz.subject == subject %}selected{% endif %}>{{ subject.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      
+      <div id="questions">
+        <h2>Questions</h2>
+        {% for question in questions %}
+          <div class="question mb-3">
+            <div class="form-group">
+              <label for="question-{{ forloop.counter }}">Question {{ forloop.counter }}:</label>
+              <input type="text" name="question-{{ forloop.counter }}" id="question-{{ forloop.counter }}" class="form-control" required value="{{ question.question }}">
+            </div>
+            <div class="form-row">
+              <div class="form-group col-md-6">
+                <label for="option-{{ forloop.parentloop.counter }}-1">Option 1:</label>
+                <input type="text" name="option-{{ forloop.parentloop.counter }}-1" id="option-{{ forloop.parentloop.counter }}-1" class="form-control" required value="{{ question.option_1 }}">
+              </div>
+              <div class="form-group col-md-6">
+                <label for="option-{{ forloop.parentloop.counter }}-2">Option 2:</label>
+                <input type="text" name="option-{{ forloop.parentloop.counter }}-2" id="option-{{ forloop.parentloop.counter }}-2" class="form-control" required value="{{ question.option_2 }}">
+              </div>
+              <div class="form-group col-md-6">
+                <label for="option-{{ forloop.parentloop.counter }}-3">Option 3:</label>
+                <input type="text" name="option-{{ forloop.parentloop.counter }}-3" id="option-{{ forloop.parentloop.counter }}-3" class="form-control" required value="{{ question.option_3 }}">
+              </div>
+              <div class="form-group col-md-6">
+                <label for="option-{{ forloop.parentloop.counter }}-4">Option 4:</label>
+                <input type="text" name="option-{{ forloop.parentloop.counter }}-4" id="option-{{ forloop.parentloop.counter }}-4" class="form-control" required value="{{ question.option_4 }}">
+              </div>
+            </div>            
+            <div class="form-group">
+              <label for="answer-{{ forloop.counter }}">Correct answer:</label>
+              <select name="answer-{{ forloop.counter }}" id="answer-{{ forloop.counter }}" class="form-control" required>
+                <option value="1">Option 1</option>
+                <option value="2">Option 2</option>
+                <option value="3">Option 3</option>
+                <option value="4">Option 4</option>
+              </select>
+            </div>
+      {% endfor %}
+    </div>
+
+    <div class="container">
+      <div class="row">
+        <div class="col-md-12">
+          <button type="button" class="btn btn-primary" id="add-question">Add Question</button>
+        </div>
+      </div>
+      
+      <div class="row">
+        <div class="col-md-12">
+          <!-- question content -->
+          <button type="button" class="btn btn-danger delete-question" id="delete-question">Delete</button>
+        </div>
+      </div>
+    
+      <div class="row">
+        <div class="col-md-12">
+          <br><br>
+          <input type="submit" class="btn btn-primary" value="Add Quiz">
+        </div>
+      </div>
+    </div>
+    </div>
+  
+  </form>  <script>
+    
+  // Add Question Button
+  const addQuestionBtn = document.querySelector("#add-question");
+  const questionsDiv = document.querySelector("#questions");
+  let questionCount = {{ questions|length }};
+  
+  addQuestionBtn.addEventListener("click", () => {
+    // Increment the question count
+    questionCount++;
+    
+    // Create the new question HTML
+    const newQuestionDiv = document.createElement("div");
+    newQuestionDiv.classList.add("question", "mb-3");
+    
+    const questionFormGroup = document.createElement("div");
+    questionFormGroup.classList.add("form-group");
+    
+    const questionLabel = document.createElement("label");
+    questionLabel.setAttribute("for", `question-${questionCount}`);
+    questionLabel.innerHTML = `Question ${questionCount}:`;
+    
+    const questionInput = document.createElement("input");
+    questionInput.setAttribute("type", "text");
+    questionInput.setAttribute("name", `question-${questionCount}`);
+    questionInput.setAttribute("id", `question-${questionCount}`);
+    questionInput.classList.add("form-control");
+    questionInput.setAttribute("required", "");
+    
+    const optionsFormRow = document.createElement("div");
+    optionsFormRow.classList.add("form-row");
+    
+    for (let i = 1; i <= 4; i++) {
+      const optionFormGroup = document.createElement("div");
+      optionFormGroup.classList.add("form-group", "col-md-6");
+      
+      const optionLabel = document.createElement("label");
+      optionLabel.setAttribute("for", `option-${questionCount}-${i}`);
+      optionLabel.innerHTML = `Option ${i}:`;
+      
+      const optionInput = document.createElement("input");
+      optionInput.setAttribute("type", "text");
+      optionInput.setAttribute("name", `option-${questionCount}-${i}`);
+      optionInput.setAttribute("id", `option-${questionCount}-${i}`);
+      optionInput.classList.add("form-control");
+      optionInput.setAttribute("required", "");
+      
+      optionFormGroup.appendChild(optionLabel);
+      optionFormGroup.appendChild(optionInput);
+      optionsFormRow.appendChild(optionFormGroup);
+    }
+    
+    const answerFormGroup = document.createElement("div");
+    answerFormGroup.classList.add("form-group");
+    
+    const answerLabel = document.createElement("label");
+    answerLabel.setAttribute("for", `answer-${questionCount}`);
+    answerLabel.innerHTML = "Correct answer:";
+    
+    const answerSelect = document.createElement("select");
+    answerSelect.setAttribute("name", `answer-${questionCount}`);
+    answerSelect.setAttribute("id", `answer-${questionCount}`);
+    answerSelect.classList.add("form-control");
+    answerSelect.setAttribute("required", "");
+    
+    for (let i = 1; i <= 4; i++) {
+      const answerOption = document.createElement("option");
+      answerOption.setAttribute("value", i);
+      answerOption.innerHTML = `Option ${i}`;
+      
+      answerSelect.appendChild(answerOption);
+    }
+    
+    questionFormGroup.appendChild(questionLabel);
+    questionFormGroup.appendChild(questionInput);
+    newQuestionDiv.appendChild(questionFormGroup);
+    newQuestionDiv.appendChild(optionsFormRow);
+    answerFormGroup.appendChild(answerLabel);
+    answerFormGroup.appendChild(answerSelect);
+    newQuestionDiv.appendChild(answerFormGroup);
+    
+    questionsDiv.appendChild(newQuestionDiv);
+  });
+  
+  // Delete Question Button
+  const deleteQuestionBtn = document.querySelector("#delete-question");
+  deleteQuestionBtn.addEventListener("click", () => {
+    const questions = document.querySelectorAll(".question");
+    if (questions.length > 0) {
+      questions[questions.length - 1].remove();
+      questionCount--;
+    }
+  });
+
+    </script>
+    
+{% endblock %}

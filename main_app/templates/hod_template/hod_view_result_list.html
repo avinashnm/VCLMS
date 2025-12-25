@@ -1,0 +1,79 @@
+{% extends 'main_app/base.html' %}
+
+{% load static %}
+
+{% block page_title %}{{page_title}}{% endblock page_title %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card card-blue">
+                    <div class="card-header">
+                        <h3 class="card-title">{{page_title}}</h3>
+                    </div>
+                    <div class="card-body">
+                        <form method="get">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <input type="text" name="search_student" class="form-control"
+                                           placeholder="Search by student name or ID"
+                                           value="{{ request.GET.search_student }}">
+                                </div>
+                                <div class="col-md-3">
+                                    <select name="filter_subject" class="form-control">
+                                        <option value="">All Subjects</option>
+                                        {% for subject in subjects %}
+                                            <option value="{{ subject.id }}"
+                                                    {% if request.GET.filter_subject == subject.id|stringformat:"s" %}
+                                                    selected
+                                                    {% endif %}>
+                                                {{ subject.name }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
+                                </div>
+                            </div>
+                        </form>
+
+                        <table class="table table-bordered mt-3">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Student</th>
+                                    <th>Subject</th>
+                                    <th>CA1 MARKS</th>
+                                    <th>CA2 MARKS</th>
+                                    <th>CA3 MARKS</th>
+                                    <th>ESE MARKS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for result in results %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>{{ result.student.full_name }}</td>
+                                        <td>{{ result.subject.name }}</td>
+                                        <td>{{ result.ca1exam }}</td>
+                                        <td>{{ result.ca2exam }}</td>
+                                        <td>{{ result.ca3exam }}</td>
+                                        <td>{{ result.eseexam }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="7">No results found.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock content %}

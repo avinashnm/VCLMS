@@ -1,0 +1,36 @@
+/* body */
+.content{
+  margin-top: 150px;
+  margin-left: 30px;
+
+}
+.content-right{
+  margin-top: 15%;
+  padding-left: 60px;
+}
+.img-right{
+  margin-top: 50px;
+}
+h1{
+  padding-bottom: 30px;
+}
+
+/*navigation*/
+.nav-style{
+  background: #292752;
+  color: white;
+  position:fixed;
+  top: 0;
+
+}
+
+.logo{
+  width: 25%;
+  height: 25%;
+}
+.float-right{
+  margin-top: 15px;
+}
+.pagination{
+  margin-left: 50%
+}

@@ -1,0 +1,25 @@
+.nav-style{
+    background: #292752;
+    color: white;
+    position:fixed;
+    top: 0;
+  
+  }
+.logo{
+    width: 25%;
+    height: 25%;
+  }
+
+.content{
+    margin-top:100px;
+
+}
+
+.prtext{
+    list-style: none;
+    color:white;
+}
+
+.prtext:hover{
+color:white;
+}

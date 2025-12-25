@@ -1,0 +1,91 @@
+
+.nav-style{
+  background: #292752;
+  color: white;
+}
+.btn-login{
+  border-radius: 30px;
+  width: 90px;
+  height: 40px;
+  background-color: white;
+  color: #333;
+  outline: none;
+  border: none;
+  font-family: 'Roboto';
+  font-weight: 500;
+}
+.my-container{
+margin-top: 30px;
+margin-left: 10%;
+}
+.title{
+  font-family: 'Roboto';
+  font-weight: 700;
+  color: #333;
+  margin-top: 90px;
+}
+.login-icon{
+  visibility: hidden;
+}
+.content-head
+{
+  font-family: 'Roboto';
+
+}
+.illustration{
+
+  position: absolute;
+  top: 15%;
+  right: -16%;
+  min-width: 900px;
+}
+.img-fluid
+{
+    width: 70%;
+    margin-top: 30px;
+
+}
+
+.student{
+  padding-bottom: 80px;
+}
+
+.btn-info{
+  width: 110px;
+  height: 40px;
+  border-radius: 20px;
+  background: #C50227;
+  border: none;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+@media only screen and (max-width: 1400px)
+{
+.my-container{
+  margin: 5px;
+ }
+
+   .login-icon{
+     visibility: visible;
+     margin: -60px;
+     color: white;
+     min-width: 300px;
+   }
+   .btn-login{
+     visibility: hidden;
+   }
+   .illustration{
+     visibility: hidden;
+   }
+
+}

@@ -1,0 +1,36 @@
+{% extends 'main_app/base.html' %}
+
+{% block content %}
+  <div class="container mt-5">
+    <div class="row">
+      <div class="col">
+        <h1>Video Courses</h1>
+        <hr>
+      </div>
+    </div>
+
+    <div class="row">
+      {% for video_course in video_courses %}
+      <div class="col-md-6 mb-4">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title">{{ video_course.title }}</h5>
+            <p class="card-text">{{ video_course.description }}</p>
+            <h5 class="card-title">{{video_course.subject}}</h5>
+            <div class="video">
+              <video class="embed-responsive embed-responsive-16by9 z-depth-1-half" controls>
+                <source src="{{ video_course.video_upload.url }}" type="video/mp4"/>
+              </video>
+            </div>
+            <form action="{% url 'watch_video' video_course.id %}" method="post">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-primary mt-3">Take Course</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+  </div>
+{% endblock %}

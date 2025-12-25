@@ -1,0 +1,196 @@
+{% extends 'main_app/base.html' %}
+{% load static %}
+{% block page_title %}{{page_title}}{% endblock page_title %}
+
+{% block content %}
+
+<section class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-12">
+                <!-- general form elements -->
+                <div class="card card-blue">
+                    <div class="card-header">
+                        <h3 class="card-title">{{page_title}}</h3>
+                    </div>
+
+                    <div class="table card-body">
+                        <table class="table table-bordered table-hover">
+                            <tr>
+                                <th>#</th>
+                                <th>Staff</th>
+                                <th>Course</th>
+                                <th>Message</th>
+                                <th>Sentiment</th>
+                                <th>Sentiment Score</th>
+                                <th>Sent On</th>
+                                <th>Replied On</th>
+                                <th>Action</th>
+                            </tr>
+                            {% for feedback in  feedbacks %}
+                                <tr>
+                                    <td>{{forloop.counter}}</td>
+                                    <td>{{feedback.staff}}</td>
+                                    <td>{{feedback.staff.course}}</td>
+                                    <td>{{feedback.feedback}}</td>
+                                    <td>{{ feedback.sentiment_label }}</td>
+                                    <td>{{ feedback.sentiment_polarity }}</td>
+
+                                    <td>{{feedback.created_at}}</td>
+                                    {% if feedback.reply == "" %}
+                                        <td><span  class='badge badge-warning'>Pending Response</span></td>
+                                        <td> <button data-toggle = "modal" data-target = "#reply_modal" value="{{feedback.id}}" class="btn btn-success reply_open_modal">Reply</button>
+                                    {% else %}
+                                        <td>{{feedback.updated_at}}</td>
+                                        <td>{{feedback.reply}}</td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </table>
+                        
+                    </div>
+                    {% if data.Positive or data.Neutral or data.Negative %}
+                    <div class="chart-container">
+                        <canvas id="polarity-chart"></canvas>
+                    </div>
+                  
+                        
+                    
+                    {% endif %}
+                    
+                    </div>
+                <!-- /.card -->
+
+            </div>
+        </div>
+    </div>
+</section>
+<div class = "modal fade" id = "reply_modal" tabindex = "-1" role = "dialog" 
+   aria-labelledby = "myModalLabel" aria-hidden = "true">
+   
+   <div class = "modal-dialog">
+      <div class = "modal-content">
+         
+         <div class = "modal-header">
+            <button type = "button" class = "close" data-dismiss = "modal" aria-hidden = "true">
+                  &times;
+            </button>
+            
+            <h4 class = "modal-title" id = "myModalLabel">
+               
+            </h4>
+         </div>
+         
+         <div class = "modal-body">
+             <input type="hidden"  id="id">
+           <p> Reply <span id="reply_name"></span></p>  
+           <textarea name="reply_message" id="reply_message" cols="30" rows="10" class="form-control"></textarea>
+        </div>
+        
+        <div class = "modal-footer">
+            <button type = "button" class = "btn btn-danger" data-dismiss = "modal">
+                Close
+            </button>
+            
+            <button id="reply_btn" class="btn btn-success btn-block">Reply</button>
+         
+         </div>
+         
+      </div><!-- /.modal-content -->
+   </div><!-- /.modal-dialog -->
+  
+</div><!-- /.modal -->
+{% endblock content %}
+{% block custom_js %}
+  <script>
+
+
+
+
+
+var ctx = document.getElementById('polarity-chart').getContext('2d');
+                        var myChart = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: ['Positive', 'Neutral', 'Negative'],
+                                datasets: [{
+                                    label: 'Feedback Sentiment Polarity',
+                                    data: [{{ data.Positive }}, {{ data.Neutral }}, {{ data.Negative }}],
+                                    backgroundColor: [
+                                        'rgba(75, 192, 192, 0.2)', // Neutral
+                                        'rgba(255, 159, 64, 0.2)', // Positive
+                                        'rgba(255, 99, 132, 0.2)', // Negative
+                                    ],
+                                    borderColor: [
+                                        'rgba(75, 192, 192, 1)', // Neutral
+                                        'rgba(255, 159, 64, 1)', // Positive
+                                        'rgba(255, 99, 132, 1)', // Negative
+                                    ],
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      $(document).ready(function(){
+          $(".reply_open_modal").click(function(){
+              var id = $(this).val()
+              var name = $(this).parents("tr").children("td:eq(1)").text()
+              $("#reply_name").text(name)
+              $("#id").val(id)
+              
+              
+            })
+            
+            $("#reply_btn").on("click", function(){
+                var id = $("#id").val()
+                var reply = $("#reply_message").val()
+
+                $.ajax({
+                    url: "{% url 'staff_feedback_message' %}",
+                    type:'POST',
+                    data:{
+                          id:id,
+                          reply:reply
+                    }
+                }).done(function(response){
+                    if (response == "True"){
+                        alert("Reply Sent")
+                        location.reload()
+                    }else{
+                        alert("Reply Could Not Be Sent")
+                    }
+                }).fail(function(response){
+                    alert("Error Occured. ")
+                })
+          })
+      })
+  </script>
+{% endblock custom_js %}

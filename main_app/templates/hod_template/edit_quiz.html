@@ -1,0 +1,65 @@
+{% extends 'main_app/base.html' %}
+
+{% block content %}
+  <div class="container mt-5">
+    <h1>Edit Quiz</h1>
+    <form method="POST" action="{% url 'add_quiz'  %}">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="title">Title:</label>
+        <input type="text" name="title" id="title" class="form-control" value="{{ quiz.title }}">
+      </div>
+      <div class="form-group">
+        <label for="description">Description:</label>
+        <textarea name="description" id="description" class="form-control">{{ quiz.description }}</textarea>
+      </div>
+      <div class="form-group">
+        <label for="subject">Subject:</label>
+        <select name="subject" id="subject" class="form-control">
+          {% for subject in subjects %}
+            <option value="{{ subject.id }}" {% if quiz.subject == subject %}selected{% endif %}>{{ subject.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+                  
+                    <div class="card my-3">
+                      <div class="card-header">
+                        <h3 class="card-title">Questions</h3>
+                      </div>
+                      <div class="card-body">
+
+                        {% for question in questions %}
+                        <div class="question mb-3">
+                          <div class="form-group">
+                            <label for="question-{{ question.id }}">Question {{ forloop.counter }}</label>
+                            <input type="text" class="form-control" id="question-{{ question.id }}" name="question-{{ question.id }}" value="{{ question.text }}">
+                          </div>
+                          {% for option in question.option_set.all %}
+                          <div class="form-group form-check">
+                              <label class="form-check-label" for="option-{{ option.id }}">Option {{ forloop.counter }}:</label>
+                              <input type="text" class="form-control" id="option-{{ option.id }}-text" name="option-{{ option.id }}-text" value="{{ option.text }}">
+							  
+							  
+							  
+                            </div>
+                            {% endfor %}
+                            <div class="form-group">
+                              <label for="question-{{ question.id }}-correct-option">Correct Option:</label>
+                              <select class="form-control" id="question-{{ question.id }}-correct-option" name="question-{{ question.id }}-correct-option">
+                                  {% for option in question.option_set.all %}
+                                      <option value="{{ option.id }}" {% if option.is_correct %}selected{% endif %}>Option {{ forloop.counter }}: {{ option.text }}</option>
+                                  {% endfor %}
+                              </select>
+                          </div>
+                          
+                      
+          
+                        {% endfor %}
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                      </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

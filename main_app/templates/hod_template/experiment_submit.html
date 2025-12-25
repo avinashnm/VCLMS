@@ -1,0 +1,68 @@
+{%load static%}
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- CSS -->
+    <link rel="stylesheet" href="{% static 'css/welc.css' %}">
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}" >
+
+    <title>Procedure</title>
+  </head>  
+  <body>
+    
+    <nav class="navbar nav-style fixed-top">
+      <div class="navbar-header ">
+          <a href="#" ><img class="logo img-fluid" src="{% static 'img/Logo.png' %}" alt="logo"></a>
+          <a href ="/logout_user">  <button type="button" class="btn btn-primary float-right">Logout</button>
+                      </a>
+                    </div>
+
+          
+      </div></nav>
+      <br><br><br><br>
+<div style="position: absolute; top: 10; left:0;">
+  <label for="score">Score: <span id="score">10</span></label>
+</div>
+
+<div style="position: absolute; top: 20; right: 0;">
+  <label for="total-score">Total Score: <span id="total-score"></span></label>
+  </div>
+<br>
+
+<form action="submit_experiment" method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="d-flex justify-content-center align-items-center" style="height: 50vh;">
+        <div class="tab p-5" style="background-color: #8bbbdf; border-radius: 10px;">
+          <h3 class="mb-5">Submit Experiment</h3>
+          <div class="form-group">
+            <label for="image">Upload Graph Image:</label>
+            <input type="file" class="form-control-file" name="image" id="image">
+          </div>
+          <div class="form-group">
+            <label for="myText">About Your Experience in Carry Outing the Experiment:</label>
+            <textarea id="myText" name="review" rows="4" cols="50" class="form-control" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary" >Submit</button>
+        </div>
+      </div>
+  </form>
+  
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous"></script>
+
+</body>
+<script>
+var pts = 20;
+
+var pt=10
+// Update the total score label
+var totalScoreLabel = document.getElementById('total-score');
+var totalScore = parseInt(localStorage.getItem('finalScore')) + pts+pt;
+totalScoreLabel.innerHTML = totalScore;
+</script>
+</html>

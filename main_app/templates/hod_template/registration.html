@@ -1,0 +1,27 @@
+{% extends 'main_app/base.html' %}
+
+{% block content %}
+  <h1>Registration List</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Attendee Name</th>
+        <th>Event Title</th>
+        <th>Registration Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for registration in registrations %}
+        <tr>
+          <td>{{ registration.attendee.name }}</td>
+          <td>{{ registration.event.title }}</td>
+          <td>{{ registration.registration_date }}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="3">No registrations found.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

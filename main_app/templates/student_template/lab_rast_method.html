@@ -1,0 +1,420 @@
+{% extends 'main_app/base.html' %}
+{% load static %}
+
+{% block extra_head %}
+<link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'dist/css/bootstrap.min.css' %}">
+<link rel="stylesheet" href="{% static 'dist/css/fonts.css' %}">
+<link rel="stylesheet" href="{% static 'dist/css/style.css' %}">
+
+<!-- jsPDF + table for report -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/1.5.3/jspdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.6/jspdf.plugin.autotable.min.js"></script>
+
+<!-- CreateJS for Adobe Animate -->
+<script src="https://code.createjs.com/createjs-2015.11.26.min.js"></script>
+
+<style>
+  table {
+    width: 100%;
+    margin-bottom: 20px;
+    border-collapse: collapse;
+  }
+  table, th, td {
+    border: 1px solid #cdcdcd;
+  }
+  table th, table td {
+    padding: 10px;
+    text-align: left;
+  }
+  #regForm {
+    background-color: #ffffff;
+    margin: 40px auto;
+    font-family: "Times New Roman", serif;
+    padding: 40px;
+    width: 70%;
+    min-width: 300px;
+  }
+  h1 { text-align: center; }
+  input {
+    padding: 10px;
+    font-size: 17px;
+    font-family: "Times New Roman", serif;
+    border: 1px solid #aaaaaa;
+  }
+  input.invalid { background-color: #ffdddd; }
+  .tab { display: none; }
+  button, input[type=button] {
+    background-color: brown;
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    font-size: 17px;
+    font-family: "Times New Roman", serif;
+    cursor: pointer;
+  }
+  button:hover { opacity: 0.8; }
+  #prevBtn { background-color: #bbbbbb; }
+  .step {
+    height: 15px;
+    width: 15px;
+    margin: 0 2px;
+    background-color: brown;
+    border-radius: 50%;
+    display: inline-block;
+    opacity: 0.5;
+  }
+  .step.active { opacity: 1; }
+  .step.finish { background-color: #4CAF50; }
+</style>
+{% endblock extra_head %}
+
+{% block content %}
+<form id="regForm">
+  {% csrf_token %}
+
+  <!-- STEP 1: Intro -->
+  <div class="tab">
+    <h1>Welcome to Virtual Chemistry Laboratory</h1>
+    <p id="s" style="margin-left: 195px;">
+      Determination of Strength of Given Solution Using Conductometric Meter
+    </p>
+    <img src="#" alt="Avatar" width="150" height="150">
+  </div>
+
+  <!-- STEP 2: Video -->
+  <div class="tab">
+    <h1>Video Tutorial</h1>
+    <iframe width="850" height="400"
+            src="https://drive.google.com/file/d/18GrZ1thbiaEJMyzAeZkeITuC8hgffYts/preview">
+    </iframe>
+  </div>
+
+  <!-- STEP 3: Quiz -->
+  <div class="tab">
+    <h1>Quiz</h1>
+    {% for q in questions %}
+      <b>{{ forloop.counter }}. {{ q.text }}</b><br>
+      <label>
+        <input type="radio" class="questions1" name="questions{{ forloop.counter }}"
+               value="{{ q.option1 }}"> {{ q.option1 }}
+      </label><br>
+      <label>
+        <input type="radio" class="questions1" name="questions{{ forloop.counter }}"
+               value="{{ q.option2 }}"> {{ q.option2 }}
+      </label><br>
+      <label>
+        <input type="radio" class="questions1" name="questions{{ forloop.counter }}"
+               value="{{ q.option3 }}"> {{ q.option3 }}
+      </label><br>
+      <label>
+        <input type="radio" class="questions1" name="questions{{ forloop.counter }}"
+               value="{{ q.option4 }}"> {{ q.option4 }}
+      </label><br><br>
+    {% endfor %}
+
+    <input type="button" value="Submit Quiz" onclick="checkQuiz()">
+    <h4>Correct answers: <label id="cs">0</label></h4>
+  </div>
+
+  <!-- STEP 4: Virtual lab (animation + table) -->
+  <div class="tab">
+    <h1>Virtual lab</h1>
+
+    <!-- Adobe Animate canvas -->
+    <div id="animation_container"
+         style="background-color:rgba(102,102,102,1); width:800px; height:600px">
+      <canvas id="canvas" width="800" height="600"
+              style="position:absolute; display:block; background-color:rgba(102,102,102,1);">
+      </canvas>
+      <div id="dom_overlay_container"
+           style="pointer-events:none; overflow:hidden; width:800px; height:600px;
+                  position:absolute; left:0; top:0; display:block;">
+      </div>
+    </div>
+
+    <div class="mt-3">
+      <input type="text" id="name" placeholder="Enter ml">
+      <input type="text" id="email" placeholder="Enter conductance">
+      <input type="button" class="add-row" value="Add Row"><br><br>
+
+      <table id="table1">
+        <thead>
+          <tr>
+            <th>Select</th>
+            <th>ml of given solution</th>
+            <th>Value of conductometric meter</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button type="button" class="delete-row">Delete Row</button>
+    </div>
+  </div>
+
+  <!-- STEP 5: Graph + reflection + PDF -->
+  <div class="tab">
+    <b>Upload Graph Image:</b><br>
+    <input type="file" onchange="encodeImage(this)" id="image"><br><br>
+
+    <b>About Your Experience in Carrying Out the Experiment:</b><br>
+    <textarea id="myText" rows="4" cols="50"></textarea><br><br>
+
+    <button type="button" onclick="generateReport()">Generate PDF</button>
+  </div>
+
+  <!-- Navigation buttons -->
+  <div style="overflow:auto;">
+    <div style="float:right;">
+      <button type="button" id="prevBtn" onclick="nextPrev(-1)">Previous</button>
+      <button type="button" id="nextBtn" onclick="nextPrev(1)">Next</button>
+    </div>
+  </div>
+
+  <!-- Step indicators -->
+  <div style="text-align:center;margin-top:40px;">
+    <span class="step"></span>
+    <span class="step"></span>
+    <span class="step"></span>
+    <span class="step"></span>
+    <span class="step"></span>
+  </div>
+
+  <div class="mt-3">
+    <h4>
+      Score: <label id="score">0</label>
+      <span style="float:right;">
+        Total score: <label id="Total_score">0</label>
+      </span>
+    </h4>
+  </div>
+
+  <!-- correct answers for JS -->
+  <script id="correct-answers" type="application/json">
+    {{ correct_answers|safe }}
+  </script>
+</form>
+{% endblock content %}
+
+{% block custom_js %}
+
+<script>
+// ----- table row add / delete + initial tab -----
+$(function () {
+  // show first tab when page loads
+  showTab(0);
+
+  $(".add-row").click(function () {
+    var name = $("#name").val();
+    var email = $("#email").val();
+    if (!name || !email) return;
+    var markup =
+      "<tr><td><input type='checkbox' name='record'></td><td>" +
+      name + "</td><td>" + email + "</td></tr>";
+    $("#table1 tbody").append(markup);
+  });
+
+  $(".delete-row").click(function () {
+    $("#table1 tbody").find("input[name='record']").each(function () {
+      if ($(this).is(":checked")) {
+        $(this).parents("tr").remove();
+      }
+    });
+  });
+});
+
+// ----- multi-step form navigation -----
+var currentTab = 0;
+var videoScore = 5;   // static placeholder
+var quizScore = 0;
+var totalScore = 0;
+
+function showTab(n) {
+  var x = document.getElementsByClassName("tab");
+  x[n].style.display = "block";
+
+  document.getElementById("prevBtn").style.display = (n === 0) ? "none" : "inline";
+  document.getElementById("nextBtn").style.display =
+    (n === x.length - 1) ? "none" : "inline";
+
+  if (n === 0) {
+    document.getElementById("score").innerHTML = 0;
+    document.getElementById("Total_score").innerHTML = 0;
+  } else if (n === 1) {
+    document.getElementById("score").innerHTML = videoScore;
+    document.getElementById("Total_score").innerHTML = videoScore;
+  } else {
+    document.getElementById("score").innerHTML = quizScore;
+    document.getElementById("Total_score").innerHTML = videoScore + quizScore;
+  }
+
+  if (n === 3) {   // index of Virtual lab tab
+    startRastIfNeeded();
+  }
+
+  totalScore = videoScore + quizScore;
+  fixStepIndicator(n);
+}
+
+function nextPrev(n) {
+  var x = document.getElementsByClassName("tab");
+  x[currentTab].style.display = "none";
+  currentTab = currentTab + n;
+  if (currentTab >= x.length) {
+    return false;
+  }
+  showTab(currentTab);
+}
+
+function fixStepIndicator(n) {
+  var i, x = document.getElementsByClassName("step");
+  for (i = 0; i < x.length; i++) {
+    x[i].className = x[i].className.replace(" active", "");
+  }
+  x[n].className += " active";
+}
+
+// ----- quiz evaluation -----
+function checkQuiz() {
+  var answers = JSON.parse(
+    document.getElementById("correct-answers").textContent
+  );
+  var correct = 0;
+
+  for (var i = 0; i < answers.length; i++) {
+    var selected = document.querySelector(
+      'input[name="questions' + (i + 1) + '"]:checked'
+    );
+    if (!selected) {
+      alert("You have missed questions!");
+      return;
+    }
+    if (selected.value === answers[i]) {
+      correct++;
+    }
+  }
+  quizScore = correct;
+  document.getElementById("cs").innerHTML = correct;
+
+  var radios = document.getElementsByClassName("questions1");
+  for (var j = 0; j < radios.length; j++) {
+    radios[j].disabled = true;
+  }
+  showTab(currentTab);  // refresh score display
+}
+
+// ----- image + PDF generation -----
+var imgdata = '';
+
+function encodeImage(input) {
+  var img = input.files[0];
+  if (!img) return;
+  var reader = new FileReader();
+  reader.onloadend = function () {
+    imgdata = reader.result;
+  };
+  reader.readAsDataURL(img);
+}
+
+function generateReport() {
+  var text = document.getElementById("myText").value;
+  var doc = new jsPDF("p", "mm", "a4");
+
+  var y = 20;
+  doc.setLineWidth(2);
+  doc.text(170, y, "{{ student_name }}");
+  doc.text(70, 20, "Strength Solution");
+  doc.text(160, y + 10, "{{ reg_no }}");
+
+  doc.autoTable({
+    html: "#table1",
+    startY: 50,
+    theme: "grid",
+    styles: { minCellHeight: 10 }
+  });
+
+  var width = doc.internal.pageSize.getWidth();
+  var height = 100;
+
+  doc.addPage();
+  doc.text(70, 20, "Graph");
+  if (imgdata) {
+    doc.addImage(imgdata, 10, 30, width - 20, height);
+  }
+
+  doc.addPage();
+  doc.text(70, 20, "Result");
+  doc.text(20, 30, text);
+  doc.text(10, 50, "Video Score: " + videoScore);
+  doc.text(10, 60, "Quiz Score: " + quizScore);
+  doc.text(10, 70, "Total Score: " + (videoScore + quizScore));
+
+  doc.save("{{ reg_no }}.pdf");
+}
+</script>
+
+<!-- Adobe Animate JS exported files -->
+<script src="{% static 'dist/js/create.js' %}"></script>
+<script src="{% static 'dist/js/rastmethod.js' %}"></script>
+
+<script>
+var canvas, stage, exportRoot, anim_container, dom_overlay_container, fnStartAnimation;
+
+function initRastAnimation() {
+  canvas = document.getElementById("canvas");
+  anim_container = document.getElementById("animation_container");
+  dom_overlay_container = document.getElementById("dom_overlay_container");
+
+  var comp = AdobeAn.getComposition("43798F7AC4340A4FB69EACC351856905");
+  var lib = comp.getLibrary();
+  var loader = new createjs.LoadQueue(false);
+  loader.addEventListener("fileload", function (evt) { handleFileLoad(evt, comp); });
+  loader.addEventListener("complete", function (evt) { handleComplete(evt, comp); });
+  loader.loadManifest(lib.properties.manifest);
+}
+
+function handleFileLoad(evt, comp) {
+  var images = comp.getImages();
+  if (evt && evt.item.type === "image") {
+    images[evt.item.id] = evt.result;
+  }
+}
+
+function handleComplete(evt, comp) {
+  var lib = comp.getLibrary();
+  var ss = comp.getSpriteSheet();
+  var queue = evt.target;
+  var ssMetadata = lib.ssMetadata;
+
+  for (var i = 0; i < ssMetadata.length; i++) {
+    ss[ssMetadata[i].name] = new createjs.SpriteSheet({
+      images: [queue.getResult(ssMetadata[i].name)],
+      frames: ssMetadata[i].frames
+    });
+  }
+
+  exportRoot = new lib.RECOVER_Exp1BackUp();
+  stage = new lib.Stage(canvas);
+  stage.enableMouseOver();
+
+  fnStartAnimation = function () {
+    stage.addChild(exportRoot);
+    createjs.Ticker.setFPS(lib.properties.fps);
+    createjs.Ticker.addEventListener("tick", stage);
+  };
+
+  AdobeAn.makeResponsive(false, "both", false, 1,
+    [canvas, anim_container, dom_overlay_container]);
+  AdobeAn.compositionLoaded(lib.properties.id);
+  fnStartAnimation();
+}
+
+// Call initRastAnimation when the Virtual lab tab is first shown
+function startRastIfNeeded() {
+  if (!canvas) {
+    initRastAnimation();
+  }
+}
+</script>
+
+{% endblock custom_js %}

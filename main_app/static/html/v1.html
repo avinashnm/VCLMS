@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://unpkg.com/konva@7.2.2/konva.min.js"></script>
+    <meta charset="utf-8" />
+    <title>canvas</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color: #f0f0f0;
+      }
+    </style>
+  </head>
+  <body  width="850" height="400">
+    <div id="container"> <h1>hi</h1></div>
+    <script>
+      var width = 850;
+      var height = 400;
+
+      function drawImage(imageObj) {
+        var stage = new Konva.Stage({
+          container: 'container',
+          width: width,
+          height: height,
+        });
+
+        var layer = new Konva.Layer();
+        // darth vader
+        var darthVaderImg = new Konva.Image({
+          image: imageObj,
+          x: stage.width() / 2 - 200 / 2,
+          y: stage.height() / 2 - 137 / 2,
+          
+          draggable: true,
+        });
+
+        // add cursor styling
+        darthVaderImg.on('mouseover', function () {
+          document.body.style.cursor = 'pointer';
+        });
+        darthVaderImg.on('mouseout', function () {
+          document.body.style.cursor = 'default';
+        });
+
+        layer.add(darthVaderImg);
+        stage.add(layer);
+      }
+      var imageObj = new Image();
+      imageObj.onload = function () {
+        drawImage(this);
+      };
+      imageObj.src="{{asset('assets/images/logo.png')}}";
+      // left button click
+   left.onclick = function() {
+      if (!imgLoaded) return;
+      posX = posX - snap;
+      context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+      context.drawImage(img, posX, posY);
+   };
+	
+   // down button click
+   down.onclick = function() {
+      if (!imgLoaded) return;
+      posY = posY + snap;
+      context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+      context.drawImage(img, posX, posY);
+   };
+	
+   // right button click
+   right.onclick = function() {
+      if (!imgLoaded) return;
+      posX = posX + snap;
+      context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+      context.drawImage(img, posX, posY);
+   };
+
+    </script>
+  </body>
+</html>

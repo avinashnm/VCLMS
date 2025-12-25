@@ -1,0 +1,62 @@
+{% extends 'main_app/base.html' %}
+
+{% block content %}
+  <div class="container mt-5">
+    <div class="row">
+      <div class="col">
+        <h1>Quiz List</h1>
+        <hr>
+      </div>
+    </div>
+
+
+
+
+
+
+    <div class="table p-2">
+
+      <table class="table table-bordered">
+          <tr>
+              <th>ID</th>
+              <th>Question</th>
+              <th>Option1</th>
+              <th>Option2</th>
+              <th>Option3</th>
+              <th>Option4</th>
+              <th>Correct Answer</th>
+              
+              <th>Actions</th>
+              
+       </tr>
+       {% for question in question %}
+       <tr>
+           <td>{{forloop.counter}}</td>
+           <td>{{ question.question }}</td>
+           <td>{{ question.option1}}</td>
+           <td>{{ question.option2}}</td>
+           <td>{{ question.option3}}</td>
+           <td>{{ question.option4}}</td>
+           <td>{{ question.correct_answer}}</td>
+        
+           
+           
+           </tr>
+           <tr>
+            {% empty %}
+            <li>No questions available.</li>
+           </tr>
+           {% endfor %}
+       </table>
+       <center>
+        <a href="{% url 'add_question' %}" class="btn-primary">Add Questions</a>
+       </center>
+   </div>
+
+
+
+
+
+  </div>
+{% endblock %}
+

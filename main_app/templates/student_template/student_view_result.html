@@ -1,0 +1,65 @@
+{% extends 'main_app/base.html' %}
+{% load static %}
+{% block page_title %}{{page_title}}{% endblock page_title %}
+
+{% block content %}
+
+<section class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-12">
+                <!-- general form elements -->
+       
+                <!-- /.card -->
+<div class="card card-blue">
+    <div class="card-header"><h3 class="card-title">{{page_title}}</h3>
+    </div>
+<br>
+<div class="card-body">
+    <form method="get">
+        
+        <div class="form-group">
+            <label for="subject">Filter by Subject:</label>
+            <select name="subject" class="form-control" id="subject">
+                <option value="">All</option>
+                {% for subject in subjects %}
+                <option value="{{ subject.id }}" {% if subject.id == request.GET.subject %}selected{% endif %}>{{ subject.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Filter</button>
+                <a href="{% url 'student_view_result' %}" class="btn btn-default">Reset</a>
+    </form>
+</div>
+
+   <div class="table p-2">
+
+       <table class="table table-bordered">
+           <tr>
+               <th>ID</th>
+               <th>Subject</th>
+               <th>CA1 MARKS</th>
+               <th>CA2 MARKS</th>
+               <th>CA3 MARKS</th>
+               <th>ESE MARKS</th>
+        </tr>
+        {% for result in results %}
+        <tr>
+            <td>{{forloop.counter}}</td>
+            <td>{{ result.subject }}</td>
+            <td>{{ result.ca1exam }}</td>
+            <td>{{ result.ca2exam }}</td>
+            <td>{{ result.ca3exam }}</td>
+            <td>{{ result.eseexam }}</td>
+            
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock content %}

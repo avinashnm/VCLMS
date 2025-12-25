@@ -1,0 +1,11 @@
+{% extends 'main_app/base.html' %}
+
+{% block content %}
+  <h1>Student Analysis</h1>
+  <p>Average marks: {{ avg_marks }}</p>
+  <p>Average attendance: {{ avg_attendance }}</p>
+  <p>Average feedback: {{ avg_feedback }}</p>
+  <p>Number of students with above-average marks: {{ above_avg_marks }}</p>
+  <p>Number of students with above-average attendance: {{ above_avg_attendance }}</p>
+  <p>Number of students with above-average feedback: {{ above_avg_feedback }}</p>
+{% endblock %}

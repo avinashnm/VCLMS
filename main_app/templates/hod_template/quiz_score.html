@@ -1,0 +1,159 @@
+{%load static%}
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="{%static 'css/video.css' %}">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="{%static 'css/bootstrap.min.css' %}" integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l" crossorigin="anonymous">
+
+    <title>Experiment</title>
+    <style>
+      .pagination{
+        margin-left: 50%;
+        margin-top: 450px;
+      }
+      table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th, td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+  th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+  }
+  ul {
+    margin-bottom: 0;
+  }
+
+    </style>
+  </head>
+  <body>
+      <!-- ==navbar=== -->
+
+      <nav class="navbar nav-style fixed-top">
+
+        <div class="navbar-header ">
+            <a href="#" ><img class="logo img-fluid" src="{%static 'images/Logo.png' %}" alt="logo"></a>
+            
+            
+        </div>
+
+        <div class="btn">
+
+
+        </div>
+
+    </nav>
+<br><br><br><br>
+<div style="position: absolute; top: 10; left:0;">
+  <label for="score">Score: <span id="score">{{ quiz_result.score }}</span></label>
+</div>
+
+<div style="position: absolute; top: 20; right: 0;">
+  <label for="total-score">Total Score: <span id="total-score"></span></label>
+  </div>
+<br>
+       
+
+
+<div class="container">
+  <h1 class="mt-5 mb-3">Your Score</h1>
+  <div class="row">
+    <div class="col-md-12">
+      <table>
+        <tbody>
+          <tr>
+            <th>User:</th>
+            <td>{{ quiz_result.student }}</td>
+          </tr>
+          <tr>
+            <th>Subject:</th>
+            <td>{{ quiz_result.quiz.subject }}</td>
+          </tr>
+          <tr>
+            <th>Quiz:</th>
+            <td>{{ quiz_result.quiz.title }}</td>
+          </tr>
+          <tr>
+            <th>Score:</th>
+            <td>{{ quiz_result.score }}</td>
+          </tr>
+          <tr>
+            <th>Percentage:</th>
+            <td>{{ quiz_result.percentage }}%</td>
+          </tr>
+          <tr>
+            <th>Correct Answers:</th>
+            <td>
+              <ul>
+                {% for question in quiz_result.quiz.question_set.all %}
+                <li><strong>{{ question.text }}</strong>: {% for option in question.option_set.all %}
+                  {% if option.is_correct %}{{ option.text }}{% endif %}
+                {% endfor %}</li>
+                {% endfor %}
+              </ul>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="text-center">
+        <button class="btn btn-primary mt-3" onclick="window.print()">Print</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+        
+    
+
+     <!-- PAGINATION -->
+     <nav aria-label="Page navigation example "style="position:absolute;top:750px;left:550px;">
+    <ul class="pagination ">
+      <li class="page-item">
+        <a class="page-link" href="#!" aria-label="Previous">
+          <span aria-hidden="true">«</span>
+          <span class="sr-only">Previous</span>
+        </a>
+      </li>
+      <li class="page-item"><a class="page-link" href="">1</a></li>
+      <li class="page-item"><a class="page-link" href="#">2</a></li>
+      <li class="page-item"><a class="page-link" href="/procedure">3</a></li>
+      <li class="page-item"><a class="page-link" href="#">4</a></li>
+      <li class="page-item"><a class="page-link" href="#">5</a></li>
+      <li class="page-item"><a class="page-link" href="#">6</a></li>
+      <li class="page-item">
+        <a class="page-link" href="#!" aria-label="Next">
+          <span aria-hidden="true">»</span>
+          <span class="sr-only">Next</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+    
+    
+</body>
+<script>
+var quizResultScore = parseInt('{{ quiz_result.score }}');
+var totalScoreLabel = document.getElementById('total-score');
+var totalScore = parseInt(localStorage.getItem('totalScore'));
+
+// Add the total score to the quiz result score
+var finalScore = totalScore + quizResultScore;
+
+// Store the final score in local storage
+localStorage.setItem('finalScore', finalScore);
+
+// Update the total score label
+totalScoreLabel.innerHTML = finalScore;
+
+
+</script>
+</html>

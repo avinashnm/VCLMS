@@ -1,0 +1,135 @@
+{% extends 'main_app/base.html' %}
+
+{% block content %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Student Report</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            margin: 0;
+        }
+
+        h4 {
+            font-size: 20px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        p {
+            margin: 0;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .gray-bg {
+            background-color: #f5f5f5;
+        }
+
+        .clearfix {
+            clear: both;
+        }
+
+        .profile-pic {
+            float: left;
+            margin-right: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Student Report</h1>
+    <div class="clearfix">
+        <img src="{{ student.admin.profile_pic }}" width="100" height="100" class="profile-pic">
+        <h2>Student Personal Details</h2>
+        <table>
+            <tr>
+                <th>Name</th>
+                <td>{{ student.admin.first_name }} {{ student.admin.last_name }}</td>
+            </tr>
+            <tr>
+                <th>Email</th>
+                <td>{{ student.admin.email }}</td>
+            </tr>
+            <tr>
+                <th>ID</th>
+                <td>{{ student.id }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <h2>Student Attendance Details</h2>
+    <table>
+        <tr>
+            <th>Date</th>
+            <th>Attendance</th>
+        </tr>
+        {% for attendance in attendances %}
+        <tr>
+            <td>{{ attendance.attendance.date|date:"M d, Y" }}</td>
+            <td>{% if attendance.status %}Present{% else %}Absent{% endif %}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <div class="gray-bg">
+        <h2>Student Attendance Brief</h2>
+        <table>
+            <tr>
+                <th>Present Days</th>
+                <td>{{ present_days }}</td>
+            </tr>
+            <tr>
+                <th>Total Days</th>
+                <td>{{ total_days }}</td>
+            </tr>
+            <tr>
+                <th>Percentage</th>
+                <td>{{ percentage }}%</td>
+            </tr>
+        </table>
+    </div>
+
+    <h2>Quiz Result</h2>
+    <table>
+        <tr>
+            <th>Quiz Title</th>
+            <th>Quiz Score</th>
+            <th>Percentage</th>
+        </tr>
+        {% for result in quiz_results %}
+        <tr>
+            <td>{{ result.quiz.title }}</td>
+            <td>{{ result.score }}</td>
+            <td>{{ result.percentage }}%</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+
+</html>
+
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends 'main_app/base.html' %}
+{% load static %}
+{% block page_title %}{{page_title}}{% endblock page_title %}
+{% block content %}
+<style>
+    .content {
+        background-image: url("{% static 'img/Frame.png' %}");
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: right center;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .content-inner {
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 20px;
+        text-align: center;
+    }
+</style>
+
+    <div class="container-fluid">
+        <div class="content-inner">
+            <!-- Small boxes (Stat box) -->
+            <h1>Welcome to Virtual Chemistry Lab</h1>
+                
+            <div class="dropdown">
+                <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
+                    Select an Experiment
+                </button>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" href="/expwelcome">Rast Method</a>
+                    <a class="dropdown-item" href="#">Experiment 2</a>
+                    <a class="dropdown-item" href="#">Experiment 3</a>
+                    <!-- Add more experiments as needed -->
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock content %}

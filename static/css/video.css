@@ -1,0 +1,23 @@
+/*navigation*/
+.nav-style{
+    background: #292752;
+    color: white;
+    position:fixed;
+    top: 0;
+  
+  }
+  
+  .logo{
+    width: 25%;
+    height: 25%;
+  }
+  .float-right{
+    margin-top: 15px;
+  }
+
+/* body contents */
+
+.video {
+    margin-top: 100px;
+
+}

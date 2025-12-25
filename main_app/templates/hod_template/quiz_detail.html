@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h1>{{ quiz.title }}</h1>
+  <p>{{ quiz.description }}</p>
+
+  <form method="POST" action="{% url 'submit_quiz' quiz.id %}">
+    {% csrf_token %}
+    {% for question in quiz.questions.all %}
+      <h2>{{ question.text }}</h2>
+      {% if question.question_type == 'text' %}
+        <textarea name="{{ question.id }}"></textarea>
+      {% elif question.question_type == 'multiple_choice' %}
+        {% for choice in question.choices.all %}
+          <input type="radio" name="{{ question.id }}" value="{{ choice.id }}">
+          <label>{{ choice.text }}</label>
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+
+    <button type="submit">Submit Quiz</button>
+  </form>
+{% endblock %}

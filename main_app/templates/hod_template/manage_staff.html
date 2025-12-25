@@ -1,0 +1,106 @@
+{% extends 'main_app/base.html' %}
+{% load static %}
+
+{% block page_title %}{{page_title}}{% endblock page_title %}
+
+{% block content %}
+
+<section class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">{{page_title}}</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="search-form" method="GET" action="{% url 'manage_staff' %}">
+                            <div class="input-group">
+                                <input id="search-input" type="text" class="form-control" placeholder="Search" name="q">
+                                <input id="query-audio" type="hidden" name="audio">
+                                <span class="input-group-btn">
+                                    <button class="btn btn-default" type="button" onclick="startListening()">
+                                        <i class="fa fa-microphone"></i>
+                                    </button>
+                                    <button class="btn btn-default" type="submit">
+                                        <i class="fa fa-search"></i>
+                                    </button>
+                                </span>
+                            </div>
+
+                            
+                        </form>
+                    
+                                     <!-- /.card-header -->
+                    <div class="card-body">
+                        <table id="example2" class="table table-bordered table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Full Name</th>
+                                    <th>Email</th>
+                                    <th>Gender</th>
+                                    <th>Course</th>
+                                    <th>Stream</th>
+                                    <th>Year</th>
+                                    <th>Avatar</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for staff in allStaff %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>{{staff.admin.first_name}} {{staff.admin.last_name}}</td>
+                                    <td>{{staff.admin.email}}</td>
+                                    <td>{{staff.admin.gender}}</td>
+                                    <td>{{staff.course.name}}</td>
+                                    <td>{{staff.admin.stream}}</td>
+                                    <td>{{staff.admin.year}}</td>
+                                    <td>
+                                        {% if staff.profile_pic == ""  %}
+                                        No Image
+                                        {% else %}
+                                        <img class="img img-fluid mb-2" height="56" width="56"
+                                            src="{{staff.admin.profile_pic}}" alt="">
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'edit_staff' staff_id=staff.id %}" class="btn btn-info">Edit</a> - 
+                                        <a href="{% url 'delete_staff' staff_id=staff.id %}" class="btn btn-danger" onclick="return confirm('Are you sure about this ?')">Delete</a>
+                                    
+                                    </td>
+                                </tr>
+                            </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="7">No staff found</td>
+                                </tr>
+                          
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+<script>
+    var recognition = new webkitSpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = function(event) {
+        var query = event.results[0][0].transcript;
+        document.getElementById('search-input').value = query;
+        document.getElementById('search-form').submit();
+    }
+
+    function startListening() {
+        recognition.start();
+    }
+</script>
+
+{% endblock content %}

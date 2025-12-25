@@ -1,0 +1,49 @@
+{% extends 'main_app/base.html' %}
+
+{% block content %}
+  <div class="container mt-5">
+    <div class="row">
+      <div class="col">
+        <h1>Study Materials</h1>
+        <hr>
+      </div>
+    </div>
+
+
+
+
+
+
+    <div class="table p-2">
+
+      <table class="table table-bordered">
+          <tr>
+              <th>ID</th>
+              <th>Title</th>
+              <th>Description</th>
+              <th>Study Material</th>
+              <th>Subject</th>
+              
+              
+       </tr>
+       {% for study_material in study_materials %}
+       <tr>
+           <td>{{forloop.counter}}</td>
+           <td>{{ study_material.title }}</td>
+           <td>{{ study_material.description}}</td>
+           <td>{{study_material.file_upload}} <a href="{% url 'study_material_download' study_material.id %}" class="btn btn-primary">Download</a></td>
+           <td>{{ study_material.subject}}</td>
+         
+           
+           </tr>
+           {% endfor %}
+       </table>
+   </div>
+
+
+
+
+
+  </div>
+{% endblock %}
+

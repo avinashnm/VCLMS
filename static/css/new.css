@@ -1,0 +1,172 @@
+body{
+  height: 2000px;
+
+}
+
+.here{
+  padding-top: 60px;
+}
+
+.table{
+  word-wrap: break-word;
+  table-layout: fixed;
+ 
+}
+
+
+/*navigation*/
+.nav-style{
+  background: #292752;
+  color: white;
+  position:fixed;
+  top: 0;
+
+}
+
+.logo{
+  width: 25%;
+  height: 25%;
+}
+.float-right{
+  margin-top: 15px;
+}
+
+/* Updatebutton style */
+a:link.link-update{
+  text-decoration: none;
+  outline: none;
+  color: white;
+  background-color: #292752;
+  margin-right: 30px;
+  padding: 8px 20px;
+  border-radius: 6px;
+}
+a:visited.link-update {
+  color: white;
+}
+a:hover.link-update {
+
+  background: #474492;
+  color: white;
+}
+/* deletebutton style */
+a:link.link-delete{
+  text-decoration: none;
+  outline: none;
+  color: white;
+  background-color: #C50227;
+  padding:8px 20px;
+  margin-top: 10px;
+  border-radius: 6px;
+}
+a:visited.link-delete {
+  color: white;
+}
+a:hover.link-delete {
+
+  background: #9B011E;
+  color: white;
+}
+/* The side navigation menu */
+.sidebar {
+  margin-top: 80px;
+  padding: 0;
+  width: 200px;
+  background-color: #474492;
+  position: fixed;
+  height: 100%;
+  overflow: auto;
+}
+
+/* Sidebar links */
+.sidebar a {
+
+  display: block;
+  color: black;
+  padding: 16px;
+  text-decoration: none;
+}
+
+/*links*/
+.cont{
+  margin-top: 60px;
+
+}
+
+/* Active/current link */
+.sidebar a.active {
+  background-color: #CCCBED;
+  color: #333;
+  font-weight: bold;
+}
+
+/* Links on mouse-over */
+.sidebar a:hover:not(.active) {
+  background-color: #555;
+  color: white;
+}
+
+/* Page content. The value of the margin-left property should match the value of the sidebar's width property */
+div.content {
+  margin-left: 200px;
+  padding: 1px 16px;
+  height: 100%;
+}
+
+/* On screens that are less than 700px wide, make the sidebar into a topbar */
+@media screen and (max-width: 700px) {
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+  }
+  .sidebar a {float: left;}
+  div.content {margin-left: 0;}
+}
+
+/*table contents*/
+.here{
+  background: #fcfcfc;
+  margin-top: 5%;
+}
+.update{
+  background-color: #474492;
+  color: white;
+}
+.delete{
+    margin-left: 20px;
+    background-color: #C50227;
+    color: white;
+}
+.nav-style{
+  background: #292752;
+  color: white;
+}
+p{
+  padding-bottom: 40px;
+}
+h1{
+  padding-bottom: 10px;
+}
+.modal-complete{
+  width: 80%;
+}
+.btn-sm{
+  padding-left: 50px;
+}
+
+/* On screens that are less than 400px, display the bar vertically, instead of horizontally */
+@media screen and (max-width: 800px) {
+  .sidebar a {
+    text-align: center;
+    float: none;
+  }
+  .delete {
+    margin-top:10px;
+}
+}
+
+
+.link-delete{
+  margin-top:30px;
+}

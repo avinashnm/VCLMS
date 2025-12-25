@@ -1,0 +1,49 @@
+{% extends 'main_app/base.html' %}
+
+{% block content %}
+<div class="container">
+  <div class="row">
+    <div class="col-md-12">
+      <h3 class="my-3">Subject : {{ quiz.subject}}</h3>
+      <form method="post" action="{% url 'take_quiz' quiz_id=quiz.id %}">
+        {% csrf_token %}
+        {% if form.errors %}
+        <div class="alert alert-danger" role="alert">
+          Please correct the following errors:
+          <ul>
+            {% for field in form %}
+            {% for error in field.errors %}
+            <li>{{ field.label }}: {{ error }}</li>
+            {% endfor %}
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        <div class="card my-3">
+          <div class="card-header">
+            <h3 class="card-title">{{ quiz.title }}</h3>
+          </div>
+          <div class="card-body">
+            {% for question in questions %}
+            <h3>Question {{ forloop.counter }}. {{ question.text }}</h3>
+
+            {% for option in question.option_set.all %}
+            <div>
+              <input type="radio" id="{{ option.id }}" name="question-{{ question.id }}-options" value="{{ option.id }}">
+
+              <label for="{{ option.id }}">{{ option.text }}</label>
+              <input type="hidden" name="is_correct" value="{{ option.is_correct }}">
+            
+            </div>
+            {% endfor %}
+            {% endfor %}
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Submit Quiz</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
