@@ -758,6 +758,12 @@ def student_lab_home(request):
             "objective": "Determine molecular weight of a solute from freezing-point depression.",
         },
         {
+        'slug': 'titration',
+        'title': 'Acid-Base Titration',
+        'objective': 'Determine unknown acid concentration using NaOH titration',
+        
+        },
+        {
             "slug": "experiment-2",
             "title": "Experiment 2",
             "objective": "Placeholder objective for experiment 2.",
@@ -787,11 +793,28 @@ def lab_rast_method(request):
     return render(request, "student_template/lab_rast_method.html", context)
 
 def lab_experiment(request, slug):
+    # Titration experiment
+    if slug == 'titration':
+        experiment = {
+            'name': 'Acid-Base Titration',
+            'materials': ['50ml burette (0.1M NaOH)', '100ml beaker', '25ml 0.1M HCl', 'Phenolphthalein'],
+            'procedure': [
+                'Pipette 25ml 0.1M HCl into beaker',
+                'Add 2 drops phenolphthalein indicator',
+                'Fill burette with 0.1M NaOH',
+                'Titrate until pink endpoint (~25ml)'
+            ],
+            'expected_volume': 25.0
+        }
+        return render(request, 'student_template/lab_titration.html', {'experiment': experiment})
+    
+    # Existing experiment template map
     template_map = {
-        "rast-method": "student_template/lab_rast_method.html",
-        "experiment-2": "student_template/lab_experiment2.html",
-        "experiment-3": "student_template/lab_experiment3.html",
+        'experiment-2': 'student_template/lab_experiment2.html',
+        'experiment-3': 'student_template/lab_experiment3.html',
+        'rast-method': 'student_template/lab_rast_method.html'
     }
+    
     template = template_map.get(slug)
     if not template:
         raise Http404()

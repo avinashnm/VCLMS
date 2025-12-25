@@ -912,6 +912,21 @@ def delete_responses(request, code):
             response.delete()
         return JsonResponse({"message": "Success"})
 
+def student_lab_titration(request):
+    experiment = {
+        'name': 'Acid-Base Titration',
+        'materials': ['50ml burette (0.1M NaOH)', '100ml beaker', '25ml 0.1M HCl', 'Phenolphthalein'],
+        'procedure': [
+            'Pipette 25ml 0.1M HCl into beaker',
+            'Add 2 drops phenolphthalein indicator',
+            'Fill burette with 0.1M NaOH',
+            'Titrate until pink endpoint (~25ml)'
+        ],
+        'expected_volume': 25.0
+    }
+    return render(request, 'student_template/lab_titration.html', {'experiment': experiment})
+
+
 # Error handler
 def FourZeroThree(request):
     return render(request, "staff_template/403.html")

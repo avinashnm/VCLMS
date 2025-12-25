@@ -161,6 +161,11 @@ path('student/watch/<int:course_id>/', student_views.watch_video, name='watch_vi
     #experiments url
     path("student/lab/<slug:slug>/", student_views.lab_experiment, name="lab_experiment"),
     path("student/lab/rast-method/", student_views.lab_rast_method, name="lab_rast_method"),
+    
+    #p5.js - titration exp url
+path('student/lab/titration-experiment/', views.student_lab_titration, name='student_lab_titration'),
+
+    
     #quiz urls
     
    
