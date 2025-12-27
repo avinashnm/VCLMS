@@ -1,94 +1,138 @@
 // --- GLOBAL STATE ---
 
-let vessels = {};
+let vessels = {};          // id -> vessel
 let bench, shelf;
 let isDragging = null;
 let hoverVessel = null;
 
 let studentVolume = 0;
-let phStage = 0; // 0: clear, 1: light pink, 2: deep pink
+let phStage = 0;           // 0: clear, 1: light pink, 2: deep pink
 
-// targets for easing
+// easing targets
 let beakerTargetVol = 0;
-let pipetteTargetVol = 25;
-let buretteTargetVol = 50;
+let pipetteTargetVol = 0;
+let buretteTargetVol = 0;
 
-// images
+// catalogue & sprites
+let catalog;
 let imgBench, imgShelf;
-let imgBurette, imgPipette, imgBottle;
-let imgBeakerEmpty, imgBeakerHcl, imgBeakerLight, imgBeakerHeavy;
+
+let imgBeaker, imgBottle, imgBurette, imgPipette;
+let imgConical, imgVolumetric, imgFunnel, imgWash, imgBunsen;
+
+// catalogue UI (no scroll now)
+let catalogVisible = true;
+let catalogToggleButton = null;
+let catalogPanelBounds = null;
+
+// simple list of chemicals for bottles
+const CHEMICALS = {
+  acid: [
+    { id: 'hcl_0_1M', label: '0.1 M HCl' },
+    { id: 'h2so4_0_1M', label: '0.1 M H2SO4' }
+  ],
+  base: [
+    { id: 'naoh_0_1M', label: '0.1 M NaOH' },
+    { id: 'koh_0_1M',  label: '0.1 M KOH' }
+  ],
+  indicator: [
+    { id: 'phenolphthalein', label: 'Phenolphthalein' }
+  ]
+};
+
+// --- PRELOAD ---
 
 function preload() {
-  imgBench       = loadImage('/static/images3/titration/bench.png');
-  imgShelf       = loadImage('/static/images3/titration/Shelf.jpg');
-  imgBurette     = loadImage('/static/images3/titration/burette.png');
-  imgPipette     = loadImage('/static/images3/titration/pipette.png');
-  imgBottle      = loadImage('/static/images3/titration/stock-HCL.png');
-  imgBeakerEmpty = loadImage('/static/images3/titration/beakerEmpty.png');
-  imgBeakerHcl   = loadImage('/static/images3/titration/beakerWithHCL.png');
-  imgBeakerLight = loadImage('/static/images3/titration/beakerLightTitration.png');
-  imgBeakerHeavy = loadImage('/static/images3/titration/beakerHeavyTitration.png');
+  imgBench = loadImage('/static/images3/titration/bench.png');
+  imgShelf = loadImage('/static/images3/titration/Shelf.jpg');
+
+  imgBeaker     = loadImage('/static/img/catalog/beaker.png');
+  imgBottle     = loadImage('/static/img/catalog/bottle.png');
+  imgBurette    = loadImage('/static/img/catalog/burette.png');
+  imgPipette    = loadImage('/static/img/catalog/pipette.png');
+  imgConical    = loadImage('/static/img/catalog/conical_flask.png');
+  imgVolumetric = loadImage('/static/img/catalog/volumetric_flask.png');
+  imgFunnel     = loadImage('/static/img/catalog/funnel.png');
+  imgWash       = loadImage('/static/img/catalog/wash_bottle.png');
+  imgBunsen     = loadImage('/static/img/catalog/bunsen_burner.png');
 }
+
+// --- SETUP ---
 
 function setup() {
-  let canvas = createCanvas(900, 500);
+  let canvas = createCanvas(900, 1000);
   canvas.parent('simulation-canvas');
 
-  shelf = { x: 20, y: 60, w: 300, h: 350 };
-  bench = { x: 300,  y: 260, w: 600, h: 340 };
+  // shelf moved right to leave space for catalog
+  shelf = { x: 260, y: 60, w: 300, h: 350 };
+  bench = { x: 360, y: 260, w: 520, h: 340 };
 
-  // define vessel objects with sprite, capacity, etc.
-  vessels.beaker = makeVessel(
-    'beaker',
-    500, 325,                  // start on bench
-    120, 140,
-    '250 mL Beaker (Unknown Acid)',
-    'Beaker with 25 mL HCl',
-    'beaker',                  // type
-    25, 250
-  );
-
-  vessels.burette = makeVessel(
-    'burette',
-    720, 190,
-    200, 360,
-    '50 mL Burette',
-    '0.1 M NaOH',
-    'burette',
-    50, 50
-  );
-
-  vessels.pipette = makeVessel(
-    'pipette',
-    260, 220,
-    300, 130,
-    '25 mL Pipette',
-    'HCl Pipette',
-    'pipette',
-    25, 25
-  );
-
-  vessels.bottle = makeVessel(
-    'bottle',
-    260, 330,
-    120, 100,
-    'Stock Bottle',
-    'HCl Stock',
-    'bottle',
-    100, 100
-  );
-
-  // initial liquid volumes
-  beakerTargetVol = 25;           // 25 mL acid
-  pipetteTargetVol = 0;           // pipette empty visually
-  buretteTargetVol = 50;
-  vessels.beaker.volume = 25;
-  vessels.pipette.volume = 0;
-  vessels.burette.volume = 50;
-
+  vessels = {};
   studentVolume = 0;
   phStage = 0;
+
+  beakerTargetVol  = 0;
+  pipetteTargetVol = 0;
+  buretteTargetVol = 0;
+
+  const catalogConfig = {
+    visible_apparatus: [
+      'beaker',
+      'conical_flask',
+      'volumetric_flask',
+      'pipette',
+      'burette',
+      'bottle',
+      'funnel',
+      'wash_bottle',
+      'bunsen_burner'
+    ]
+  };
+
+  catalog = new LabCatalog(catalogConfig);
+  catalog.initSprites({
+    beaker:           imgBeaker,
+    pipette:          imgPipette,
+    bottle:           imgBottle,
+    burette:          imgBurette,
+    conical_flask:    imgConical,
+    volumetric_flask: imgVolumetric,
+    funnel:           imgFunnel,
+    wash_bottle:      imgWash,
+    bunsen_burner:    imgBunsen
+  });
 }
+
+// --- HELPERS: CAPACITY / CHEMICAL ---
+
+function askCapacity(type) {
+  let options;
+  if (type === 'beaker')              options = [50, 100, 250, 500];
+  else if (type === 'pipette')       options = [10, 25];
+  else if (type === 'burette')       options = [25, 50];
+  else if (type === 'volumetric_flask') options = [100, 250, 500];
+  else return null;
+
+  const input = window.prompt(`Choose ${type} capacity (mL): ` + options.join(', '));
+  if (input === null) return null;
+  const value = parseFloat(input);
+  if (!options.includes(value)) return null;
+  return value;
+}
+
+function askChemical(kind) {
+  const list = CHEMICALS[kind];
+  if (!list || !list.length) return null;
+
+  const text = list.map((c, i) => `${i + 1}. ${c.label}`).join('\n');
+  const choice = window.prompt(`Choose a ${kind}:\n${text}`);
+  if (choice === null) return null;
+  const idx = parseInt(choice, 10) - 1;
+  if (idx < 0 || idx >= list.length) return null;
+  return list[idx];
+}
+
+// --- VESSEL MODEL ---
 
 function makeVessel(id, x, y, w, h, title, chem, vtype, vol, cap) {
   return {
@@ -101,32 +145,34 @@ function makeVessel(id, x, y, w, h, title, chem, vtype, vol, cap) {
     type: vtype,
     volume: vol,
     capacity: cap,
-    dragging: false
+    dragging: false,
+    isUnderBurette: false,
+    chemicalId: null
   };
 }
+
+// --- MAIN DRAW LOOP ---
 
 function draw() {
   background(240, 242, 248);
 
   drawEnvironment();
   easeVolumes();
-
   handleInteraction();
 
-  // draw in order: shelf, bench layer behind, then vessels
   drawShelfAndBench();
 
   hoverVessel = null;
-  drawVessel(vessels.bottle);
-  drawVessel(vessels.beaker);
-  drawVessel(vessels.burette);
-  drawVessel(vessels.pipette);
+  Object.values(vessels).forEach(v => drawVessel(v));
 
   if (hoverVessel) drawTooltip(hoverVessel);
+
+  if (catalogVisible) drawCatalogPanel();
+
   drawDataPanel();
 }
 
-// --------- DRAWING FUNCTIONS ----------
+// --- DRAWING ---
 
 function drawEnvironment() {
   noStroke();
@@ -135,19 +181,17 @@ function drawEnvironment() {
 }
 
 function drawShelfAndBench() {
-  // shelf
   imageMode(CORNER);
   image(imgShelf, shelf.x, shelf.y, shelf.w, shelf.h);
-
-  // bench (at bottom)
   image(imgBench, bench.x, bench.y, bench.w, bench.h);
 
-  // soft shadows on bench
   fill(0, 0, 0, 35);
   noStroke();
-  ellipse(vessels.beaker.x, bench.y + 10, 90, 12);
-  ellipse(vessels.bottle.x, bench.y + 10, 80, 12);
-  ellipse(vessels.burette.x, bench.y + 10, 70, 12);
+  Object.values(vessels).forEach(v => {
+    if (v.y > bench.y - 40) {
+      ellipse(v.x, bench.y + 10, 70, 10);
+    }
+  });
 }
 
 function drawVessel(v) {
@@ -161,37 +205,39 @@ function drawVessel(v) {
   imageMode(CENTER);
 
   if (v.type === 'beaker') {
-    let img = imgBeakerEmpty;
-    if (v.volume > 0 && phStage === 0) img = imgBeakerHcl;
-    else if (phStage === 1) img = imgBeakerLight;
-    else if (phStage === 2) img = imgBeakerHeavy;
-    image(img, 0, 0, v.w, v.h);
+    image(imgBeaker, 0, 0, v.w, v.h);
   } else if (v.type === 'burette') {
     image(imgBurette, 0, 0, v.w, v.h);
-    // overlay liquid level in tube: simple blue rect
-    let tubeTop = -v.h/2 + 80;
-    let tubeBottom = v.h/2 - 120;
-    let tubeH = tubeBottom - tubeTop;
-    let frac = constrain(v.volume / v.capacity, 0, 1);
+    let tubeTop    = -v.h/2 + 80;
+    let tubeBottom =  v.h/2 - 120;
+    let frac   = constrain(v.volume / v.capacity, 0, 1);
     let liqTop = lerp(tubeTop, tubeBottom, 1 - frac);
     noStroke();
     fill(70, 150, 240, 200);
     rect(-v.w * 0.03, liqTop, v.w * 0.05, tubeBottom - liqTop);
   } else if (v.type === 'pipette') {
     image(imgPipette, 0, 0, v.w, v.h);
-    let tubeTop = -v.h/2 + 100;
-    let tubeBottom = v.h/2 - 120;
-    let tubeH = tubeBottom - tubeTop;
-    let frac = constrain(v.volume / v.capacity, 0, 1);
-    let liqTop = lerp(tubeTop, tubeBottom, 1 - frac);
-    noStroke();
-    fill(70, 150, 240, 200);
-    rect(-v.w * 0.02, liqTop, v.w * 0.04, tubeBottom - liqTop);
   } else if (v.type === 'bottle') {
     image(imgBottle, 0, 0, v.w, v.h);
+    push();
+    textAlign(CENTER, CENTER);
+    textSize(11);
+    fill(0);
+    let labelY = -5;
+    text(v.chem, 0, labelY);
+    pop();
+  } else if (v.type === 'conical_flask') {
+    image(imgConical, 0, 0, v.w, v.h);
+  } else if (v.type === 'volumetric_flask') {
+    image(imgVolumetric, 0, 0, v.w, v.h);
+  } else if (v.type === 'funnel') {
+    image(imgFunnel, 0, 0, v.w, v.h);
+  } else if (v.type === 'wash_bottle') {
+    image(imgWash, 0, 0, v.w, v.h);
+  } else if (v.type === 'bunsen_burner') {
+    image(imgBunsen, 0, 0, v.w, v.h);
   }
 
-  // draw title below
   textAlign(CENTER);
   textSize(11);
   fill(30);
@@ -222,105 +268,185 @@ function drawTooltip(v) {
 }
 
 function drawDataPanel() {
-  // instructions panel on left
-  fill(255, 255, 255, 235);
-  stroke(210);
-  rect(30, 30, 280, 130, 12);
-  noStroke(); fill(0);
-  textAlign(LEFT);
-  textSize(16); textStyle(BOLD);
-  text('Titration Procedure', 45, 55);
-  textStyle(NORMAL); textSize(13);
-  text('1. Drag pipette near beaker to fill.', 45, 82);
-  text('2. Drag burette tip over beaker mouth.', 45, 102);
-  text('3. Release to titrate until pink.', 45, 122);
+  const panelW = 220;
+  const panelH = 150;
+  const margin = 40;
+  const panelX = width - panelW - margin;
 
-  // live data on right
   fill(255, 255, 255, 235);
   stroke(210);
-  rect(width - 230, 30, 200, 140, 12);
-  noStroke(); fill(0);
+  rect(panelX, 30, panelW, panelH, 12);
+
+  noStroke();
+  fill(0);
   textAlign(LEFT);
-  textSize(15); textStyle(BOLD);
-  text('Live Data', width - 215, 55);
-  textStyle(NORMAL); textSize(13);
-  text('Base added: ' + nf(studentVolume, 1, 2) + ' mL', width - 215, 80);
+  textSize(15);
+  textStyle(BOLD);
+  text('Live Data', panelX + 15, 55);
+
+  textStyle(NORMAL);
+  textSize(13);
+  text('Base added: ' + nf(studentVolume, 1, 2) + ' mL', panelX + 15, 80);
 
   if (studentVolume > 0) {
     let diff = abs(studentVolume - 25.0);
     if (diff < 0.25) {
       fill(0, 150, 0);
-      text('Perfect endpoint ✔', width - 215, 105);
+      text('Perfect endpoint ✔', panelX + 15, 105);
       phStage = 2;
     } else if (studentVolume > 26) {
       fill(200, 0, 0);
-      text('Overshot endpoint ✖', width - 215, 105);
+      text('Overshot endpoint ✖', panelX + 15, 105);
       phStage = 2;
     } else {
       fill(120, 120, 0);
-      text('Approaching endpoint…', width - 215, 105);
+      text('Approaching endpoint…', panelX + 15, 105);
       phStage = 1;
     }
   } else {
     phStage = 0;
   }
+
+  let btnX = 40;
+  let btnY = height - 50;
+  let btnW = 200;
+  let btnH = 32;
+
+  fill(255, 255, 255, 235);
+  stroke(180);
+  rect(btnX, btnY, btnW, btnH, 8);
+  noStroke();
+  fill(0);
+  textAlign(CENTER, CENTER);
+  textSize(13);
+  text(catalogVisible ? 'Hide Apparatus Catalog' : 'Show Apparatus Catalog',
+       btnX + btnW / 2, btnY + btnH / 2);
+
+  catalogToggleButton = { x: btnX, y: btnY, w: btnW, h: btnH };
 }
 
-// --------- EASING VOLUMES ---------
+// --- CATALOG PANEL (NO SCROLL) ---
+
+function drawCatalogPanel() {
+  // single panel left of shelf
+  const panelX = 20;
+  const panelY = 30;
+  const panelW = shelf.x - 40;   // space between left edge and shelf
+  const panelH = height - 80;
+
+  catalogPanelBounds = { x: panelX, y: panelY, w: panelW, h: panelH };
+
+  // outer white panel
+  fill(255, 255, 255, 235);
+  stroke(170);
+  rect(panelX, panelY, panelW, panelH, 10);
+
+  // heading text
+  noStroke();
+  fill(0);
+  textAlign(LEFT);
+  textSize(15);
+  textStyle(BOLD);
+  text('Apparatus Catalog', panelX + 12, panelY + 24);
+
+  // let LabCatalog draw ONLY the list, no extra card
+  const innerY = panelY + 40;          // list starts just under heading
+  catalog.drawPanel(
+    panelX,        // x = left edge of panel
+    innerY,        // y = where list should start
+    panelW,        // use full width
+    panelH - 50    // height for list
+  );
+}
+
+
+
+
+// --- EASING ---
 
 function easeVolumes() {
-  vessels.beaker.volume += (beakerTargetVol - vessels.beaker.volume) * 0.2;
-  vessels.burette.volume += (buretteTargetVol - vessels.burette.volume) * 0.2;
-  vessels.pipette.volume += (pipetteTargetVol - vessels.pipette.volume) * 0.2;
+  Object.values(vessels).forEach(v => {
+    if (v.type === 'beaker') {
+      v.volume += (beakerTargetVol - v.volume) * 0.2;
+    } else if (v.type === 'burette') {
+      v.volume += (buretteTargetVol - v.volume) * 0.2;
+    } else if (v.type === 'pipette') {
+      v.volume += (pipetteTargetVol - v.volume) * 0.2;
+    }
+  });
 }
 
-// --------- INTERACTION / PHYSICS ---------
+// --- INTERACTION / PHYSICS ---
 
 function handleInteraction() {
   if (!isDragging) return;
 
-  // pipette over bottle -> fill pipette
-  if (isDragging.id === 'pipette') {
-    if (near(isDragging, vessels.bottle, 40)) {
+  if (isDragging.type === 'pipette') {
+    const bottle = Object.values(vessels).find(v => v.type === 'bottle');
+    const beaker = Object.values(vessels).find(v => v.type === 'beaker');
+    if (bottle && near(isDragging, bottle, 40)) {
       let step = 0.8;
-      if (vessels.bottle.volume >= step && pipetteTargetVol < vessels.pipette.capacity) {
-        vessels.bottle.volume -= step;
-        pipetteTargetVol = min(vessels.pipette.capacity, pipetteTargetVol + step);
+      if (bottle.volume >= step && pipetteTargetVol < isDragging.capacity) {
+        bottle.volume -= step;
+        pipetteTargetVol = min(isDragging.capacity, pipetteTargetVol + step);
       }
     }
-    // pipette over beaker -> pour HCl
-    if (near(isDragging, vessels.beaker, 40)) {
+    if (beaker && near(isDragging, beaker, 40)) {
       let step = 0.8;
-      if (pipetteTargetVol >= step && beakerTargetVol < vessels.beaker.capacity) {
+      if (pipetteTargetVol >= step && beakerTargetVol < beaker.capacity) {
         pipetteTargetVol = max(0, pipetteTargetVol - step);
-        beakerTargetVol = min(vessels.beaker.capacity, beakerTargetVol + step);
+        beakerTargetVol  = min(beaker.capacity, beakerTargetVol + step);
       }
     }
   }
-
-  // burette over beaker -> titrate NaOH
-  
 }
 
 function near(a, b, radius) {
+  if (!a || !b) return false;
   return dist(a.x, a.y, b.x, b.y) < radius;
 }
 
-function buretteTipOverBeaker() {
-  let tipX = vessels.burette.x;
-  let tipY = vessels.burette.y + vessels.burette.h/2 - 10;
-  return (abs(tipX - vessels.beaker.x) < 35 &&
-          tipY < vessels.beaker.y &&
-          tipY > vessels.beaker.y - vessels.beaker.h/2);
-}
-
-// --------- EVENTS ---------
+// --- EVENTS ---
 
 function mousePressed() {
-  // choose vessel to drag (topmost first)
-  let order = ['pipette', 'burette', 'beaker', 'bottle'];
-  for (let id of order) {
-    let v = vessels[id];
+  // toggle button
+  if (catalogToggleButton) {
+    const b = catalogToggleButton;
+    if (mouseX > b.x && mouseX < b.x + b.w &&
+        mouseY > b.y && mouseY < b.y + b.h) {
+      catalogVisible = !catalogVisible;
+      return;
+    }
+  }
+
+  // catalogue click
+  // --- FIXED CATALOGUE CLICK ---
+// --- FIXED CATALOGUE CLICK LOGIC ---
+if (catalogVisible && catalogPanelBounds &&
+    mouseX > catalogPanelBounds.x && mouseX < catalogPanelBounds.x + catalogPanelBounds.w &&
+    mouseY > catalogPanelBounds.y && mouseY < catalogPanelBounds.y + catalogPanelBounds.h) {
+
+  // The 'Apparatus Catalog' title and padding take up about 40-50 pixels 
+  // before the actual interactive buttons start.
+  const listHeaderOffset = 100; 
+  
+  // Calculate the click position relative ONLY to the start of the item list
+  const localX = mouseX - catalogPanelBounds.x;
+  const localY = mouseY - (catalogPanelBounds.y + listHeaderOffset);
+
+  // Use these local coordinates to determine which item was clicked
+  const item = catalog.handleClick(localX, localY); 
+  
+  if (item) {
+    spawnApparatusFromCatalog(item);
+    return; // Stop further processing once an item is spawned
+  }
+}
+
+  // drag-existing vessels (unchanged)
+  const ids = Object.keys(vessels);
+  for (let i = ids.length - 1; i >= 0; i--) {
+    const v = vessels[ids[i]];
     if (mouseX > v.x - v.w/2 && mouseX < v.x + v.w/2 &&
         mouseY > v.y - v.h/2 && mouseY < v.y + v.h/2) {
       v.dragging = true;
@@ -329,6 +455,8 @@ function mousePressed() {
     }
   }
 }
+
+
 
 function mouseDragged() {
   if (isDragging) {
@@ -339,82 +467,110 @@ function mouseDragged() {
 
 function mouseReleased() {
   if (isDragging) {
-    // snap to nearest slot on bench or shelf
     snapToZones(isDragging);
     isDragging.dragging = false;
     isDragging = null;
   }
 }
 
-function snapToZones(v) {
-  // Fixed burette position on right side of bench
-  const BURETTE_X = 220;
-  const BURETTE_Y = 190;
+// no mouseWheel handler – scrolling disabled
 
-  // Bench work positions
-  const benchY = bench.y - 35;       // general bench height
-  const bottlePos  = { x: 260, y: benchY };
-  const pipettePos = { x: 360, y: benchY - 40 };
-  const beakerPos  = { x: 500, y: benchY };
+function mouseClicked() {
+  if (mouseButton === RIGHT && hoverVessel) {
+    delete vessels[hoverVessel.id];
+    hoverVessel = null;
+  }
+}
 
-  // Special slot: beaker directly under burette stand
-  const beakerUnderBurette = { x: BURETTE_X - 40, y: benchY + 10 };
-
-  // 1) Burette: always snap back to its fixed stand
-  if (v.id === 'burette') {
-    v.x = BURETTE_X;
-    v.y = BURETTE_Y;
-    v.snapX = v.x;
-    v.snapY = v.y;
-    return;
+function keyPressed() {
+  if (key === 'r' || key === 'R') {
+    if (hoverVessel) {
+      delete vessels[hoverVessel.id];
+      hoverVessel = null;
+      return;
+    }
   }
 
-  // 2) For other vessels – check shelf first
+  if (key === ' ' || keyCode === 32) {
+    const beaker = Object.values(vessels).find(v => v.type === 'beaker');
+    const burette = Object.values(vessels).find(v => v.type === 'burette');
+    if (!beaker || !burette) return;
+
+    const benchY = bench.y - 35;
+    const under =
+      Math.abs(beaker.x - (burette.x - 40)) < 10 &&
+      Math.abs(beaker.y - (benchY + 10)) < 15;
+
+    if (!under && !beaker.isUnderBurette) {
+      console.log('Place the beaker under the burette, then press SPACE to titrate.');
+      return;
+    }
+
+    let flow = keyIsDown(SHIFT) ? 0.8 : 0.25;
+    if (buretteTargetVol >= flow && beakerTargetVol < beaker.capacity) {
+      buretteTargetVol = max(0, buretteTargetVol - flow);
+      beakerTargetVol  = min(beaker.capacity, beakerTargetVol + flow);
+      studentVolume   += flow;
+    }
+  }
+}
+
+// --- SNAP TO SHELF / BENCH ---
+
+function snapToZones(v) {
+  const benchY = bench.y - 35;
+  const shelfCenterX = shelf.x + shelf.w / 2;
+
+  const BURETTE_X = bench.x + bench.w - 120;
+  const BURETTE_Y = 190;
+  const beakerUnderBurette = { x: BURETTE_X - 40, y: benchY + 10 };
+
   const inShelf =
     mouseX > shelf.x && mouseX < shelf.x + shelf.w &&
     mouseY > shelf.y && mouseY < shelf.y + shelf.h + 40;
 
-  if (inShelf) {
-    const shelfCenterX = shelf.x + shelf.w / 2;
+  if (v.type === 'burette') {
+    v.x = BURETTE_X;
+    v.y = BURETTE_Y;
+  } else if (inShelf) {
     const topY    = shelf.y + 60;
     const midY    = shelf.y + shelf.h / 2;
     const bottomY = shelf.y + shelf.h - 60;
 
-    if (v.id === 'bottle') {
+    if (v.type === 'bottle') {
       v.x = shelfCenterX;
       v.y = topY;
-    } else if (v.id === 'pipette') {
+    } else if (v.type === 'pipette') {
       v.x = shelfCenterX;
       v.y = midY;
-    } else if (v.id === 'beaker') {
+    } else {
       v.x = shelfCenterX;
       v.y = bottomY;
+      if (v.type === 'beaker') v.isUnderBurette = false;
     }
-
   } else {
-    // 3) Not on shelf → bench logic
-
-    if (v.id === 'bottle') {
-      v.x = bottlePos.x;
-      v.y = bottlePos.y;
-    } else if (v.id === 'pipette') {
-      v.x = pipettePos.x;
-      v.y = pipettePos.y;
-    } else if (v.id === 'beaker') {
-      // If released near the burette stand → snap under burette
+    if (v.type === 'bottle') {
+      v.x = bench.x + 80;
+      v.y = benchY;
+    } else if (v.type === 'pipette') {
+      v.x = bench.x + 160;
+      v.y = benchY - 40;
+    } else if (v.type === 'beaker') {
       const dx = mouseX - beakerUnderBurette.x;
       const dy = mouseY - beakerUnderBurette.y;
       const distToStand = Math.sqrt(dx * dx + dy * dy);
-
       if (distToStand < 80) {
         v.x = beakerUnderBurette.x;
         v.y = beakerUnderBurette.y;
         v.isUnderBurette = true;
       } else {
-        v.x = beakerPos.x;
-        v.y = beakerPos.y;
+        v.x = bench.x + 260;
+        v.y = benchY;
         v.isUnderBurette = false;
       }
+    } else {
+      v.x = bench.x + 260;
+      v.y = benchY;
     }
   }
 
@@ -422,46 +578,165 @@ function snapToZones(v) {
   v.snapY = v.y;
 }
 
-function keyPressed() {
-  // SPACE bar = titrate, only if beaker is under burette stand
-  if (key === ' ' || keyCode === 32) {
-    const beaker = vessels.beaker;
-    const burette = vessels.burette;
+// --- SPAWN FROM CATALOG ---
 
-    // optional safety: check position instead of flag
-    const under =
-      Math.abs(beaker.x - (burette.x - 40)) < 10 &&
-      Math.abs(beaker.y - (bench.y - 35 + 10)) < 15;
+let idCounter = 0;
+function nextId(type) {
+  idCounter += 1;
+  return `${type}_${idCounter}`;
+}
 
-    if (!under && !beaker.isUnderBurette) {
-      // not in correct position – optionally show hint
-      console.log('Place the beaker under the burette, then press SPACE to titrate.');
-      return;
-    }
+function spawnApparatusFromCatalog(item) {
+  const type = item.id || item.type;
+  if (!type) return;
 
-    // perform one titration "step"
-    let flow = keyIsDown(SHIFT) ? 0.8 : 0.25;
+  if (type === 'burette' || type === 'bunsen_burner') {
+    if (Object.values(vessels).some(v => v.type === type)) return;
+  }
 
-    if (buretteTargetVol >= flow && beakerTargetVol < beaker.capacity) {
-      buretteTargetVol = max(0, buretteTargetVol - flow);
-      beakerTargetVol  = min(beaker.capacity, beakerTargetVol + flow);
-      studentVolume    += flow;
-    }
+  let v = null;
+
+  if (type === 'beaker') {
+    const cap = askCapacity('beaker');
+    if (!cap) return;
+    v = makeVessel(
+      nextId('beaker'),
+      shelf.x + shelf.w / 2,
+      shelf.y + shelf.h - 60,
+      120, 140,
+      `${cap} mL Beaker`,
+      'Empty',
+      'beaker',
+      0, cap
+    );
+    beakerTargetVol = 0;
+
+  } else if (type === 'pipette') {
+    const cap = askCapacity('pipette');
+    if (!cap) return;
+    v = makeVessel(
+      nextId('pipette'),
+      shelf.x + shelf.w / 2,
+      shelf.y + shelf.h / 2,
+      300, 130,
+      `${cap} mL Pipette`,
+      'Empty',
+      'pipette',
+      0, cap
+    );
+    pipetteTargetVol = 0;
+
+  } else if (type === 'burette') {
+    const cap = askCapacity('burette');
+    if (!cap) return;
+    v = makeVessel(
+      nextId('burette'),
+      bench.x + bench.w - 120,
+      190,
+      200, 360,
+      `${cap} mL Burette`,
+      '0.1 M NaOH',
+      'burette',
+      cap, cap
+    );
+    buretteTargetVol = cap;
+
+  } else if (type === 'volumetric_flask') {
+    const cap = askCapacity('volumetric_flask');
+    if (!cap) return;
+    v = makeVessel(
+      nextId('volumetric_flask'),
+      shelf.x + shelf.w / 2,
+      shelf.y + shelf.h - 60,
+      120, 160,
+      `${cap} mL Volumetric Flask`,
+      'Empty',
+      'volumetric_flask',
+      0, cap
+    );
+
+  } else if (type === 'conical_flask') {
+    v = makeVessel(
+      nextId('conical_flask'),
+      shelf.x + shelf.w / 2,
+      shelf.y + shelf.h - 60,
+      120, 150,
+      'Conical Flask',
+      'Empty',
+      'conical_flask',
+      0, 250
+    );
+
+  } else if (type === 'bottle') {
+    const chem = askChemical('acid');
+    if (!chem) return;
+    v = makeVessel(
+      nextId('bottle'),
+      shelf.x + shelf.w / 2,
+      shelf.y + 60,
+      120, 100,
+      'Reagent Bottle',
+      chem.label,
+      'bottle',
+      100, 100
+    );
+    v.chemicalId = chem.id;
+
+  } else if (type === 'funnel') {
+    v = makeVessel(
+      nextId('funnel'),
+      shelf.x + shelf.w / 2,
+      shelf.y + shelf.h / 2,
+      80, 80,
+      'Funnel',
+      '',
+      'funnel',
+      0, 0
+    );
+
+  } else if (type === 'wash_bottle') {
+    v = makeVessel(
+      nextId('wash_bottle'),
+      shelf.x + shelf.w / 2,
+      shelf.y + shelf.h / 2,
+      100, 120,
+      'Wash Bottle',
+      'Distilled Water',
+      'wash_bottle',
+      0, 250
+    );
+
+  } else if (type === 'bunsen_burner') {
+    v = makeVessel(
+      nextId('bunsen_burner'),
+      bench.x + 80,
+      bench.y - 20,
+      80, 120,
+      'Bunsen Burner',
+      '',
+      'bunsen_burner',
+      0, 0
+    );
+  }
+
+  if (v) {
+    vessels[v.id] = v;
   }
 }
 
-
+// --- RESET ---
 
 function resetExperiment() {
-  studentVolume = 0;
-  beakerTargetVol = 25;
+  studentVolume    = 0;
+  beakerTargetVol  = 0;
   pipetteTargetVol = 0;
-  buretteTargetVol = 50;
+  buretteTargetVol = 0;
 
-  vessels.beaker.volume = 25;
-  vessels.burette.volume = 50;
-  vessels.pipette.volume = 0;
-  vessels.bottle.volume = 100;
+  Object.values(vessels).forEach(v => {
+    if (v.type === 'beaker' || v.type === 'pipette') v.volume = 0;
+    if (v.type === 'burette') v.volume = v.capacity;
+    if (v.type === 'bottle')  v.volume = 100;
+  });
 
   phStage = 0;
 }
