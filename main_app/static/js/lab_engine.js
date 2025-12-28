@@ -60,12 +60,16 @@ function preload() {
 // --- SETUP ---
 
 function setup() {
-  let canvas = createCanvas(900, 1000);
+  const root = document.getElementById('simulation-canvas');
+  const w = root ? root.clientWidth : window.innerWidth;
+  const h = root ? root.clientHeight : window.innerHeight - 48; // minus header
+
+  let canvas = createCanvas(w, h);
   canvas.parent('simulation-canvas');
 
-  // shelf moved right to leave space for catalog
+  // recompute shelf/bench positions based on width/height
   shelf = { x: 260, y: 60, w: 300, h: 350 };
-  bench = { x: 360, y: 260, w: 520, h: 340 };
+  bench = { x: width * 0.4, y: height * 0.45, w: width * 0.55, h: height * 0.4 };
 
   vessels = {};
   studentVolume = 0;
@@ -101,6 +105,16 @@ function setup() {
     wash_bottle:      imgWash,
     bunsen_burner:    imgBunsen
   });
+}
+
+function windowResized() {
+  const root = document.getElementById('simulation-canvas');
+  const w = root ? root.clientWidth : window.innerWidth;
+  const h = root ? root.clientHeight : window.innerHeight - 48;
+  resizeCanvas(w, h);
+
+  // recompute positions if needed
+  bench = { x: width * 0.4, y: height * 0.45, w: width * 0.55, h: height * 0.4 };
 }
 
 // --- HELPERS: CAPACITY / CHEMICAL ---
