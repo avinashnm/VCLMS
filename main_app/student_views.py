@@ -752,6 +752,11 @@ def submit_experiment(request):
 #virtualLab view
 def student_lab_home(request):
     experiments = [
+            {
+        "title": "Na₂CO₃–NaHCO₃ Double Indicator",
+        "slug": "double-indicator",
+        "objective": "Estimate sodium carbonate and bicarbonate in a mixture using phenolphthalein and methyl orange.",
+            },
         {
             "slug": "rast-method",
             "title": "Rast Method",
