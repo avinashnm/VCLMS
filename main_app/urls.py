@@ -155,15 +155,11 @@ path('student/watch/<int:course_id>/', student_views.watch_video, name='watch_vi
      path('study_materials_views/', hod_views.study_materials_views, name='study_materials_views'),
     path('study_materials/<int:pk>/download/', hod_views.study_material_download, name='study_material_download'),
     
-    #virtualLab url
-     path("student/lab/", student_views.student_lab_home, name="student_lab_home"),
 
-    #experiments url
-    path("student/lab/<slug:slug>/", student_views.lab_experiment, name="lab_experiment"),
-    path("student/lab/rast-method/", student_views.lab_rast_method, name="lab_rast_method"),
-    
-    #p5.js - titration exp url
-path('student/lab/titration-experiment/', views.student_lab_titration, name='student_lab_titration'),
+    #virtual lab urls
+     path("student/lab/", student_views.student_lab_home, name="student_lab_home"),
+     path("student/lab/<slug:slug>/", student_views.lab_experiment_info, name="lab_experiment"),
+     path("student/lab/<slug:slug>/simulate/", student_views.lab_experiment_simulation, name="lab_experiment_simulation"),
 
     
     #quiz urls

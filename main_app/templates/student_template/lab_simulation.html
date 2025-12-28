@@ -1,0 +1,85 @@
+{% extends 'main_app/base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+  body {
+    overflow: hidden;
+  }
+
+  /* Hide the whole left sidebar/profile area for this page */
+  /* Adjust selectors to your base.html structure */
+  #sidebar,
+  .sidebar,
+  .sidebar-wrapper,
+  .main-sidebar,
+  .app-sidebar,          /* fallback names, one of these will match */
+  .page-sidebar {
+    display: none !important;
+  }
+
+  /* Ensure main content spans full width */
+  .content-wrapper,
+  .main-panel,
+  .page-content,
+  #content {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  .lab-root {
+    position: fixed;
+    inset: 0;
+    background: #f4f5fb;
+    z-index: 999;              /* above sidebar */
+    display: flex;
+    flex-direction: column;
+  }
+
+  .lab-header {
+    flex: 0 0 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 20px;
+    background: #ffffff;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .lab-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .lab-main {
+    position: relative;
+    flex: 1 1 auto;
+  }
+
+  #simulation-canvas {
+    position: absolute;
+    inset: 0;
+  }
+</style>
+
+<div class="lab-root">
+  <div class="lab-header">
+    <h2 class="lab-title">{{ experiment.name }}</h2>
+    <a href="{% url 'lab_experiment' slug %}" class="btn btn-outline-secondary btn-sm">
+      ← Back to Info
+    </a>
+  </div>
+
+  <div class="lab-main">
+    <!-- p5.js will mount the canvas here; slug tells JS which experiment -->
+    <div id="simulation-canvas"
+         data-experiment-slug="{{ slug }}">
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/p5.min.js' %}"></script>
+<script src="{% static 'js/lab_catalog.js' %}"></script>
+<script src="{% static 'js/lab_engine.js' %}"></script>
+{% endblock %}

@@ -752,6 +752,11 @@ def submit_experiment(request):
 #virtualLab view
 def student_lab_home(request):
     experiments = [
+            {
+        "title": "Na₂CO₃–NaHCO₃ Double Indicator",
+        "slug": "double-indicator",
+        "objective": "Estimate sodium carbonate and bicarbonate in a mixture using phenolphthalein and methyl orange.",
+            },
         {
             "slug": "rast-method",
             "title": "Rast Method",
@@ -792,30 +797,103 @@ def lab_rast_method(request):
     }
     return render(request, "student_template/lab_rast_method.html", context)
 
-def lab_experiment(request, slug):
-    # Titration experiment
-    if slug == 'titration':
-        experiment = {
-            'name': 'Acid-Base Titration',
-            'materials': ['50ml burette (0.1M NaOH)', '100ml beaker', '25ml 0.1M HCl', 'Phenolphthalein'],
-            'procedure': [
-                'Pipette 25ml 0.1M HCl into beaker',
-                'Add 2 drops phenolphthalein indicator',
-                'Fill burette with 0.1M NaOH',
-                'Titrate until pink endpoint (~25ml)'
+# shows description/materials/procedure for any experiment
+def lab_experiment_info(request, slug):
+    experiment_map = {
+        "double-indicator": {
+            "name": "Estimation of Na₂CO₃ and NaHCO₃ in a Mixture",
+            "objective": "Estimate sodium carbonate and bicarbonate using double indicator method.",
+            "principle": (
+                "The mixture of Na₂CO₃ and NaHCO₃ is titrated with standard HCl. "
+                "Phenolphthalein gives the volume required to convert CO₃²⁻ to HCO₃⁻ (V₁). "
+                "Methyl orange gives the total neutralisation volume (V₂)."
+            ),
+            "materials": [
+                "Standard N/10 HCl in burette",
+                "Mixture solution (Na₂CO₃ + NaHCO₃)",
+                "20 mL pipette",
+                "Conical flask",
+                "Phenolphthalein indicator",
+                "Methyl orange indicator",
             ],
-            'expected_volume': 25.0
-        }
-        return render(request, 'student_template/lab_titration.html', {'experiment': experiment})
-    
-    # Existing experiment template map
-    template_map = {
-        'experiment-2': 'student_template/lab_experiment2.html',
-        'experiment-3': 'student_template/lab_experiment3.html',
-        'rast-method': 'student_template/lab_rast_method.html'
+            "procedure": [
+                "Rinse burette with N/10 HCl and fill it. Remove air bubbles.",
+                "Pipette 20 mL of the given mixture into a clean conical flask.",
+                "Add 2–3 drops of phenolphthalein; solution appears pink.",
+                "Titrate with HCl until the pink colour just disappears (phenolphthalein end point, V₁).",
+                "To the same solution add 2–3 drops of methyl orange; solution becomes yellow.",
+                "Continue titration until the colour changes from yellow to orange/red (methyl orange end point, V₂).",
+                "Repeat titration to obtain concordant readings.",
+            ],
+        },
+        "titration": {
+            "name": "Acid-Base Titration",
+            "objective": "Determine unknown acid concentration using NaOH titration.",
+            "principle": "Standard NaOH is titrated against HCl using phenolphthalein as indicator.",
+            "materials": [
+                "0.1 M NaOH in burette",
+                "0.1 M HCl in beaker",
+                "Pipette",
+                "Phenolphthalein indicator",
+            ],
+            "procedure": [
+                "Pipette 25 mL of HCl into a beaker.",
+                "Add 2–3 drops phenolphthalein.",
+                "Fill burette with 0.1 M NaOH.",
+                "Titrate until the first permanent pink colour appears.",
+            ],
+        },
+        # add entries for other experiments as needed
     }
-    
-    template = template_map.get(slug)
-    if not template:
+
+    experiment = experiment_map.get(slug)
+    if not experiment:
         raise Http404()
-    return render(request, template, {"slug": slug})
+
+    return render(
+        request,
+        "student_template/lab_experiment_info.html",
+        {"experiment": experiment, "slug": slug},
+    )
+
+
+def lab_experiment_simulation(request, slug):
+    # Per‑experiment configuration (can move to DB later)
+    experiment_map = {
+        "double-indicator": {
+            "name": "Estimation of Na₂CO₃ and NaHCO₃ in a Mixture",
+            "objective": "Estimate sodium carbonate and bicarbonate using double indicator method.",
+            "type": "double_indicator",
+        },
+        "titration": {
+            "name": "Acid-Base Titration",
+            "objective": "Determine unknown acid concentration using NaOH titration.",
+            "type": "simple_titration",
+        },
+        "experiment-2": {
+            "name": "Experiment 2",
+            "objective": "Placeholder objective for experiment 2.",
+            "type": "placeholder",
+        },
+        "experiment-3": {
+            "name": "Experiment 3",
+            "objective": "Placeholder objective for experiment 3.",
+            "type": "placeholder",
+        },
+        "rast-method": {
+            "name": "Rast Method",
+            "objective": "Determine molecular weight of a solute from freezing-point depression.",
+            "type": "rast",
+        },
+    }
+
+    experiment = experiment_map.get(slug)
+    if not experiment:
+        raise Http404()
+
+    context = {
+        "slug": slug,          # needed by JS
+        "experiment": experiment,
+    }
+    return render(request, "student_template/lab_simulation.html", context)
+
