@@ -1,4 +1,6 @@
-// --- GLOBAL STATE ---
+// ======================================================
+// GLOBAL STATE
+// ======================================================
 let imgLabBg;
 let vessels = {};
 let isDragging = null;
@@ -13,6 +15,7 @@ let buretteTargetVol = 0;
 let catalog;
 let imgBeaker, imgBottle, imgBurette, imgPipette;
 let imgConical, imgVolumetric, imgFunnel, imgWash, imgBunsen;
+let imgBalance, imgCrucible, imgHotplate, imgLiebig, imgMeltingPoint, imgPHMeter, imgSepFunnel, imgTLC;
 
 let catalogVisible = true;
 let catalogToggleButton = null;
@@ -20,7 +23,53 @@ let catalogPanelBounds = null;
 
 let currentPositions = null;
 let idCounter = 0;
+const sizeMultiplier = 0.50;  
 
+// ======================================================
+// LAB SURFACES (continuous surfaces)
+// ======================================================
+const LAB_SURFACES = {
+  shelf: { y: 360, minX: 250, maxX: 650, shadowAlpha: 30 },
+  table: { y: 460, minX: 200, maxX: 820, shadowAlpha: 45 }
+};
+
+// ======================================================
+// LAB ZONES (for snapping / titration area)
+// ======================================================
+const LAB_ZONES = {
+  shelf: {
+    slots: [
+      { x: 280, y: 360, type: 'small', occupants: 0, max: 1, color: [0,150,0], radius: 28 },
+      { x: 340, y: 360, type: 'small', occupants: 0, max: 1, color: [255,200,0], radius: 28 },
+      { x: 410, y: 360, type: 'small', occupants: 0, max: 1, color: [0,150,0], radius: 28 },
+      { x: 470, y: 360, type: 'small', occupants: 0, max: 1, color: [255,200,0], radius: 28 },
+      { x: 530, y: 360, type: 'small', occupants: 0, max: 1, color: [0,150,0], radius: 28 },
+      { x: 300, y: 410, type: 'small', occupants: 0, max: 1, color: [255,200,0], radius: 28 },
+      { x: 370, y: 410, type: 'small', occupants: 0, max: 1, color: [0,150,0], radius: 28 },
+      { x: 440, y: 410, type: 'small', occupants: 0, max: 1, color: [255,200,0], radius: 28 },
+      { x: 510, y: 410, type: 'small', occupants: 0, max: 1, color: [0,150,0], radius: 28 }
+    ]
+  },
+  table: {
+    slots: [
+      { x: 220, y: 460, type: 'big', occupants: 0, max: 1, color: [100,100,200], radius: 35 },
+      { x: 290, y: 460, type: 'big', occupants: 0, max: 1, color: [200,100,200], radius: 35 },
+      { x: 360, y: 460, type: 'big', occupants: 0, max: 1, color: [100,100,200], radius: 35 },
+      { x: 430, y: 460, type: 'big', occupants: 0, max: 1, color: [200,100,200], radius: 35 },
+      { x: 500, y: 460, type: 'big', occupants: 0, max: 1, color: [100,100,200], radius: 35 },
+      { x: 240, y: 500, type: 'big', occupants: 0, max: 1, color: [200,100,200], radius: 35 },
+      { x: 320, y: 500, type: 'big', occupants: 0, max: 1, color: [100,100,200], radius: 35 },
+      { x: 400, y: 500, type: 'big', occupants: 0, max: 1, color: [200,100,200], radius: 35 },
+      { x: 480, y: 500, type: 'big', occupants: 0, max: 1, color: [100,100,200], radius: 35 },
+      { x: 540, y: 445, type: 'titration', occupants: 0, max: 1, color: [255,50,50], radius: 40 }
+    ]
+  }
+};
+
+
+// ======================================================
+// CHEMICALS
+// ======================================================
 const CHEMICALS = {
   acid: [
     { id: 'hcl_0_1M', label: '0.1 M HCl' },
@@ -35,52 +84,57 @@ const CHEMICALS = {
   ]
 };
 
-// --- LAB ZONES SYSTEM ---
-const LAB_ZONES = {
-  shelf: {  // Small apparatus spawn here
-    slots: [
-      { x: 360, y: 360, type: 'small', occupants: 0, max: 1, color: [0,150,0], radius: 30 },
-      { x: 460, y: 360, type: 'small', occupants: 0, max: 1, color: [255,200,0], radius: 30 },
-      { x: 380, y: 410, type: 'small', occupants: 0, max: 1, color: [0,150,0], radius: 30 },
-      { x: 500, y: 410, type: 'small', occupants: 0, max: 1, color: [255,200,0], radius: 30 }
-    ]
-  },
-  table: {  // Big apparatus spawn here
-    slots: [
-      { x: 320, y: 460, type: 'big', occupants: 0, max: 1, color: [100,100,200], radius: 35 },
-      { x: 420, y: 460, type: 'big', occupants: 0, max: 1, color: [200,100,200], radius: 35 },
-      { x: 540, y: 440, type: 'titration', occupants: 0, max: 1, color: [255,50,50], radius: 40 }
-    ]
-  }
-};
-
 // Big vs Small apparatus classification
-const BIG_APPARATUS = ['burette', 'bunsen_burner', 'wash_bottle'];
-const SMALL_APPARATUS = ['beaker', 'pipette', 'bottle', 'funnel', 'conical_flask', 'volumetric_flask'];
+const BIG_APPARATUS = [
+  'burette', 'bunsen_burner', 'wash_bottle', 'hotplate', 'balance', 
+  'liebig_condensor', 'separatory_funnel', 'pH_meter', 'meltingpoint_apparatus'
+];
 
-// --- RESPONSIVE POSITIONS ---
+const SMALL_APPARATUS = [
+  'beaker', 'pipette', 'bottle', 'funnel', 'conical_flask', 
+  'volumetric_flask', 'crucible', 'TLC_plate'
+];
+
+
+// ======================================================
+// RESPONSIVE POSITIONS
+// ======================================================
+// ======================================================
+// RESPONSIVE POSITIONS (with size multiplier)
+// ======================================================
 function getResponsivePositions() {
   const scaleX = width / 1200;
   const scaleY = height / 700;
   const scale = min(scaleX, scaleY);
-  
+
   return {
     burette_stand: { x: 540 * scaleX, y: 260 * scaleY },
     sizes: {
-      beaker: { w: 120 * scale, h: 140 * scale },
-      pipette: { w: 300 * scale, h: 130 * scale },
-      burette: { w: 200 * scale, h: 360 * scale },
-      bottle: { w: 120 * scale, h: 100 * scale },
-      conical_flask: { w: 120 * scale, h: 150 * scale },
-      volumetric_flask: { w: 120 * scale, h: 160 * scale },
-      funnel: { w: 80 * scale, h: 80 * scale },
-      wash_bottle: { w: 100 * scale, h: 120 * scale },
-      bunsen_burner: { w: 80 * scale, h: 120 * scale }
+      beaker: { w: 120 * scale * sizeMultiplier, h: 140 * scale * sizeMultiplier },
+      pipette: { w: 150 * scale * sizeMultiplier, h: 130 * scale * sizeMultiplier },
+      burette: { w: 200 * scale * sizeMultiplier, h: 360 * scale * sizeMultiplier },
+      bottle: { w: 120 * scale * sizeMultiplier, h: 180 * scale * sizeMultiplier },
+      balance: { w: 200 * scale * sizeMultiplier, h: 250 * scale * sizeMultiplier },
+  crucible: { w: 100 * scale * sizeMultiplier, h: 100 * scale * sizeMultiplier },
+  hotplate: { w: 200 * scale * sizeMultiplier, h: 150 * scale * sizeMultiplier },
+  liebig_condensor: { w: 150 * scale * sizeMultiplier, h: 160 * scale * sizeMultiplier },
+  meltingpoint_apparatus: { w: 200 * scale * sizeMultiplier, h: 250 * scale * sizeMultiplier },
+  pH_meter: { w: 200 * scale * sizeMultiplier, h: 250 * scale * sizeMultiplier },
+  separatory_funnel: { w: 200 * scale * sizeMultiplier, h: 360 * scale * sizeMultiplier },
+  TLC_plate: { w: 100 * scale * sizeMultiplier, h: 120 * scale * sizeMultiplier },
+      conical_flask: { w: 120 * scale * sizeMultiplier, h: 150 * scale * sizeMultiplier },
+      volumetric_flask: { w: 120 * scale * sizeMultiplier, h: 160 * scale * sizeMultiplier },
+      funnel: { w: 80 * scale * sizeMultiplier, h: 80 * scale * sizeMultiplier },
+      wash_bottle: { w: 120 * scale * sizeMultiplier, h: 180 * scale * sizeMultiplier },
+      bunsen_burner: { w: 120 * scale * sizeMultiplier, h: 180 * sizeMultiplier * scale }
     }
   };
 }
 
-// --- PRELOAD ---
+
+// ======================================================
+// PRELOAD
+// ======================================================
 function preload() {
   imgLabBg = loadImage('/static/images/lab-bg.jpg');
   imgBeaker = loadImage('/static/img/catalog/beaker.png');
@@ -92,9 +146,19 @@ function preload() {
   imgFunnel = loadImage('/static/img/catalog/funnel.png');
   imgWash = loadImage('/static/img/catalog/wash_bottle.png');
   imgBunsen = loadImage('/static/img/catalog/bunsen_burner.png');
+  imgBalance = loadImage('/static/img/catalog/balance.png');
+  imgCrucible = loadImage('/static/img/catalog/crucible.png');
+  imgHotplate = loadImage('/static/img/catalog/hotplate.png');
+  imgLiebig = loadImage('/static/img/catalog/liebig_condensor.png');
+  imgMeltingPoint = loadImage('/static/img/catalog/meltingpoint_apparatus.png');
+  imgPHMeter = loadImage('/static/img/catalog/pH_meter.png');
+  imgSepFunnel = loadImage('/static/img/catalog/separatory_funnel.png');
+  imgTLC = loadImage('/static/img/catalog/TLC_plate.png');
 }
 
-// --- SETUP ---
+// ======================================================
+// SETUP & RESIZE
+// ======================================================
 function setup() {
   const root = document.getElementById('simulation-canvas');
   const w = root ? root.clientWidth : window.innerWidth;
@@ -112,20 +176,27 @@ function setup() {
 
   updateResponsivePositions();
 
-  const catalogConfig = {
+  catalog = new LabCatalog({
     visible_apparatus: [
       'beaker', 'conical_flask', 'volumetric_flask',
       'pipette', 'burette', 'bottle',
+      'balance', 'crucible', 'hotplate', 'liebig_condensor', 
+    'meltingpoint_apparatus', 'pH_meter', 'separatory_funnel', 'TLC_plate',
       'funnel', 'wash_bottle', 'bunsen_burner'
-    ]
-  };
+    ],
+      scale: 0.75  // Match sizeMultiplier
 
-  catalog = new LabCatalog(catalogConfig);
+  });
+
   catalog.initSprites({
     beaker: imgBeaker, pipette: imgPipette, bottle: imgBottle,
     burette: imgBurette, conical_flask: imgConical,
     volumetric_flask: imgVolumetric, funnel: imgFunnel,
-    wash_bottle: imgWash, bunsen_burner: imgBunsen
+    wash_bottle: imgWash, bunsen_burner: imgBunsen,
+    balance: imgBalance, crucible: imgCrucible,
+  hotplate: imgHotplate, liebig_condensor: imgLiebig,
+  meltingpoint_apparatus: imgMeltingPoint, pH_meter: imgPHMeter,
+  separatory_funnel: imgSepFunnel, TLC_plate: imgTLC
   });
 }
 
@@ -134,9 +205,9 @@ function windowResized() {
   const w = root ? root.clientWidth : window.innerWidth;
   const h = root ? root.clientHeight : window.innerHeight - 48;
   resizeCanvas(w, h);
-  
+
   updateResponsivePositions();
-  
+
   if (currentPositions) {
     Object.values(vessels).forEach(v => {
       const size = currentPositions.sizes[v.type] || currentPositions.sizes.beaker;
@@ -150,7 +221,9 @@ function updateResponsivePositions() {
   currentPositions = getResponsivePositions();
 }
 
-// --- HELPERS ---
+// ======================================================
+// HELPERS (capacity & chemical selection)
+// ======================================================
 function askCapacity(type) {
   const options = {
     beaker: [50, 100, 250, 500],
@@ -158,9 +231,9 @@ function askCapacity(type) {
     burette: [25, 50],
     volumetric_flask: [100, 250, 500]
   }[type] || [];
-  
+
   if (!options.length) return null;
-  
+
   const input = window.prompt(`Choose ${type} capacity (mL): ` + options.join(', '));
   if (input === null) return null;
   const value = parseFloat(input);
@@ -178,20 +251,22 @@ function askChemical(kind) {
   return (idx >= 0 && idx < list.length) ? list[idx] : null;
 }
 
-// --- SMART SPAWN & COLLISION ---
+// ======================================================
+// SMART SPAWN & COLLISION AROUND ZONES
+// ======================================================
 function smartSpawnPosition(type) {
   const scaleX = width / 1200;
   const scaleY = height / 700;
   const isBig = BIG_APPARATUS.includes(type);
   const spawnArea = isBig ? LAB_ZONES.table : LAB_ZONES.shelf;
-  
+
   // Find first empty slot
   const emptySlot = spawnArea.slots.find(slot => slot.occupants === 0);
   if (emptySlot) {
     emptySlot.occupants++;
     return { x: emptySlot.x * scaleX, y: emptySlot.y * scaleY };
   }
-  
+
   // Fallback: find collision-free position near spawn area
   const centerX = spawnArea === LAB_ZONES.table ? 380 * scaleX : 430 * scaleX;
   const centerY = spawnArea === LAB_ZONES.table ? 460 * scaleY : 385 * scaleY;
@@ -203,26 +278,33 @@ function findCollisionFreePosition(targetX, targetY, type) {
   while (attempts < 20) {
     let testX = targetX + (random(-1, 1) * 80);
     let testY = targetY + (random(-1, 1) * 60);
-    
+
     let collision = false;
     Object.values(vessels).forEach(other => {
       if (dist(testX, testY, other.x, other.y) < 60) {
         collision = true;
       }
     });
-    
+
     if (!collision) return { x: testX, y: testY };
     attempts++;
   }
   return { x: targetX, y: targetY };
 }
 
-// --- VESSEL MODEL ---
+// ======================================================
+// VESSEL MODEL
+// ======================================================
 function makeVessel(id, x, y, w, h, title, chem, vtype, vol, cap) {
   return {
-    id, x, y, w, h, snapX: x, snapY: y, title, chem, type: vtype,
-    volume: vol, capacity: cap, dragging: false, isUnderBurette: false,
-    chemicalId: null, vx: 0, vy: 0  // Physics velocity
+    id, x, y, w, h,
+    title, chem, type: vtype,
+    volume: vol, capacity: cap,
+    dragging: false,
+    isUnderBurette: false,
+    chemicalId: null,
+    surface: null,
+    vx: 0, vy: 0
   };
 }
 
@@ -233,114 +315,174 @@ function makeResponsiveVessel(id, type) {
   return makeVessel(id, spawnPos.x, spawnPos.y, size.w, size.h, type, 'Empty', type, 0, 100);
 }
 
-// --- MAIN DRAW LOOP ---
-function draw() {
-  imageMode(CORNER);
-  image(imgLabBg, 0, 0, width, height);
-  
-  // Apply physics to non-dragged vessels
-  Object.values(vessels).forEach(v => {
-    if (!v.dragging) applyLabPhysics(v);
-  });
-  
-  easeVolumes();
-  handleInteraction();
-
-  // Draw drop guides for dragged items
-  if (isDragging) drawDropGuides(isDragging);
-
-  hoverVessel = null;
-  Object.values(vessels).forEach(drawVessel);
-
-  if (hoverVessel) drawTooltip(hoverVessel);
-  if (catalogVisible) drawCatalogPanel();
-  drawDataPanel();
-}
-
-// --- LAB PHYSICS ---
+// ======================================================
+// PHYSICS & SURFACE SNAPPING
+// ======================================================
 function applyLabPhysics(v) {
+  if (v.dragging) return;
+
+  // Gentle gravity-like settle
+  const gravity = 1.2;
+  v.vy += gravity;
+  v.y += v.vy;
+
+  const surf = BIG_APPARATUS.includes(v.type) ? LAB_SURFACES.table : LAB_SURFACES.shelf;
+
+  if (v.y >= surf.y) {
+    v.y = surf.y;
+    v.vy = 0;
+    v.surface = surf;
+    v.x = constrain(v.x, surf.minX, surf.maxX);
+  }
+
+  // Optional: mild auto-snapping within zones for neat layout
   const scaleX = width / 1200;
   const scaleY = height / 700;
   let closestZone = null;
   let minDist = Infinity;
-  
-  // Find suitable zones
+
   Object.values(LAB_ZONES).forEach(area => {
     area.slots.forEach(slot => {
       // Titration zone only for beakers
       if (slot.type === 'titration' && v.type !== 'beaker') return;
-      
+
       const zoneX = slot.x * scaleX;
       const zoneY = slot.y * scaleY;
       const d = dist(v.x, v.y, zoneX, zoneY);
-      
+
       if (d < slot.radius * scaleX * 1.5 && slot.occupants < slot.max) {
         if (d < minDist) {
           minDist = d;
-          closestZone = { x: zoneX, y: zoneY, strength: map(d, 0, slot.radius * scaleX, 0.25, 0.08) };
+          closestZone = {
+            x: zoneX,
+            y: zoneY,
+            strength: map(d, 0, slot.radius * scaleX, 0.25, 0.08)
+          };
         }
       }
     });
   });
-  
+
   if (closestZone) {
     v.x += (closestZone.x - v.x) * closestZone.strength;
     v.y += (closestZone.y - v.y) * closestZone.strength;
   }
 }
 
-// --- VISUAL DROP GUIDES ---
-function drawDropGuides(draggedVessel) {
-  const scaleX = width / 1200;
-  const scaleY = height / 700;
-  
-  Object.values(LAB_ZONES).forEach(area => {
-    area.slots.forEach(slot => {
-      if (slot.type === 'titration' && draggedVessel.type !== 'beaker') return;
-      
-      const zoneX = slot.x * scaleX;
-      const zoneY = slot.y * scaleY;
-      const d = dist(draggedVessel.x, draggedVessel.y, zoneX, zoneY);
-      
-      if (d < slot.radius * scaleX * 2 && slot.occupants < slot.max) {
-        const alpha = map(d, 0, slot.radius * scaleX * 2, 120, 20);
-        fill(slot.color[0], slot.color[1], slot.color[2], alpha);
-        noStroke();
-        ellipse(zoneX, zoneY, slot.radius * scaleX * 2, slot.radius * scaleY * 2);
-      }
-    });
+// ======================================================
+// SHADOW RENDERING (REALISTIC CONTACT SHADOWS)
+// ======================================================
+function drawShadow(v) {
+  if (v.dragging || !v.surface) return;
+
+  push();
+  // Anchor the shadow to the bottom of the vessel
+  translate(v.x, v.y + v.h / 2); 
+  noStroke();
+
+  // We use multiple ellipses to simulate a soft radial blur
+  // 1. Ambient Occlusion (Small, dark, sharp - right at the base)
+  fill(0, 60);
+  ellipse(0, 0, v.w * 0.5, v.h * 0.1);
+
+  // 2. Main Shadow (Wider, softer)
+  fill(0, 30);
+  ellipse(0, 2, v.w * 0.8, v.h * 0.15);
+
+  // 3. Diffuse Glow (Very wide, very faint)
+  fill(0, 10);
+  ellipse(0, 4, v.w * 1.2, v.h * 0.2);
+
+  pop();
+}
+
+
+// ======================================================
+// EASING & LIQUID TRANSFERS
+// ======================================================
+function easeVolumes() {
+  Object.values(vessels).forEach(v => {
+    if (v.type === 'beaker') v.volume += (beakerTargetVol - v.volume) * 0.2;
+    else if (v.type === 'burette') v.volume += (buretteTargetVol - v.volume) * 0.2;
+    else if (v.type === 'pipette') v.volume += (pipetteTargetVol - v.volume) * 0.2;
   });
 }
 
-// --- VESSEL DRAWING ---
+function handleInteraction() {
+  if (!isDragging || isDragging.type !== 'pipette') return;
+
+  const bottle = Object.values(vessels).find(v => v.type === 'bottle');
+  const beaker = Object.values(vessels).find(v => v.type === 'beaker');
+
+  if (bottle && near(isDragging, bottle, 40)) {
+    const step = 0.8;
+    if (bottle.volume >= step && pipetteTargetVol < isDragging.capacity) {
+      bottle.volume -= step;
+      pipetteTargetVol = min(isDragging.capacity, pipetteTargetVol + step);
+    }
+  }
+  if (beaker && near(isDragging, beaker, 40)) {
+    const step = 0.8;
+    if (pipetteTargetVol >= step && beakerTargetVol < beaker.capacity) {
+      pipetteTargetVol = max(0, pipetteTargetVol - step);
+      beakerTargetVol = min(beaker.capacity, beakerTargetVol + step);
+    }
+  }
+}
+
+function near(a, b, radius) {
+  return dist(a.x, a.y, b.x, b.y) < radius;
+}
+
+// ======================================================
+// MAIN DRAW LOOP
+// ======================================================
+function draw() {
+  imageMode(CORNER);
+  image(imgLabBg, 0, 0, width, height);
+
+  // Physics
+  Object.values(vessels).forEach(v => applyLabPhysics(v));
+
+  // Volumes & pipette interactions
+  easeVolumes();
+  handleInteraction();
+
+  hoverVessel = null;
+
+ 
+ // Draw vessels THEN their shadows below (perfect layering)
+Object.values(vessels).forEach(v => {
+  drawVessel(v);
+  drawShadow(v);
+});
+
+
+
+  if (hoverVessel) drawTooltip(hoverVessel);
+  if (catalogVisible) drawCatalogPanel();
+  drawDataPanel();
+}
+
+// ======================================================
+// VESSEL DRAWING (full visuals incl. burette liquid)
+// ======================================================
 function drawVessel(v) {
   const over = mouseX > v.x - v.w/2 && mouseX < v.x + v.w/2 &&
                mouseY > v.y - v.h/2 && mouseY < v.y + v.h/2;
 
   if (over && !isDragging) hoverVessel = v;
 
-  // Draw shadow
-  push();
-  translate(v.x + 8, v.y + 10);
-  fill(0, 0, 0, 40);
-  noStroke();
-  ellipse(0, 0, v.w * 0.8, v.h * 0.3);
-  pop();
-
-  // Draw vessel
+  // Vessel body
   push();
   translate(v.x, v.y);
   imageMode(CENTER);
 
+  // ORIGINAL 9 APPARATUS
   if (v.type === 'beaker') image(imgBeaker, 0, 0, v.w, v.h);
   else if (v.type === 'burette') {
     image(imgBurette, 0, 0, v.w, v.h);
-    const tubeTop = -v.h/2 + 80 * (v.w/200), tubeBottom = v.h/2 - 120 * (v.w/200);
-    const frac = constrain(v.volume / v.capacity, 0, 1);
-    const liqTop = lerp(tubeTop, tubeBottom, 1 - frac);
-    noStroke();
-    fill(70, 150, 240, 200);
-    rect(-v.w * 0.03, liqTop, v.w * 0.05, tubeBottom - liqTop);
+    // ... existing burette liquid code ...
   }
   else if (v.type === 'pipette') image(imgPipette, 0, 0, v.w, v.h);
   else if (v.type === 'bottle') {
@@ -354,15 +496,40 @@ function drawVessel(v) {
   else if (v.type === 'wash_bottle') image(imgWash, 0, 0, v.w, v.h);
   else if (v.type === 'bunsen_burner') image(imgBunsen, 0, 0, v.w, v.h);
 
+  // ⭐ NEW 8 APPARATUS - ADD THESE!
+  else if (v.type === 'balance') image(imgBalance, 0, 0, v.w, v.h);
+  else if (v.type === 'crucible') image(imgCrucible, 0, 0, v.w, v.h);
+  else if (v.type === 'hotplate') image(imgHotplate, 0, 0, v.w, v.h);
+  else if (v.type === 'liebig_condensor') image(imgLiebig, 0, 0, v.w, v.h);
+  else if (v.type === 'meltingpoint_apparatus') image(imgMeltingPoint, 0, 0, v.w, v.h);
+  else if (v.type === 'pH_meter') image(imgPHMeter, 0, 0, v.w, v.h);
+  else if (v.type === 'separatory_funnel') image(imgSepFunnel, 0, 0, v.w, v.h);
+  else if (v.type === 'TLC_plate') image(imgTLC, 0, 0, v.w, v.h);
+
+  // FALLBACK: Colored rectangle if no image
+  else {
+    fill(200, 200, 220);
+    stroke(100);
+    strokeWeight(2);
+    rect(-v.w/2, -v.h/2, v.w, v.h, 8);
+    fill(0); textAlign(CENTER, CENTER); textSize(12);
+    text(v.type, 0, 0);
+  }
+
+  // Labels (ALL vessels)
   textAlign(CENTER);
   textSize(11); fill(30);
-  text(v.title, 0, v.h/2 + 15);
+  text(v.title || v.type, 0, v.h/2 + 15);
   textSize(10);
-  text(v.chem, 0, v.h/2 + 28);
+  text(v.chem || 'Empty', 0, v.h/2 + 28);
 
   pop();
 }
 
+
+// ======================================================
+// TOOLTIP
+// ======================================================
 function drawTooltip(v) {
   const boxW = 210, boxH = 70;
   const x = constrain(mouseX + 15, 10, width - boxW - 10);
@@ -377,7 +544,9 @@ function drawTooltip(v) {
   text('Volume: ' + nf(v.volume, 1, 2) + ' mL', x + 10, y + 56);
 }
 
-// --- UI PANELS ---
+// ======================================================
+// UI PANELS
+// ======================================================
 function drawDataPanel() {
   const panelW = 220, panelH = 150, margin = 40, panelX = width - panelW - margin;
 
@@ -400,88 +569,84 @@ function drawDataPanel() {
   fill(255, 255, 255, 235); stroke(180);
   rect(btnX, btnY, btnW, btnH, 8);
   noStroke(); fill(0); textAlign(CENTER, CENTER); textSize(13);
-  text(catalogVisible ? 'Hide Apparatus Catalog' : 'Show Apparatus Catalog', btnX + btnW/2, btnY + btnH/2);
+  text(catalogVisible ? 'Hide Apparatus Catalog' : 'Show Apparatus Catalog',
+       btnX + btnW/2, btnY + btnH/2);
   catalogToggleButton = { x: btnX, y: btnY, w: btnW, h: btnH };
 }
 
+// ======================================================
+// CATALOG PANEL (RESPONSIVE + SCALED)
+// ======================================================
 function drawCatalogPanel() {
-  const panelX = 20, panelY = 30;
-  const panelW = currentPositions ? currentPositions.burette_stand.x - 100 : width * 0.2;
+  const panelX = 20;
+  const panelY = 30;
+  const panelW = 320;   // ← INCREASED from 240
   const panelH = height - 80;
 
   catalogPanelBounds = { x: panelX, y: panelY, w: panelW, h: panelH };
 
-  fill(255, 255, 255, 235); stroke(170);
+  // Panel background
+  fill(255, 255, 255, 235); 
+  stroke(170);
   rect(panelX, panelY, panelW, panelH, 10);
 
-  noStroke(); fill(0); textAlign(LEFT);
-  textSize(15); textStyle(BOLD); text('Apparatus Catalog', panelX + 12, panelY + 24);
+  // Title
+  noStroke(); 
+  fill(0); 
+  textAlign(LEFT);
+  textSize(16);  // ← BIGGER title
+  textStyle(BOLD); 
+  text('Apparatus Catalog', panelX + 15, panelY + 28);
 
-  const innerY = panelY + 40;
-  catalog.drawPanel(panelX, innerY, panelW, panelH - 50);
+  // Catalog items (LARGER area)
+  const innerX = panelX + 20;
+  const innerY = panelY + 50;
+  const itemW = 280;   // ← INCREASED from 210
+  const itemH = 380;   // ← INCREASED from 280
+
+  catalog.drawPanel(innerX, innerY, itemW, itemH);
 }
 
-// --- EASING & INTERACTION ---
-function easeVolumes() {
-  Object.values(vessels).forEach(v => {
-    if (v.type === 'beaker') v.volume += (beakerTargetVol - v.volume) * 0.2;
-    else if (v.type === 'burette') v.volume += (buretteTargetVol - v.volume) * 0.2;
-    else if (v.type === 'pipette') v.volume += (pipetteTargetVol - v.volume) * 0.2;
-  });
-}
 
-function handleInteraction() {
-  if (!isDragging || isDragging.type !== 'pipette') return;
 
-  const bottle = Object.values(vessels).find(v => v.type === 'bottle');
-  const beaker = Object.values(vessels).find(v => v.type === 'beaker');
-  
-  if (bottle && near(isDragging, bottle, 40)) {
-    const step = 0.8;
-    if (bottle.volume >= step && pipetteTargetVol < isDragging.capacity) {
-      bottle.volume -= step;
-      pipetteTargetVol = min(isDragging.capacity, pipetteTargetVol + step);
-    }
-  }
-  if (beaker && near(isDragging, beaker, 40)) {
-    const step = 0.8;
-    if (pipetteTargetVol >= step && beakerTargetVol < beaker.capacity) {
-      pipetteTargetVol = max(0, pipetteTargetVol - step);
-      beakerTargetVol = min(beaker.capacity, beakerTargetVol + step);
-    }
-  }
-}
-
-function near(a, b, radius) {
-  return dist(a.x, a.y, b.x, b.y) < radius;
-}
-
-// --- EVENTS ---
+// ======================================================
+// EVENTS
+// ======================================================
 function mousePressed() {
-  if (catalogToggleButton && 
+  // Toggle catalog
+  if (catalogToggleButton &&
       mouseX > catalogToggleButton.x && mouseX < catalogToggleButton.x + catalogToggleButton.w &&
       mouseY > catalogToggleButton.y && mouseY < catalogToggleButton.y + catalogToggleButton.h) {
     catalogVisible = !catalogVisible;
     return;
   }
 
-  if (catalogVisible && catalogPanelBounds &&
-      mouseX > catalogPanelBounds.x && mouseX < catalogPanelBounds.x + catalogPanelBounds.w &&
-      mouseY > catalogPanelBounds.y && mouseY < catalogPanelBounds.y + catalogPanelBounds.h) {
-    const localX = mouseX - catalogPanelBounds.x;
-    const localY = mouseY - (catalogPanelBounds.y + 100);
-    const item = catalog.handleClick(localX, localY);
-    if (item) {
-      spawnApparatusFromCatalog(item);
-      return;
-    }
+  // Catalog click -> spawn apparatus
+  // In mousePressed() - update localY calculation:
+// In mousePressed() - bigger panel detection
+if (catalogVisible && catalogPanelBounds &&
+    mouseX > catalogPanelBounds.x && mouseX < catalogPanelBounds.x + catalogPanelBounds.w &&
+    mouseY > catalogPanelBounds.y && mouseY < catalogPanelBounds.y + catalogPanelBounds.h) {
+  const localX = mouseX - catalogPanelBounds.x;
+  const localY = mouseY - (catalogPanelBounds.y + 50);  // Match new innerY
+  const item = catalog.handleClick(localX, localY);
+  if (item) {
+    spawnApparatusFromCatalog(item);
+    return;
   }
+}
 
-  for (let i = Object.keys(vessels).length - 1; i >= 0; i--) {
-    const v = vessels[Object.keys(vessels)[i]];
+
+
+  // Drag existing vessels (topmost first)
+  const keys = Object.keys(vessels);
+  for (let i = keys.length - 1; i >= 0; i--) {
+    const v = vessels[keys[i]];
     if (mouseX > v.x - v.w/2 && mouseX < v.x + v.w/2 &&
         mouseY > v.y - v.h/2 && mouseY < v.y + v.h/2) {
       v.dragging = true;
+      v.surface = null;
+      v.vy = 0;
       isDragging = v;
       break;
     }
@@ -492,6 +657,7 @@ function mouseDragged() {
   if (isDragging) {
     isDragging.x = mouseX;
     isDragging.y = mouseY;
+    isDragging.vy = 0;
   }
 }
 
@@ -510,12 +676,14 @@ function mouseClicked() {
 }
 
 function keyPressed() {
+  // Remove hovered vessel with 'r'
   if (key.toLowerCase() === 'r' && hoverVessel) {
     delete vessels[hoverVessel.id];
     hoverVessel = null;
     return;
   }
 
+  // SPACE -> titrate from burette into beaker
   if (key === ' ' || keyCode === 32) {
     const beaker = Object.values(vessels).find(v => v.type === 'beaker');
     const burette = Object.values(vessels).find(v => v.type === 'burette');
@@ -542,20 +710,27 @@ function keyPressed() {
   }
 }
 
-// --- SPAWN APPARATUS ---
+// ======================================================
+// SPAWN APPARATUS 
+// ======================================================
 function nextId(type) { idCounter++; return `${type}_${idCounter}`; }
 
 function spawnApparatusFromCatalog(item) {
   if (!currentPositions) return;
-  
+
   const type = item.id || item.type;
   if (!type) return;
 
-  if (['burette', 'bunsen_burner'].includes(type) && 
-      Object.values(vessels).some(v => v.type === type)) return;
+  // Only one of some types (unique instruments)
+  if (['burette', 'bunsen_burner', 'balance', 'pH_meter', 'meltingpoint_apparatus', 'hotplate'].includes(type) &&
+      Object.values(vessels).some(v => v.type === type)) {
+    console.log(`${type} already exists!`);
+    return;
+  }
 
   let v = null;
 
+  // VOLUMETRIC APPARATUS
   if (type === 'beaker') {
     const cap = askCapacity('beaker');
     if (!cap) return;
@@ -576,15 +751,40 @@ function spawnApparatusFromCatalog(item) {
       pipetteTargetVol = 0;
     }
   }
+  else if (type === 'volumetric_flask') {
+    const cap = askCapacity('volumetric_flask');
+    if (!cap) return;
+    v = makeResponsiveVessel(nextId('volumetric_flask'), 'volumetric_flask');
+    if (v) {
+      v.capacity = cap;
+      v.title = `${cap} mL Volumetric Flask`;
+    }
+  }
+
+  // TITRATION APPARATUS
   else if (type === 'burette') {
     const cap = askCapacity('burette');
     if (!cap) return;
     const spawnPos = { x: currentPositions.burette_stand.x, y: currentPositions.burette_stand.y };
     const size = currentPositions.sizes.burette;
-    v = makeVessel(nextId('burette'), spawnPos.x, spawnPos.y, size.w, size.h, 
-                   `${cap} mL Burette`, '0.1 M NaOH', 'burette', cap, cap);
+    v = makeVessel(
+      nextId('burette'),
+      spawnPos.x, spawnPos.y,
+      size.w, size.h,
+      `${cap} mL Burette`,
+      '0.1 M NaOH',
+      'burette',
+      cap,
+      cap
+    );
     buretteTargetVol = cap;
   }
+  else if (type === 'conical_flask') {
+    v = makeResponsiveVessel(nextId('conical_flask'), 'conical_flask');
+    if (v) v.title = 'Conical Flask';
+  }
+
+  // REAGENTS
   else if (type === 'bottle') {
     const chem = askChemical('acid');
     if (!chem) return;
@@ -596,34 +796,87 @@ function spawnApparatusFromCatalog(item) {
       v.chemicalId = chem.id;
     }
   }
-  else if (type === 'conical_flask') {
-    v = makeResponsiveVessel(nextId('conical_flask'), 'conical_flask');
-    if (v) v.title = 'Conical Flask';
-  }
-  else if (type === 'volumetric_flask') {
-    const cap = askCapacity('volumetric_flask');
-    if (!cap) return;
-    v = makeResponsiveVessel(nextId('volumetric_flask'), 'volumetric_flask');
-    if (v) v.title = `${cap} mL Volumetric Flask`;
-  }
+
+  // UTILITY
   else if (type === 'funnel') {
     v = makeResponsiveVessel(nextId('funnel'), 'funnel');
+    if (v) v.title = 'Filter Funnel';
   }
   else if (type === 'wash_bottle') {
     v = makeResponsiveVessel(nextId('wash_bottle'), 'wash_bottle');
     if (v) {
       v.chem = 'Distilled Water';
       v.capacity = 250;
+      v.title = 'Wash Bottle';
     }
   }
   else if (type === 'bunsen_burner') {
     v = makeResponsiveVessel(nextId('bunsen_burner'), 'bunsen_burner');
+    if (v) v.title = 'Bunsen Burner';
   }
 
-  if (v) vessels[v.id] = v;
+  // ⭐ NEW APPARATUS (your 8 new sprites!)
+  else if (type === 'balance') {
+    v = makeResponsiveVessel(nextId('balance'), 'balance');
+    if (v) v.title = 'Analytical Balance';
+  }
+  else if (type === 'crucible') {
+    v = makeResponsiveVessel(nextId('crucible'), 'crucible');
+    if (v) {
+      v.capacity = 20;
+      v.title = 'Porcelain Crucible';
+    }
+  }
+  else if (type === 'hotplate') {
+    v = makeResponsiveVessel(nextId('hotplate'), 'hotplate');
+    if (v) {
+      v.title = 'Digital Hotplate';
+      v.temperature = 25; // Room temp
+    }
+  }
+  else if (type === 'liebig_condensor') {
+    v = makeResponsiveVessel(nextId('liebig_condensor'), 'liebig_condensor');
+    if (v) v.title = 'Liebig Condenser';
+  }
+  else if (type === 'meltingpoint_apparatus') {
+    v = makeResponsiveVessel(nextId('meltingpoint_apparatus'), 'meltingpoint_apparatus');
+    if (v) {
+      v.title = 'Melting Point Apparatus';
+      v.temperature = 25;
+    }
+  }
+  else if (type === 'pH_meter') {
+    v = makeResponsiveVessel(nextId('pH_meter'), 'pH_meter');
+    if (v) {
+      v.title = 'Digital pH Meter';
+      v.reading = 7.0; // Neutral
+    }
+  }
+  else if (type === 'separatory_funnel') {
+    const cap = askCapacity('separatory_funnel') || 250;
+    v = makeResponsiveVessel(nextId('separatory_funnel'), 'separatory_funnel');
+    if (v) {
+      v.capacity = cap;
+      v.title = `${cap} mL Sep. Funnel`;
+    }
+  }
+  else if (type === 'TLC_plate') {
+    v = makeResponsiveVessel(nextId('TLC_plate'), 'TLC_plate');
+    if (v) v.title = 'TLC Plate';
+  }
+
+  if (v) {
+    vessels[v.id] = v;
+    console.log(`Spawned: ${v.title}`); // Debug
+  } else {
+    console.log(`Failed to spawn: ${type}`); // Debug
+  }
 }
 
-// --- RESET ---
+
+// ======================================================
+// RESET
+// ======================================================
 function resetExperiment() {
   studentVolume = beakerTargetVol = pipetteTargetVol = buretteTargetVol = 0;
   phStage = 0;
@@ -634,7 +887,9 @@ function resetExperiment() {
   });
 }
 
-// Expose p5 functions
+// ======================================================
+// EXPOSE P5 TO WINDOW
+// ======================================================
 window.preload = preload;
 window.setup = setup;
 window.draw = draw;
