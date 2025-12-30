@@ -148,3 +148,51 @@ class LabCatalog {
     return this.hoverItem;  // Caller checks bounds
   }
 }
+class ChemicalCatalog {
+  constructor(chemicals) {
+    this.chemicals = chemicals;
+    this.hoverItem = null;
+  }
+  
+  drawPanel(x, y, w, h, scale = 0.8) {
+    // Title
+    noStroke(); fill(0); textAlign(LEFT); textSize(15 * scale); textStyle(BOLD);
+    text('🧴 CHEMICALS', x + 12, y + 25);
+    textStyle(NORMAL); textSize(11 * scale);
+    text('Click to spawn bottle', x + 12, y + 42);
+    
+    const colW = 140 * scale, rowH = 110 * scale, margin = 15 * scale;
+    this.hoverItem = null;
+    
+    for (let i = 0; i < this.chemicals.length; i++) {
+      const item = this.chemicals[i];
+      const col = i % 2, row = Math.floor(i / 2);
+      const px = x + 15 + col * (colW + margin);
+      const py = y + 65 + row * (rowH + 10);
+      
+      const over = mouseX > px && mouseX < px + colW &&
+                  mouseY > py && mouseY < py + rowH;
+      
+      // Hover effect
+      if (over) {
+        fill(255, 200, 200, 220); stroke(255, 100, 100); strokeWeight(2 * scale);
+        this.hoverItem = item;
+      } else {
+        fill(255, 240, 240, 200); stroke(200); strokeWeight(1 * scale);
+      }
+      rect(px, py, colW, rowH, 12);
+      
+      // Chemical color preview (bottle shape)
+      fill(...item.color, 200); noStroke();
+      rect(px + 20, py + 30, colW - 40, 55, 25, 5, 25, 5);
+      fill(...item.color, 180);
+      rect(px + 25, py + 45, colW - 50, 35, 20);
+      
+      // Label
+      fill(50); textAlign(CENTER); textSize(11 * scale);
+      text(item.label, px + colW/2, py + 95);
+    }
+  }
+  
+  handleClick(mx, my) { return this.hoverItem; }
+}
