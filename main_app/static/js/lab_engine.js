@@ -392,21 +392,19 @@ function proximityCheck() {
     v.glow = 0;
     v.hint = '';
     
-    // Pipette interactions
     if (v.type === 'pipette') {
       const bottle = Object.values(vessels).find(b => b.type === 'bottle');
       const beaker = Object.values(vessels).find(b => b.type === 'beaker');
       
       if (bottle && near(v, bottle, 50)) {
         v.glow = 1;
-        v.hint = 'SHIFT = Suck acid/base';
+        v.hint = 'SHIFT = Suck';
       } else if (beaker && near(v, beaker, 50)) {
         v.glow = 1;
-        v.hint = 'SHIFT = Pour contents';
+        v.hint = 'SHIFT = Pour';
       }
     }
     
-    // pH Meter
     if (v.type === 'pH_meter') {
       const beaker = Object.values(vessels).find(b => b.type === 'beaker');
       if (beaker && near(v, beaker, 50)) {
@@ -414,18 +412,54 @@ function proximityCheck() {
         v.hint = 'Hover to read pH';
       }
     }
-    
-    // Balance
-    if (v.type === 'balance') {
-      const crucible = Object.values(vessels).find(c => c.type === 'crucible');
-      const beaker = Object.values(vessels).find(b => b.type === 'beaker');
-      if ((crucible && near(v, crucible, 50)) || (beaker && near(v, beaker, 50))) {
-        v.glow = 1;
-        v.hint = 'T = Tare';
-      }
-    }
   });
 }
+
+function instrumentReadings() {
+  const balance = Object.values(vessels).find(v => v.type === 'balance');
+  if (!balance) return;
+
+  let totalPhysicalWeight = 0;
+  Object.values(vessels).forEach(v => {
+    if (v.id === balance.id) return;
+    
+    // Check if on pan
+    const onPan = dist(v.x, v.y, balance.x, balance.y - balance.h * 0.4) < 40;
+    v.isOnBalance = onPan; // Flag to hide labels later
+
+    if (onPan) {
+      const tares = { beaker: 45.5, pipette: 15.0, bottle: 80.0, crucible: 25.0 };
+      totalPhysicalWeight += (tares[v.type] || 30.0) + (v.volume || 0);
+    }
+  });
+
+  balance.rawWeight = totalPhysicalWeight;
+  let targetWeight = max(0, balance.rawWeight - (balance.tareOffset || 0));
+
+  // --- ANALYTICAL STABILIZATION LOGIC ---
+  if (balance.displayWeight === undefined) balance.displayWeight = 0;
+  
+  // Smoothly glide toward the target weight
+  balance.displayWeight = lerp(balance.displayWeight, targetWeight, 0.1);
+
+  
+}
+
+function drawBalanceDisplay(v) {
+  push();
+  const lcdX = -v.w * 0.25;
+  const lcdY = v.h * 0.01; 
+
+  fill(0);
+  textAlign(RIGHT, CENTER);
+  textSize(v.h * 0.10);
+  
+  // Make sure you don't have a variable named 'text' here
+  let displayVal = nf(v.displayWeight || 0, 1, 3) + "g";
+  text(displayVal, lcdX + v.w * 0.38, lcdY + v.h * 0.1);
+  pop();
+}
+
 
 // ======================================================
 // PHYSICS & SURFACE SNAPPING
@@ -433,49 +467,58 @@ function proximityCheck() {
 function applyLabPhysics(v) {
   if (v.dragging) return;
 
-  // Gravity
+  // 1. Check Balance Snapping
+  const balance = Object.values(vessels).find(b => b.type === 'balance');
+  let snappedToBalance = false;
+
+  if (balance && v.id !== balance.id && !isNaN(balance.x) && 
+      dist(v.x, v.y, balance.x, balance.y - balance.h * 0.4) < 60) {
+    
+    v.x = lerp(v.x, balance.x, 0.2); 
+    v.y = lerp(v.y, balance.y - balance.h * 0.45, 0.2); 
+    v.vy = 0;
+    v.surface = null; 
+    snappedToBalance = true;
+    v.isOnBalance = true; // NEW: Set this flag to hide labels
+  } else {
+    v.isOnBalance = false; // NEW: Reset flag when moved away
+  }
+
+  if (snappedToBalance) return;
+
+  // 2. Standard Gravity and Surface logic
   const gravity = 1.2;
   v.vy += gravity;
   v.y += v.vy;
 
-  // Find closest surface
   let closestSurface = null;
   let minDist = Infinity;
   
-  Object.values(labSurfaces).forEach(surf => {
-    const dist = abs(v.y - surf.y);
-    if (dist < minDist) {
-      minDist = dist;
-      closestSurface = surf;
-    }
-  });
+  if (labSurfaces) {
+    Object.values(labSurfaces).forEach(surf => {
+      const d = abs(v.y - surf.y);
+      if (d < minDist) { minDist = d; closestSurface = surf; }
+    });
+  }
 
-  // Snap to surface + dynamic positioning
-  if (closestSurface && v.y >= closestSurface.y - 20) {
+  if (closestSurface && v.y >= closestSurface.y - 10) {
     v.y = closestSurface.y;
     v.vy = 0;
     v.surface = closestSurface;
     
-    // DYNAMIC SPACING - apparatus auto-arrange!
-    const spacing = v.w * 1.3;  // Perfect spacing based on size
-    const sameSurfaceVessels = Object.values(vessels).filter(other => 
-      other !== v && 
-      other.surface === closestSurface && 
-      abs(other.y - v.y) < 15  // Same row
+    // Auto-arrangement logic
+    const spacing = v.w * 1.3;
+    const neighbors = Object.values(vessels).filter(other => 
+      other !== v && other.surface === closestSurface && abs(other.y - v.y) < 15
     );
     
-    // Repel from neighbors (smooth arrangement)
-    sameSurfaceVessels.forEach(neighbor => {
-      const dx = v.x - neighbor.x;
+    neighbors.forEach(n => {
+      const dx = v.x - n.x;
       const overlap = spacing - abs(dx);
-      if (overlap > 0) {
-        v.x += (dx > 0 ? overlap * 0.12 : -overlap * 0.12);
+      if (overlap > 0 && !isNaN(dx)) {
+        v.x += (dx > 0 ? overlap * 0.1 : -overlap * 0.1);
       }
     });
-    
-    // Gentle bounds (not harsh constrain)
-    const margin = v.w * 0.6 + 20;
-    v.x = lerp(v.x, constrain(v.x, closestSurface.minX + margin, closestSurface.maxX - margin), 0.15);
   }
 }
 
@@ -604,31 +647,6 @@ function handlePipetteInteraction() {
   }
 }
 
-// ======================================================
-// INSTRUMENT READINGS
-// ======================================================
-function instrumentReadings() {
-  // pH Meter reading
-  const phMeter = Object.values(vessels).find(v => v.type === 'pH_meter');
-  if (phMeter) {
-    const beaker = Object.values(vessels).find(b => b.type === 'beaker' && near(phMeter, b, 50));
-    if (beaker) {
-      phMeter.reading = map(beakerTargetVol, 0, 25, 1, 11); // Simulated pH curve
-    }
-  }
-
-  // Balance reading
-  const balance = Object.values(vessels).find(v => v.type === 'balance');
-  if (balance) {
-    const crucible = Object.values(vessels).find(c => c.type === 'crucible' && near(balance, c, 50));
-    const beaker = Object.values(vessels).find(b => b.type === 'beaker' && near(balance, b, 50));
-    if (crucible) {
-      balance.mass = crucible.volume * 1.2; // Simulated mass
-    } else if (beaker) {
-      balance.mass = beaker.volume;
-    }
-  }
-}
 function drawSnapGuides() {
   
 }
@@ -710,10 +728,9 @@ function drawVessel(v) {
   const over = mouseX > v.x - v.w/2 && mouseX < v.x + v.w/2 &&
               mouseY > v.y - v.h/2 && mouseY < v.y + v.h/2;
 
-  if (over && !isDragging) 
-    {
-      hoverVessel = v;
-    }
+  if (over && !isDragging) {
+    hoverVessel = v;
+  }
 
   push();
   translate(v.x, v.y);
@@ -725,62 +742,42 @@ function drawVessel(v) {
     drawingContext.shadowBlur = 30 * v.glow;
   }
 
-  // Vessel sprites (ALL 17 apparatus)
+  // --- SPRITE RENDERING ---
   if (v.type === 'beaker') {
-  image(imgBeaker, 0, 0, v.w, v.h);
-  drawRealisticLiquid(v, color(100, 200, 255)); 
-} 
+    image(imgBeaker, 0, 0, v.w, v.h);
+    drawRealisticLiquid(v, color(100, 200, 255)); 
+  } 
   else if (v.type === 'burette') {
-  image(imgBurette, 0, 0, v.w, v.h);
-  drawRealisticLiquid(v, v.color || color(255, 160, 100));
-}
-  else if (v.type === 'pipette') {
-  image(imgPipette, 0, 0, v.w, v.h);
-  drawRealisticLiquid(v, color(200, 200, 200)); // Default clear
-}
-  else if (v.type === 'bottle') {
-  image(imgBottle, 0, 0, v.w, v.h);
-  
-  let liquidColor = v.color ? color(...v.color) : color(100, 200, 255);
-    drawRealisticLiquid(v, v.color || color(100, 200, 255));
-
-  
-  // AUTO BOTTLE LABEL from catalog data
-  if (v.chemicalId) {
-    push();
-    translate(-1, 8);
-    
-    // Get chemical info from catalog (you'll need a lookup function)
-    const chemInfo = getChemicalInfo(v.chemicalId);
-    
-    fill(0); textAlign(CENTER, CENTER); textStyle(BOLD);
-    
-    // Line 1: Full chemical name
-    textSize(8);
-    text(chemInfo.name, 0, -7);
-    
-    // Line 2: Formula
-    textSize(9);
-    fill(20); textStyle(BOLD);
-    text(chemInfo.formula, 0, 5);
-    
-    // Line 3: Concentration
-    if (chemInfo.conc) {
-      textSize(7);
-      fill(60);
-      text(chemInfo.conc, 0, 16);
-    }
-    pop();
+    image(imgBurette, 0, 0, v.w, v.h);
+    drawRealisticLiquid(v, v.color || color(255, 160, 100));
   }
-}
-
-
+  else if (v.type === 'pipette') {
+    image(imgPipette, 0, 0, v.w, v.h);
+    drawRealisticLiquid(v, color(200, 200, 200));
+  }
+  else if (v.type === 'bottle') {
+    image(imgBottle, 0, 0, v.w, v.h);
+    drawRealisticLiquid(v, v.color || color(100, 200, 255));
+    
+    if (v.chemicalId) {
+      push(); translate(-1, 8);
+      const chemInfo = getChemicalInfo(v.chemicalId);
+      fill(0); textAlign(CENTER, CENTER); textStyle(BOLD);
+      textSize(8); text(chemInfo.name, 0, -7);
+      textSize(9); text(chemInfo.formula, 0, 5);
+      if (chemInfo.conc) { textSize(7); fill(60); text(chemInfo.conc, 0, 16); }
+      pop();
+    }
+  }
+  else if (v.type === 'balance') {
+    image(imgBalance, 0, 0, v.w, v.h);
+    drawBalanceDisplay(v); // Integrated realistic meter
+  }  
   else if (v.type === 'conical_flask') image(imgConical, 0, 0, v.w, v.h);
   else if (v.type === 'volumetric_flask') image(imgVolumetric, 0, 0, v.w, v.h);
   else if (v.type === 'funnel') image(imgFunnel, 0, 0, v.w, v.h);
   else if (v.type === 'wash_bottle') image(imgWash, 0, 0, v.w, v.h);
   else if (v.type === 'bunsen_burner') image(imgBunsen, 0, 0, v.w, v.h);
-  else if (v.type === 'balance') image(imgBalance, 0, 0, v.w, v.h);
   else if (v.type === 'crucible') image(imgCrucible, 0, 0, v.w, v.h);
   else if (v.type === 'hotplate') image(imgHotplate, 0, 0, v.w, v.h);
   else if (v.type === 'liebig_condensor') image(imgLiebig, 0, 0, v.w, v.h);
@@ -788,42 +785,34 @@ function drawVessel(v) {
   else if (v.type === 'pH_meter') image(imgPHMeter, 0, 0, v.w, v.h);
   else if (v.type === 'separatory_funnel') image(imgSepFunnel, 0, 0, v.w, v.h);
   else if (v.type === 'TLC_plate') image(imgTLC, 0, 0, v.w, v.h);
-
-  
-
-  // Fallback
   else {
-    fill(200, 200, 220);
-    stroke(100);
-    strokeWeight(2);
+    fill(200, 200, 220); stroke(100); strokeWeight(2);
     rect(-v.w/2, -v.h/2, v.w, v.h, 8);
-    fill(0); textAlign(CENTER, CENTER); textSize(12);
-    text(v.type, 0, 0);
+    fill(0); textAlign(CENTER, CENTER); textSize(12); text(v.type, 0, 0);
   }
 
   drawingContext.shadowBlur = 0;
   drawingContext.shadowColor = 'transparent';
 
-  if (v.type !== 'bottle') {  // ← KEY FIX: Skip bottles
-  textAlign(CENTER);
-  textSize(11); fill(30);
-  text(v.title || v.type, 0, v.h/2 + 15);
-  textSize(10);
-  text(v.chem || 'Empty', 0, v.h/2 + 28);
-}
+  // --- LABEL LOGIC: Hide if it's a bottle, the balance, or an item ON the balance ---
+  const shouldHideLabel = v.type === 'bottle' || v.type === 'balance' || v.isOnBalance;
 
-  // Instrument displays
+  if (!shouldHideLabel) {
+    textAlign(CENTER);
+    textSize(11); fill(30);
+    text(v.title || v.type, 0, v.h/2 + 15);
+    textSize(10);
+    text(v.chem || 'Empty', 0, v.h/2 + 28);
+  }
+
+  // --- INSTRUMENT OVERLAYS ---
   if (v.type === 'pH_meter' && v.reading) {
     drawDigitalDisplay(20, -30, `pH: ${nf(v.reading, 1, 2)}`);
   }
-  if (v.type === 'balance' && v.mass !== undefined) {
-    drawDigitalDisplay(-40, -60, `Mass: ${nf(v.mass, 1, 3)}g`);
-  }
+  // Note: The green balance display was removed from here to fix the duplication issue.
 
-  // Hints
   if (v.hint) {
-    fill(0, 255, 0, 200);
-    textSize(10); textAlign(CENTER);
+    fill(0, 255, 0, 200); textSize(10); textAlign(CENTER);
     text(v.hint, 0, -v.h/2 - 10);
   }
 
@@ -990,7 +979,7 @@ function drawGenericLiquid(v, col, fillRatio) {
 }
 
 
-function drawDigitalDisplay(x, y, text) {
+function drawDigitalDisplay(x, y, label) { // Change 'text' to 'label' here
   // Digital display background
   fill(0, 50);
   stroke(100);
@@ -1002,7 +991,8 @@ function drawDigitalDisplay(x, y, text) {
   noStroke();
   textAlign(LEFT, CENTER);
   textSize(11);
-  text(text, x, y);
+  // This now correctly calls the p5.js text() function
+  text(label, x, y); 
 }
 
 // ======================================================
@@ -1199,6 +1189,19 @@ function mousePressed() {
     }
   }
 
+  Object.values(vessels).forEach(v => {
+    if (v.type === 'balance') {
+      // Check if mouse is over the "TARE" button area (bottom right of the control panel)
+      const isOverTare = mouseX > v.x + v.w * 0.1 && mouseX < v.x + v.w * 0.4 &&
+                         mouseY > v.y + v.h * 0.1 && mouseY < v.y + v.h * 0.4;
+      
+      if (isOverTare) {
+        // Taring: Set the offset to the current raw weight
+        v.tareOffset = v.rawWeight;
+        console.log("Balance Tared to:", v.tareOffset);
+      }
+    }
+  });
   // Drag vessels
   const keys = Object.keys(vessels);
   for (let i = keys.length - 1; i >= 0; i--) {
@@ -1275,11 +1278,8 @@ if (key === ' ' || keyCode === 32) {
 
   // T - Tare balance
   if (key.toLowerCase() === 't') {
-    const balance = Object.values(vessels).find(v => v.type === 'balance');
-    if (balance) {
-      balance.massOffset = balance.mass || 0;
-      console.log('Balance tared');
-    }
+     const balance = Object.values(vessels).find(v => v.type === 'balance');
+     if (balance) balance.tareOffset = balance.rawWeight;
   }
 
   // H - Heat toggle
@@ -1382,14 +1382,16 @@ function spawnApparatusFromCatalog(item) {
     v = makeResponsiveVessel(nextId('bunsen_burner'), 'bunsen_burner');
     if (v) v.title = 'Bunsen Burner';
   }
-  else if (type === 'balance') {
-    v = makeResponsiveVessel(nextId('balance'), 'balance');
-    if (v) {
-      v.title = 'Analytical Balance';
-      v.mass = 0;
-      v.massOffset = 0;
-    }
+   else if (type === 'balance') {
+  v = makeResponsiveVessel(nextId('balance'), 'balance');
+  if (v) {
+    v.title = 'Analytical Balance';
+    v.tareOffset = 0;   // Explicitly initialize
+    v.rawWeight = 0;    // Explicitly initialize
+    v.displayWeight = 0; // Explicitly initialize
+    v.mass = 0;         // For backwards compatibility
   }
+}
   else if (type === 'crucible') {
     v = makeResponsiveVessel(nextId('crucible'), 'crucible');
     if (v) {
