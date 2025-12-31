@@ -358,22 +358,69 @@ function applySloshPhysics(v) {
 // ======================================================
 // VESSEL MODEL
 // ======================================================
+/**
+ * PHASE 1 UPDATED VESSEL MODEL
+ * This model now tracks chemical volumes specifically for the Jan 8th test.
+ */
 function makeVessel(id, x, y, w, h, title, chem, vtype, vol, cap) {
-  
   return {
-    id, x, y, w, h,
-    title, chem, type: vtype,
-    volume: vol, capacity: cap,
+    // --- BASIC IDENTITY ---
+    id: id,
+    type: vtype,
+    title: title,
+    chem: chem,             // Display label (e.g., "0.1 M HCl")
+    chemicalId: null,       // Catalog ID (e.g., "hcl_0_1M")
+    
+    // --- DIMENSIONS & PHYSICS ---
+    x: x, 
+    y: y, 
+    w: w, 
+    h: h,
+    vx: 0, 
+    vy: 0,
+    lastX: x,               // For slosh physics calculation
+    tilt: 0,                // Visual tilt angle
+    tiltVel: 0,             // Tilt momentum
+    surface: null,          // Which lab surface it's on
+    
+    // --- VOLUME & CAPACITY ---
+    volume: vol,            // The total visual liquid level (mL)
+    capacity: cap,          // Maximum allowed (mL)
+    
+    hasFunnel: false, 
+    tiltAngle: 0, // 0 to 90 degrees
+    isDraining: false,
+
+    // --- UI & INTERACTION STATES ---
     dragging: false,
     isUnderBurette: false,
-    chemicalId: null,
-    surface: null,
-    vx: 0, vy: 0,
-    lastX: x,
-    tilt: 0,
-    tiltVel: 0,
-    glow: 0, // Proximity glow effect
-    hint: '' // Contextual hint
+    isOnBalance: false,     // Visual flag to hide labels
+    glow: 0,                // Proximity feedback
+    hint: '',               // Contextual guidance
+    color: [200, 220, 255, 150], // Current liquid color (RGBA)
+
+    // ======================================================
+    // NEW: THE CHEMICAL BRAIN (For Double Indicator Test)
+    // ======================================================
+    contents: {
+      // Precise volume tracking for marking
+      mixture_vol: 0,       // Volume of Na2CO3 + NaHCO3 (Analyte)
+      hcl_vol: 0,           // Volume of HCl added (Titrant)
+      water_vol: 0,         // For rinsing/dilution checks
+      
+      // Indicator Tracking
+      pp_drops: 0,          // Phenolphthalein drops
+      mo_drops: 0,          // Methyl Orange drops
+      
+      // Assessment Flags (Procedural Marking)
+      isRinsed: false,      // Did student clean it before use?
+      isContaminated: false, // Flagged if wrong chemicals mixed
+      titrationStage: 1,    // 1 = V1 (PP), 2 = V2 (MO)
+      
+      // Target values (Updated dynamically during experiment)
+      theoreticalV1: 10.0,  
+      theoreticalV2: 25.0   
+    }
   };
 }
 
@@ -382,6 +429,57 @@ function makeResponsiveVessel(id, type) {
   const spawnPos = smartSpawnPosition(type);
   const size = currentPositions.sizes[type] || currentPositions.sizes.beaker;
   return makeVessel(id, spawnPos.x, spawnPos.y, size.w, size.h, type, 'Empty', type, 0, 100);
+}
+
+function getTitrationColor(v) {
+  const c = v.contents;
+  
+  // 1. Basic mixture color (Clear/Distilled look)
+  let baseColor = [220, 230, 255, 120]; 
+
+  // 2. Stage 1: Phenolphthalein (Pink -> Colorless)
+  if (c.pp_drops > 0 && c.mo_drops === 0) {
+    if (c.hcl_vol < 10.0) {
+      // Deep pink if 0mL HCl, fades to pale pink near 10mL
+      let alpha = map(c.hcl_vol, 8.0, 10.0, 180, 0, true);
+      return [255, 105, 180, alpha]; 
+    } else {
+      return [240, 240, 255, 100]; // Colorless
+    }
+  }
+
+  // 3. Stage 2: Methyl Orange (Yellow -> Orange/Red)
+  if (c.mo_drops > 0) {
+    if (c.hcl_vol < 25.0) {
+      return [255, 220, 0, 180]; // Golden Yellow
+    } else if (c.hcl_vol >= 25.0 && c.hcl_vol < 25.5) {
+      return [255, 140, 0, 200]; // Orange (End point)
+    } else {
+      return [220, 50, 0, 220]; // Red (Overshot)
+    }
+  }
+
+  return baseColor;
+}
+
+function handleIndicatorDrops() {
+  const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
+  if (!isDragging || !flask) return;
+
+  // Check if dragging Phenolphthalein or Methyl Orange bottle
+  if (isDragging.chemicalId === 'phenolphthalein' || isDragging.chemicalId === 'methyl_orange') {
+    if (near(isDragging, flask, 60) && mouseIsPressed && frameCount % 30 === 0) {
+      
+      // Add a visual drop particle
+      createParticles(isDragging.x, isDragging.y + 30, 1, 'drip');
+      
+      // Update state
+      if (isDragging.chemicalId === 'phenolphthalein') flask.contents.pp_drops++;
+      if (isDragging.chemicalId === 'methyl_orange') flask.contents.mo_drops++;
+      
+      console.log("Drops added to flask");
+    }
+  }
 }
 
 // ======================================================
@@ -465,6 +563,17 @@ function drawBalanceDisplay(v) {
 // PHYSICS & SURFACE SNAPPING
 // ======================================================
 function applyLabPhysics(v) {
+  if (v.type === 'funnel' && v.isAttachedTo) {
+    const parent = vessels[v.isAttachedTo];
+    if (parent) {
+      v.x = parent.x;
+      v.y = parent.y - (parent.h * 0.46);
+      v.vy = 0; // Disable gravity for attached items
+      return; 
+    } else {
+      v.isAttachedTo = null; // Parent was deleted
+    }
+  }
   if (v.dragging) return;
 
   // 1. Check Balance Snapping
@@ -609,40 +718,40 @@ function handlePipetteInteraction() {
 
   const pipette = isDragging;
   const bottle = Object.values(vessels).find(v => v.type === 'bottle' && v.volume > 0 && near(pipette, v, 60));
-  const beaker = Object.values(vessels).find(v => v.type === 'beaker' && near(pipette, v, 60));
+  // Find receiver (beaker or conical flask)
+  const receiver = Object.values(vessels).find(v => (v.type === 'beaker' || v.type === 'conical_flask') && near(pipette, v, 60));
 
   if (bottle && keyIsDown(SHIFT)) {
-    // SUCKING MOTION
     const step = 0.8;
     if (bottle.volume >= step && pipetteTargetVol < pipette.capacity) {
       bottle.volume -= step;
       pipetteTargetVol += step;
       
-      // Transfer Chemical Properties to Pipette
       pipette.color = bottle.color;
       pipette.chemicalId = bottle.chemicalId;
       pipette.chem = bottle.chem;
-
-      if (frameCount % 5 === 0) createParticles(bottle.x, bottle.y + 20, 1, 'bubble');
     }
   }
   
-  if (beaker && keyIsDown(SHIFT)) {
-    // POURING MOTION
+  if (receiver && keyIsDown(SHIFT)) {
     const step = 0.8;
-    if (pipetteTargetVol >= step && beakerTargetVol < beaker.capacity) {
+    if (pipetteTargetVol >= step && receiver.volume < receiver.capacity) {
       pipetteTargetVol -= step;
-      beakerTargetVol += step;
+      receiver.volume += step;
       
-      // Transfer Chemical Properties to Beaker
-      beaker.color = pipette.color;
-      beaker.chemicalId = pipette.chemicalId;
-      beaker.chem = pipette.chem;
+      // --- PHASE 1 FIX: TRANSFER CHEMICAL TO THE BRAIN ---
+      if (pipette.chemicalId === 'na2co3_nahco3') {
+          receiver.contents.mixture_vol += step;
+      }
+      // --------------------------------------------------
 
-      // Draw the colored stream
+      receiver.color = pipette.color;
+      receiver.chemicalId = pipette.chemicalId;
+      receiver.chem = pipette.chem;
+
       let tipX = pipette.x;
       let tipY = pipette.y + (pipette.h * 0.4);
-      drawPouringStream(tipX, tipY, beaker.x, beaker.y - 15, color(...(pipette.color || [100, 200, 255])));
+      drawPouringStream(tipX, tipY, receiver.x, receiver.y - 15, color(...(pipette.color || [100, 200, 255])));
     }
   }
 }
@@ -691,11 +800,17 @@ function draw() {
   Object.values(vessels).forEach(v => applyLabPhysics(v));
   easeVolumes();
   handlePipetteInteraction();
+    handleBuretteFilling(); // <--- ADD THIS HERE
+  handleIndicatorDrops();
   instrumentReadings();
 
   // Draw shadows first, then vessels
   Object.values(vessels).forEach(v => drawShadow(v));
-  Object.values(vessels).forEach(v => drawVessel(v));
+Object.values(vessels).forEach(v => {
+    drawVessel(v);
+    if (v.type === 'burette') drawBuretteZoom(v); // Call the zoom here
+  });
+  
   drawTitrationZone();
   drawSnapGuides();  // ✨ Visual feedback!
 
@@ -773,8 +888,14 @@ function drawVessel(v) {
     image(imgBalance, 0, 0, v.w, v.h);
     drawBalanceDisplay(v); // Integrated realistic meter
   }  
-  else if (v.type === 'conical_flask') image(imgConical, 0, 0, v.w, v.h);
-  else if (v.type === 'volumetric_flask') image(imgVolumetric, 0, 0, v.w, v.h);
+else if (v.type === 'conical_flask') {
+  image(imgConical, 0, 0, v.w, v.h);
+  
+  // NEW: Calculate dynamic titration color
+  let activeColor = getTitrationColor(v);
+  drawRealisticLiquid(v, color(...activeColor)); 
+} 
+ else if (v.type === 'volumetric_flask') image(imgVolumetric, 0, 0, v.w, v.h);
   else if (v.type === 'funnel') image(imgFunnel, 0, 0, v.w, v.h);
   else if (v.type === 'wash_bottle') image(imgWash, 0, 0, v.w, v.h);
   else if (v.type === 'bunsen_burner') image(imgBunsen, 0, 0, v.w, v.h);
@@ -911,6 +1032,30 @@ function drawRealisticLiquid(v, col) {
     vertex(w/2, topY - slosh);
     bezierVertex(0, topY + 4, -w/4, topY + 4, -w/2, topY + slosh);
     endShape(CLOSE);
+  }
+  else if (v.type === 'burette') {
+    // Burettes are very narrow tubes
+    const w = v.w * 0.12; 
+    const bottomY = v.h * 0.38; // Bottom of the glass tube before the stopcock
+    const hMax = v.h * 0.75;    // Total height of the graduated part
+    
+    const fillRatio = v.volume / v.capacity;
+    const topY = bottomY - (hMax * fillRatio);
+
+    // Liquid Color (HCl is usually clear, but we give it a slight tint for the UI)
+    fill(255, 120, 80, 180); 
+    noStroke();
+    
+    // Draw the column of liquid
+    rect(-w/2, topY, w, bottomY - topY);
+    
+    // Meniscus (The curve at the top)
+    fill(255, 120, 80, 255);
+    ellipse(0, topY, w, 4);
+
+    // Highlight for glass effect
+    stroke(255, 100); strokeWeight(1);
+    line(-w/4, topY + 5, -w/4, bottomY - 5);
   }
   pop();
 }
@@ -1115,6 +1260,10 @@ function drawControlsPanel() {
   text('SHIFT+SPACE = Fast', x + 15, y + 70);
   text('H = Heat ON/OFF', x + 15, y + 90);
   text('T = Tare/Reset', x + 15, y + 110);
+  text('↑ / ↓  = Tilt Bottle (Fill)', x + 15, y + 50);
+  text('SPACE  = Titrate (Flask)', x + 15, y + 70);
+  text('S Key  = Drain (Zeroing)', x + 15, y + 90);
+  text('D Key  = Add Indicator Drop', x + 15, y + 110);
 }
 
 function drawCatalogPanel() {
@@ -1227,6 +1376,28 @@ function mouseDragged() {
 
 function mouseReleased() {
   if (isDragging) {
+    // --- FUNNEL SNAPPING LOGIC ---
+    if (isDragging.type === 'funnel') {
+      const burette = Object.values(vessels).find(v => v.type === 'burette');
+      if (burette) {
+        // Calculate the exact top of the burette glass
+        const buretteTopX = burette.x;
+        const buretteTopY = burette.y - (burette.h * 0.46); // Adjusted for sprite height
+        
+        if (dist(isDragging.x, isDragging.y, buretteTopX, buretteTopY) < 40) {
+          // Snap funnel to burette
+          isDragging.x = buretteTopX;
+          isDragging.y = buretteTopY;
+          isDragging.isAttachedTo = burette.id; // Record the connection
+          burette.hasFunnel = true;            // Mark burette as ready to fill
+          console.log("Funnel Snapped to Burette!");
+        } else {
+          isDragging.isAttachedTo = null;
+          burette.hasFunnel = false;
+        }
+      }
+    }
+    
     isDragging.dragging = false;
     isDragging = null;
   }
@@ -1240,58 +1411,227 @@ function mouseClicked() {
 }
 
 function keyPressed() {
-  // Remove with 'R'
-  if (key.toLowerCase() === 'r' && hoverVessel) {
+  const keyL = key.toLowerCase();
+
+  // 1. REMOVE APPARATUS
+  if (keyL === 'r' && hoverVessel) {
     delete vessels[hoverVessel.id];
     hoverVessel = null;
     return;
   }
 
-  // SPACE - Titration
-// Inside keyPressed() or a dedicated titration update function:
-if (key === ' ' || keyCode === 32) {
-  const beaker = Object.values(vessels).find(v => v.type === 'beaker');
+  // 2. TARE BALANCE
+  if (keyL === 't') {
+    const balance = Object.values(vessels).find(v => v.type === 'balance');
+    if (balance) balance.tareOffset = balance.rawWeight;
+  }
+
+  // 3. HEAT TOGGLE
+  if (keyL === 'h') {
+    const hotplate = Object.values(vessels).find(v => v.type === 'hotplate');
+    if (hotplate) hotplate.heating = !hotplate.heating;
+  }
+
+  // 4. ADD INDICATOR DROP (Crucial for Phase 1 Testing)
+  // Logic: If you are dragging an indicator bottle over a flask/beaker, press 'D' to add a drop.
+  if (keyL === 'd' && isDragging) {
+    const target = Object.values(vessels).find(v => 
+      (v.type === 'conical_flask' || v.type === 'beaker') && near(isDragging, v, 60)
+    );
+    
+    if (target) {
+      if (isDragging.chemicalId === 'phenolphthalein') {
+        target.contents.pp_drops++;
+        createParticles(isDragging.x, isDragging.y + 20, 2, 'drip');
+        console.log("PP drops in flask:", target.contents.pp_drops);
+      } else if (isDragging.chemicalId === 'methyl_orange') {
+        target.contents.mo_drops++;
+        createParticles(isDragging.x, isDragging.y + 20, 2, 'drip');
+        console.log("MO drops in flask:", target.contents.mo_drops);
+      }
+    }
+  }
+// Inside keyPressed()
+if (key.toLowerCase() === 's') {
   const burette = Object.values(vessels).find(v => v.type === 'burette');
-  
-  if (beaker && burette) {
-    const d = dist(beaker.x, beaker.y, burette.x - 45, burette.y + 120);
-    if (d < 80) {
-      // Logic for titration transfer
+  // Check if any beaker is under the burette to catch waste
+  const wasteBeaker = Object.values(vessels).find(v => 
+    v.type === 'beaker' && dist(v.x, v.y, burette.x, burette.y + 150) < 60
+  );
+
+  if (burette && wasteBeaker) {
+    // Small drainage for precision zeroing
+    const drainAmount = 0.02; 
+    if (burette.volume > 0) {
+       burette.volume -= drainAmount;
+       wasteBeaker.volume += drainAmount;
+       createParticles(burette.x, burette.y + 120, 1, 'drip');
+    }
+  } else if (burette && !wasteBeaker) {
+     // Penalty logic: If they drain without a beaker, they spill on the table!
+     burette.volume -= 0.02;
+     createParticles(burette.x, burette.y + 120, 1, 'drip');
+     console.log("⚠️ Spilling on table! Use a waste beaker.");
+  }
+}
+  if (key.toLowerCase() === 's') {
+  const burette = Object.values(vessels).find(v => v.type === 'burette');
+  const wasteBeaker = Object.values(vessels).find(v => v.type === 'beaker' && dist(v.x, v.y, burette.x, burette.y + 150) < 50);
+
+  if (burette && wasteBeaker) {
+    const drainRate = 0.05; // Slow drainage for precision
+    if (burette.volume > 0) {
+      burette.volume -= drainRate;
+      wasteBeaker.volume += drainRate;
+      
+      // Visual Drip
+      createParticles(burette.x, burette.y + 120, 1, 'drip');
+      console.log("Draining... Current Vol:", burette.volume);
+    }
+  }
+}
+  // 5. TITRATION (SPACE BAR)
+  // Note: In p5.js, keyPressed only fires ONCE per press. 
+  // For continuous titration, the logic below is better placed in the draw() loop 
+  // using keyIsDown(32), but here is the corrected logic for Phase 1:
+  if (key === ' ' || keyCode === 32) {
+    const burette = Object.values(vessels).find(v => v.type === 'burette');
+    // Find EITHER a beaker OR a conical flask under the burette
+    const receiver = Object.values(vessels).find(v => 
+      (v.type === 'beaker' || v.type === 'conical_flask') && 
+      dist(v.x, v.y, burette.x - 45, burette.y + 120) < 80
+    );
+
+    if (burette && receiver) {
       const flow = keyIsDown(SHIFT) ? 0.6 : 0.15;
       
-      if (buretteTargetVol >= flow && beakerTargetVol < beaker.capacity) {
+      if (burette.volume >= flow && receiver.volume < receiver.capacity) {
+        // --- UPDATING VISUALS ---
         buretteTargetVol -= flow;
-        beakerTargetVol += flow;
+        receiver.volume += flow; // Update the receiver's local volume
         studentVolume += flow;
+
+        // --- PHASE 1: UPDATING THE CHEMICAL BRAIN ---
+        receiver.contents.hcl_vol += flow; 
         
-        // DRAW THE REALISTIC STREAM
+        // Visual feedback
         drawPouringStream(
-          burette.x - 45, burette.y + 110, // From burette tip
-          beaker.x, beaker.y - 15,          // To beaker center
-          color(255, 160, 100)              // Chemical color
+          burette.x - 45, burette.y + 110, 
+          receiver.x, receiver.y - 15, 
+          color(255, 160, 100)
         );
       }
     }
   }
 }
+function handleBuretteFilling() {
+  if (!isDragging || isDragging.type !== 'bottle') return;
+  
+  const burette = Object.values(vessels).find(v => v.type === 'burette');
+  if (!burette) return;
 
+  const buretteTopY = burette.y - (burette.h * 0.45);
+  const distance = dist(mouseX, mouseY, burette.x, buretteTopY);
 
-  // T - Tare balance
-  if (key.toLowerCase() === 't') {
-     const balance = Object.values(vessels).find(v => v.type === 'balance');
-     if (balance) balance.tareOffset = balance.rawWeight;
-  }
+  if (distance < 70) {
+    if (!burette.hasFunnel) {
+      isDragging.hint = "⚠️ Need Funnel on top!";
+      return;
+    }
 
-  // H - Heat toggle
-  if (key.toLowerCase() === 'h') {
-    const hotplate = Object.values(vessels).find(v => v.type === 'hotplate');
-    if (hotplate) {
-      hotplate.heating = !hotplate.heating;
-      console.log('Hotplate:', hotplate.heating ? 'ON' : 'OFF');
+    // --- LAPTOP FRIENDLY CONTROLS ---
+    isDragging.hint = "Arrows ↑/↓ to Tilt & Pour";
+
+    // Initialize tiltAngle if not exists
+    if (isDragging.tiltAngle === undefined) isDragging.tiltAngle = 0;
+
+    // Use Arrow Keys for smooth, precise tilting
+    if (keyIsDown(UP_ARROW)) {
+      isDragging.tiltAngle = constrain(isDragging.tiltAngle + 2, 0, 90);
+    } else if (keyIsDown(DOWN_ARROW)) {
+      isDragging.tiltAngle = constrain(isDragging.tiltAngle - 2, 0, 0);
+    }
+    // Return to upright position slowly if no key is pressed
+    if (!keyIsDown(UP_ARROW) && !keyIsDown(DOWN_ARROW)) {
+       isDragging.tiltAngle = lerp(isDragging.tiltAngle, 0, 0.1);
+    }
+
+    // Calculate Flow based on the tilt angle
+    // (Flow starts at 25 degrees, max at 90)
+    let flowRate = map(isDragging.tiltAngle, 25, 90, 0, 0.8, true);
+    
+    if (flowRate > 0 && isDragging.volume > 0) {
+      if (burette.volume < burette.capacity) {
+        let actualFlow = flowRate * (deltaTime / 25); 
+        burette.volume += actualFlow;
+        isDragging.volume -= actualFlow;
+        
+        // Visual stream
+        drawPouringStream(isDragging.x, isDragging.y + 10, burette.x, buretteTopY - 10, color(255, 120, 80));
+      } else {
+        isDragging.hint = "⚠️ BURETTE FULL / OVERFLOW!";
+      }
     }
   }
 }
 
+// Add this to your global window events to control tilt
+function mouseWheel(event) {
+  if (isDragging && isDragging.type === 'bottle') {
+    isDragging.tiltAngle = constrain((isDragging.tiltAngle || 0) - event.delta * 0.1, 0, 90);
+    return false; // prevent page scroll
+  }
+}
+
+function drawBuretteZoom(v) {
+  const zoomX = width - 250;
+  const zoomY = 150;
+  const zoomSize = 180;
+
+  // Only show if bottle or meniscus is near the top
+  const isNearTop = v.volume > v.capacity - 5;
+  if (!isNearTop && !isDragging) return;
+
+  push();
+  // Draw Zoom Circular Frame
+  fill(255); stroke(0); strokeWeight(3);
+  circle(zoomX, zoomY, zoomSize);
+  clip(() => { circle(zoomX, zoomY, zoomSize); }); // p5.js masking
+
+  // Draw Magnified Burette
+  translate(zoomX, zoomY + 300); // Center the top of the burette
+  scale(5); // 5x Magnification
+  
+  // Re-draw the tube and the graduation lines
+  noFill(); stroke(100, 150); strokeWeight(0.5);
+  rect(-10, -100, 20, 150);
+  
+  // Draw Graduation Lines (The tricky part!)
+  for(let i=0; i <= 50; i++) {
+    let lineY = -100 + (i * 10);
+    line(-10, lineY, (i % 5 === 0 ? 5 : 0), lineY);
+    if(i % 10 === 0) {
+       fill(0); textSize(4); noStroke();
+       text(i/10, 8, lineY + 2);
+    }
+  }
+
+  // Draw the rising liquid in high detail
+  let fillRatio = v.volume / v.capacity;
+  let liquidTop = 50 - (150 * fillRatio);
+  fill(255, 120, 80, 150); noStroke();
+  rect(-10, liquidTop, 20, 100);
+  
+  // The Meniscus Curve
+  fill(255, 120, 80);
+  arc(0, liquidTop, 20, 5, PI, 0);
+
+  pop();
+  
+  // Zoom Label
+  fill(0); noStroke(); textAlign(CENTER); textSize(12);
+  text("PRECISION VIEW (0-5 mL)", zoomX, zoomY + zoomSize/2 + 20);
+}
 // ======================================================
 // SPAWN APPARATUS
 // ======================================================
@@ -1343,13 +1683,16 @@ function spawnApparatusFromCatalog(item) {
     }
   }
   else if (type === 'burette') {
-    const cap = askCapacity('burette');
-    if (!cap) return;
+    const cap = askCapacity('burette') || 50;
     const spawnPos = { x: currentPositions.burette_stand.x, y: currentPositions.burette_stand.y };
     const size = currentPositions.sizes.burette;
+    
+    // START AT 0 VOLUME for Phase 1 realism
     v = makeVessel(nextId('burette'), spawnPos.x, spawnPos.y, size.w, size.h,
-      `${cap} mL Burette`, '0.1 M NaOH', 'burette', cap, cap);
-    buretteTargetVol = cap;
+      `${cap} mL Burette`, 'Empty', 'burette', 0, cap);
+      
+    buretteTargetVol = 0; // Target is now 0
+    v.contents.hcl_vol = 0;
   }
   else if (type === 'conical_flask') {
     v = makeResponsiveVessel(nextId('conical_flask'), 'conical_flask');
@@ -1443,6 +1786,7 @@ function spawnApparatusFromCatalog(item) {
     console.log(`Spawned: ${v.title}`);
   }
 }
+
 
 // ======================================================
 // RESET
