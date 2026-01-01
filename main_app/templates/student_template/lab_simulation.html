@@ -78,6 +78,16 @@
     </div>
   </div>
 </div>
+<script>
+    // 1. Capture the rules from Django
+    const EXPERIMENT_CONFIG = JSON.parse('{{ config_json|safe }}');
+    
+    // 2. Set the theoretical targets in the global scope for the engine
+    const THEORETICAL_V1 = EXPERIMENT_CONFIG.targets.v1;
+    const THEORETICAL_V2 = EXPERIMENT_CONFIG.targets.v2;
+    
+    console.log("Lab Config Loaded. Target V1:", THEORETICAL_V1);
+</script>
 
 <script src="{% static 'js/p5.min.js' %}"></script>
 <script src="{% static 'js/lab_catalog.js' %}"></script>

@@ -1,4 +1,5 @@
 import json
+import random
 import math
 from datetime import datetime
 
@@ -174,6 +175,29 @@ def student_view_profile(request):
 
     return render(request, "student_template/student_view_profile.html", context)
 
+# --- NEW VIEW: Save the student's lab result ---
+@csrf_exempt
+def save_lab_report(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            student = get_object_or_404(Student, admin=request.user)
+            
+            # Logic to save to your database
+            # Example (Assuming you have a LabReport model):
+            # LabReport.objects.create(
+            #     student=student,
+            #     experiment_name=data.get('name'),
+            #     score=data.get('totalScore'),
+            #     v1_observed=data.get('v1'),
+            #     v2_observed=data.get('v2'),
+            #     log=data.get('log')
+            # )
+            
+            return JsonResponse({"status": "success", "message": "Experiment report saved successfully!"})
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    return HttpResponseNotAllowed(['POST'])
 
 @csrf_exempt
 def student_fcmtoken(request):
@@ -864,6 +888,21 @@ def lab_experiment_simulation(request, slug):
             "name": "Estimation of Na₂CO₃ and NaHCO₃ in a Mixture",
             "objective": "Estimate sodium carbonate and bicarbonate using double indicator method.",
             "type": "double_indicator",
+            # THE BRAIN: Define marks and success steps here
+            "milestones": [
+                {"id": "fill_burette", "desc": "Fill burette with HCl", "points": 10},
+                {"id": "zero_burette", "desc": "Adjust to 0.00 mL mark", "points": 15},
+                {"id": "pipette_mixture", "desc": "Pipette 20mL of analyte", "points": 15},
+                {"id": "add_pp", "desc": "Add Phenolphthalein", "points": 10},
+                {"id": "reach_v1", "desc": "Find V1 Endpoint (Colorless)", "points": 25},
+                {"id": "add_mo", "desc": "Add Methyl Orange", "points": 10},
+                {"id": "reach_v2", "desc": "Find V2 Endpoint (Red)", "points": 15},
+            ],
+            # THE SECRET TARGETS: Unique for every student session
+            "targets": {
+                "v1": round(random.uniform(9.5, 11.5), 2),  # Random V1 target
+                "v2": round(random.uniform(23.0, 27.0), 2), # Random V2 target
+            }
         },
         "titration": {
             "name": "Acid-Base Titration",
@@ -887,13 +926,15 @@ def lab_experiment_simulation(request, slug):
         },
     }
 
-    experiment = experiment_map.get(slug)
-    if not experiment:
+    experiment_data = experiment_map.get(slug)
+    if not experiment_data:
         raise Http404()
 
     context = {
-        "slug": slug,          # needed by JS
-        "experiment": experiment,
+        "slug": slug,
+        "experiment": experiment_data,
+        # We pass a JSON string so the JavaScript engine can read the rules
+        "config_json": json.dumps(experiment_data),
+        "page_title": "Simulation: " + experiment_data['name']
     }
     return render(request, "student_template/lab_simulation.html", context)
-

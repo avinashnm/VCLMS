@@ -423,54 +423,35 @@ function makeResponsiveVessel(id, type) {
 
 function getTitrationColor(v) {
   const c = v.contents;
-  
-  // 1. Basic mixture color (Clear/Distilled look)
-  let baseColor = [220, 230, 255, 120]; 
+  // Ensure we use the randomized target from your student_views.py
+  // Fallback to 10.0 if for some reason the config didn't load
+  const targetV1 = (typeof THEORETICAL_V1 !== 'undefined') ? THEORETICAL_V1 : 10.0;
+  const targetV2 = (typeof THEORETICAL_V2 !== 'undefined') ? THEORETICAL_V2 : 25.0;
 
-  // 2. Stage 1: Phenolphthalein (Pink -> Colorless)
+  // 1. If flask is basically empty, show water
+  if (c.mixture_vol < 0.5) return [200, 220, 255, 100]; 
+
+  // 2. Stage 1: Phenolphthalein (Analyte + PP = PINK)
   if (c.pp_drops > 0 && c.mo_drops === 0) {
-    if (c.hcl_vol < 10.0) {
-      // Deep pink if 0mL HCl, fades to pale pink near 10mL
-      let alpha = map(c.hcl_vol, 8.0, 10.0, 180, 0, true);
-      return [255, 105, 180, alpha]; 
+    if (c.hcl_vol < targetV1) {
+      // Fade intensity near the endpoint
+      let intensity = map(c.hcl_vol, targetV1 - 1.5, targetV1, 220, 30, true);
+      return [255, 105, 180, intensity]; 
     } else {
-      return [240, 240, 255, 100]; // Colorless
+      return [245, 245, 255, 100]; // Endpoint reached: Colorless
     }
   }
 
-  // 3. Stage 2: Methyl Orange (Yellow -> Orange/Red)
+  // 3. Stage 2: Methyl Orange (After V1 + MO = YELLOW)
   if (c.mo_drops > 0) {
-    if (c.hcl_vol < 25.0) {
-      return [255, 220, 0, 180]; // Golden Yellow
-    } else if (c.hcl_vol >= 25.0 && c.hcl_vol < 25.5) {
-      return [255, 140, 0, 200]; // Orange (End point)
-    } else {
-      return [220, 50, 0, 220]; // Red (Overshot)
-    }
+    if (c.hcl_vol < targetV2) return [255, 210, 0, 180]; // Yellow
+    else return [255, 80, 0, 220]; // Red/Orange Endpoint
   }
 
-  return baseColor;
+  // 4. Default Analyte color (Amber/Tan)
+  return [235, 215, 160, 160];
 }
 
-function handleIndicatorDrops() {
-  const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-  if (!isDragging || !flask) return;
-
-  // Check if dragging Phenolphthalein or Methyl Orange bottle
-  if (isDragging.chemicalId === 'phenolphthalein' || isDragging.chemicalId === 'methyl_orange') {
-    if (near(isDragging, flask, 60) && mouseIsPressed && frameCount % 30 === 0) {
-      
-      // Add a visual drop particle
-      createParticles(isDragging.x, isDragging.y + 30, 1, 'drip');
-      
-      // Update state
-      if (isDragging.chemicalId === 'phenolphthalein') flask.contents.pp_drops++;
-      if (isDragging.chemicalId === 'methyl_orange') flask.contents.mo_drops++;
-      
-      console.log("Drops added to flask");
-    }
-  }
-}
 
 // ======================================================
 // PROXIMITY & GLOW SYSTEM
@@ -710,68 +691,68 @@ function easeVolumes() {
 function near(a, b, radius) {
   return dist(a.x, a.y, b.x, b.y) < radius;
 }
+function handleIndicatorDrops() {
+  if (!isDragging || !mouseIsPressed) return;
+  
+  const flask = Object.values(vessels).find(v => v.type === 'conical_flask' && near(isDragging, v, 70));
+  if (flask && (isDragging.chemicalId === 'phenolphthalein' || isDragging.chemicalId === 'methyl_orange')) {
+    
+    // Slow down drop rate
+    if (frameCount % 30 === 0) {
+      if (isDragging.chemicalId === 'phenolphthalein') flask.contents.pp_drops++;
+      if (isDragging.chemicalId === 'methyl_orange') flask.contents.mo_drops++;
+      createParticles(isDragging.x, isDragging.y + 30, 2, 'drip');
+      console.log("Indicator mixed into flask");
+    }
+  }
+}
 
 function handlePipetteInteraction() {
   if (!isDragging || isDragging.type !== 'pipette') return;
-
   const pipette = isDragging;
   
-  // Find source (Bottle or Beaker)
   const source = Object.values(vessels).find(v => 
-    (v.type === 'bottle' || v.type === 'chemical_bottle' || v.type === 'beaker') && 
-    v.targetVolume > 0.01 && near(pipette, v, 60)
-  );
-  
-  // Find receiver (Beaker or Conical Flask)
+    (v.type === 'bottle' || v.type === 'chemical_bottle' || v.type === 'beaker') && v.targetVolume > 0.01 && near(pipette, v, 60));
+    
   const receiver = Object.values(vessels).find(v => 
-    (v.type === 'beaker' || v.type === 'conical_flask') && near(pipette, v, 60)
-  );
+    (v.type === 'beaker' || v.type === 'conical_flask') && near(pipette, v, 60));
 
-  // --- CONTINUOUS SUCKING (Hold SHIFT) ---
   if (source && keyIsDown(SHIFT)) {
-    let suckRate = 0.5; // Amount per frame
-    // Check if pipette has room and source has liquid
+    let rate = 0.5 * (deltaTime / 50);
     if (pipette.targetVolume < pipette.capacity && source.targetVolume > 0) {
-      // Calculate how much we can actually take
-      let spaceInPipette = pipette.capacity - pipette.targetVolume;
-      let actualSuck = min(suckRate, source.targetVolume, spaceInPipette);
-      
-      source.targetVolume -= actualSuck;
-      pipette.targetVolume += actualSuck;
-      
-      // Transfer Chemical ID and Color
+      let amt = min(rate, source.targetVolume, pipette.capacity - pipette.targetVolume);
+      source.targetVolume -= amt;
+      pipette.targetVolume += amt;
+      // Transfer identity to pipette
       pipette.color = source.color;
       pipette.chemicalId = source.chemicalId;
       pipette.chem = source.chem;
     }
   }
   
-  // --- CONTINUOUS POURING (Hold SHIFT) ---
   if (receiver && keyIsDown(SHIFT)) {
-    let pourRate = 0.5; // Amount per frame
-    if (pipette.targetVolume > 0 && receiver.targetVolume < receiver.capacity) {
+    let rate = 0.5 * (deltaTime / 50);
+    if (pipette.targetVolume > 0.01 && receiver.targetVolume < receiver.capacity) {
+      let amt = min(rate, pipette.targetVolume, receiver.capacity - receiver.targetVolume);
+      pipette.targetVolume -= amt;
+      receiver.targetVolume += amt;
       
-      // Calculate how much we can actually pour without overflowing
-      let spaceInReceiver = receiver.capacity - receiver.targetVolume;
-      let actualPour = min(pourRate, pipette.targetVolume, spaceInReceiver);
+      // --- MIXING LOGIC: Don't overwrite the flask if it's already an Analyte ---
+      const isIndicator = pipette.chemicalId === 'phenolphthalein' || pipette.chemicalId === 'methyl_orange';
       
-      pipette.targetVolume -= actualPour;
-      receiver.targetVolume += actualPour;
-      
-      // Update Chemical Brain for Titration
       if (pipette.chemicalId === 'na2co3_nahco3') {
-          receiver.contents.mixture_vol += actualPour;
+          receiver.contents.mixture_vol += amt;
+          receiver.chemicalId = pipette.chemicalId;
+          receiver.chem = "Analyte Mixture";
+          receiver.color = pipette.color;
+      } else if (isIndicator) {
+          // Update the "Brain" counts only
+          if (pipette.chemicalId === 'phenolphthalein') receiver.contents.pp_drops += (amt * 10);
+          if (pipette.chemicalId === 'methyl_orange') receiver.contents.mo_drops += (amt * 10);
+          // Note: We DO NOT change receiver.chem or receiver.color here
       }
 
-      // Sync visual properties to the receiver
-      receiver.color = pipette.color;
-      receiver.chemicalId = pipette.chemicalId;
-      receiver.chem = pipette.chem;
-
-      // Visual Pouring Stream
-      let tipX = pipette.x;
-      let tipY = pipette.y + (pipette.h * 0.4);
-      drawPouringStream(tipX, tipY, receiver.x, receiver.y - 15, color(...(pipette.color || [100, 200, 255])));
+      drawPouringStream(pipette.x, pipette.y + 20, receiver.x, receiver.y - 15, color(...(pipette.color || [255,255,255])));
     }
   }
 }
@@ -878,8 +859,28 @@ function drawVessel(v) {
     drawingContext.shadowBlur = 30 * v.glow;
   }
 
+  if (v.type === 'bottle' || v.type === 'chemical_bottle') {
+    push();
+    if (v.dragging && v.tiltAngle) {
+      translate(0, -v.h * 0.4); // Pivot at neck
+      rotate(radians(v.tiltAngle));
+      translate(0, v.h * 0.4);
+    }
+    image(imgBottle, 0, 0, v.w, v.h);
+    drawRealisticLiquid(v, v.color || color(100, 200, 255));
+    
+    if (v.chemicalId) {
+      push(); translate(-1, 8);
+      const chemInfo = getChemicalInfo(v.chemicalId);
+      fill(0); textAlign(CENTER, CENTER); textStyle(BOLD); textSize(8);
+      text(chemInfo.name, 0, -7);
+      text(chemInfo.formula, 0, 5);
+      pop();
+    }
+    pop();
+  }
   // --- SPRITE RENDERING ---
-  if (v.type === 'beaker') {
+  else if (v.type === 'beaker') {
     image(imgBeaker, 0, 0, v.w, v.h);
     drawRealisticLiquid(v, color(100, 200, 255)); 
   } 
@@ -902,35 +903,7 @@ function drawVessel(v) {
     image(imgPipette, 0, 0, v.w, v.h);
     drawRealisticLiquid(v, color(200, 200, 200));
   }
-  else if (v.type === 'bottle') {
-    push();
-    // Move to bottle position
-    translate(0, 0); 
-    
-    // If being tilted, rotate around the "neck" area
-    if (v.dragging && v.tiltAngle) {
-      // 1. Move origin to the top of the bottle (the pivot point)
-      translate(0, -v.h * 0.4);
-      // 2. Rotate
-      rotate(radians(v.tiltAngle));
-      // 3. Move back so the bottle body is below the pivot
-      translate(0, v.h * 0.4);
-    }
-    
-    image(imgBottle, 0, 0, v.w, v.h);
-    drawRealisticLiquid(v, v.color || color(100, 200, 255));
-    
-    // Draw Label (Name/Formula)
-    if (v.chemicalId) {
-      push(); translate(-1, 8);
-      const chemInfo = getChemicalInfo(v.chemicalId);
-      fill(0); textAlign(CENTER, CENTER); textStyle(BOLD);
-      textSize(8); text(chemInfo.name, 0, -7);
-      textSize(9); text(chemInfo.formula, 0, 5);
-      pop();
-    }
-    pop(); // End of rotation logic
-  }
+  
   else if (v.type === 'balance') {
     image(imgBalance, 0, 0, v.w, v.h);
     drawBalanceDisplay(v); // Integrated realistic meter
@@ -939,8 +912,7 @@ else if (v.type === 'conical_flask') {
   image(imgConical, 0, 0, v.w, v.h);
   
   // NEW: Calculate dynamic titration color
-  let activeColor = getTitrationColor(v);
-  drawRealisticLiquid(v, color(...activeColor)); 
+    drawRealisticLiquid(v, color(...getTitrationColor(v))); 
 } 
  else if (v.type === 'volumetric_flask') image(imgVolumetric, 0, 0, v.w, v.h);
   else if (v.type === 'funnel') image(imgFunnel, 0, 0, v.w, v.h);
@@ -1019,8 +991,18 @@ function drawPouringStream(startX, startY, endX, endY, col) {
 
 // APPARATUS-SPECIFIC REALISTIC LIQUIDS
 function drawRealisticLiquid(v, col) {
-  // Use the vessel's assigned color if it exists, otherwise use the passed default
-  let activeCol = v.color ? color(...v.color) : col;
+  // --- BUG FIX: Prioritize the dynamic 'col' argument (the Titration Color) ---
+  // If 'col' is passed, it means the chemistry engine is overriding the visual property.
+  let activeCol;
+  if (col) {
+    activeCol = col;
+  } else if (v.color) {
+    activeCol = color(...v.color);
+  } else {
+    activeCol = color(200, 220, 255, 100); // Default water look
+  }
+
+  // Visual safety: don't draw if basically empty
   if (v.volume <= 0.01) return;
   
   applySloshPhysics(v);
@@ -1046,17 +1028,17 @@ function drawRealisticLiquid(v, col) {
     endShape(CLOSE);
     
     // Meniscus Highlight
-    stroke(255, 255, 255, 100); strokeWeight(1); noFill();
+    stroke(255, 100); strokeWeight(1); noFill();
     arc(0, topY, w, 6 + abs(slosh), PI, 0);
 
   } 
   else if (v.type === 'conical_flask') {
-    // --- NEW: CONICAL FLASK LIQUID (TRAPEZOID) ---
+    // --- CONICAL FLASK LIQUID (TRAPEZOID) ---
     const hMax = v.h * 0.65;
     const bottomY = v.h * 0.42;
     const topY = bottomY - (hMax * fillRatio);
     
-    // Conical shape: bottom is wider than the neck
+    // Geometry: bottom is wider than the neck
     const bottomW = v.w * 0.8;
     const neckW = v.w * 0.25;
     const currentTopW = lerp(bottomW, neckW, fillRatio);
@@ -1068,12 +1050,13 @@ function drawRealisticLiquid(v, col) {
     vertex(currentTopW/2, topY - slosh); 
     vertex(-currentTopW/2, topY + slosh);
     endShape(CLOSE);
+    
     // Meniscus
-    stroke(255, 120); noFill(); ellipse(0, topY, currentTopW, 4);
+    stroke(255, 120); strokeWeight(1); noFill(); 
+    ellipse(0, topY, currentTopW, 4 + abs(slosh));
 
   }
   else if (v.type === 'pipette') {
-    // Liquid mechanics for Pipette neck
     const w = v.w * 0.105; 
     const tipY = v.h * 0.40; 
     const neckHeight = v.h * 0.85;
@@ -1083,7 +1066,6 @@ function drawRealisticLiquid(v, col) {
     noStroke();
     rect(-w/2, topY, w, tipY - topY, 1);
     
-    // Tiny meniscus for the pipette
     fill(r, g, b, 255);
     ellipse(0, topY, w, 3);
 
@@ -1104,46 +1086,31 @@ function drawRealisticLiquid(v, col) {
   }
   else if (v.type === 'burette') {
     const tubeWidth = v.w * 0.10; 
-    
-    // --- VERTICAL CALIBRATION ---
-    // bottomLimit: Where the liquid meets the stopcock (Lowered from 0.36 to 0.44)
     const bottomLimit = v.h * 0.25; 
-    
-    // hMax: Total height of the glass tube from stopcock to top rim
     const hMax = v.h * 0.70;    
-    
-    // topRim: The absolute top of the glass
     const topRim = bottomLimit - hMax;
-
-    // Calculate liquid top based on volume
-    const fillRatio = v.volume / v.capacity;
     const topY = bottomLimit - (hMax * fillRatio);
 
-    let c = v.color ? color(...v.color) : color(255, 100, 50, 150);
-    
     push();
     translate(BURETTE_GLASS_X_OFFSET, 0);
     
-    // 1. Main Liquid Column (Constrained to the top of the glass)
-    fill(red(c), green(c), blue(c), 160); 
+    // Main Column (Capped at top rim)
+    fill(r, g, b, 160); 
     noStroke();
-    // We use max(topY, topRim) so the liquid doesn't draw above the glass sprite
-    rect(-tubeWidth/2, max(topY, topRim), tubeWidth, bottomLimit - max(topY, topRim));
+    let renderTopY = max(topY, topRim);
+    rect(-tubeWidth/2, renderTopY, tubeWidth, bottomLimit - renderTopY);
     
-    // 2. Tapered Tip (Small triangle to fill the bottom pointed part)
+    // Tapered Bottom Tip
     beginShape();
     vertex(-tubeWidth/2, bottomLimit);
     vertex(tubeWidth/2, bottomLimit);
-    vertex(0, bottomLimit + 10); // Pointed end
+    vertex(0, bottomLimit + 10);
     endShape(CLOSE);
 
-    // 3. Meniscus (Only draw if it hasn't spilled out the top)
+    // Surface Meniscus
     if (topY > topRim) {
-        fill(red(c), green(c), blue(c), 255);
+        fill(r, g, b, 255);
         ellipse(0, topY, tubeWidth, 3);
-    } else {
-        // Visual indicator of spilling at the top
-        if (frameCount % 5 === 0) createParticles(0, topRim, 1, 'drip');
     }
     pop();
   }
@@ -1564,16 +1531,27 @@ function keyPressed() {
 
   // 4. ADD INDICATOR DROP (Crucial for Phase 1 Testing)
   // Logic: If you are dragging an indicator bottle over a flask/beaker, press 'D' to add a drop.
-   if (keyL === 'd' && isDragging) {
+   // Inside keyPressed()
+if (keyL === 'd' && isDragging) {
+    // Use a wider distance (120) because students drag bottles loosely
     const target = Object.values(vessels).find(v => 
-      (v.type === 'conical_flask' || v.type === 'beaker') && near(isDragging, v, 60)
+      (v.type === 'conical_flask' || v.type === 'beaker') && dist(isDragging.x, isDragging.y, v.x, v.y) < 120
     );
+    
     if (target) {
-      if (isDragging.chemicalId === 'phenolphthalein') target.contents.pp_drops++;
-      else if (isDragging.chemicalId === 'methyl_orange') target.contents.mo_drops++;
-      createParticles(isDragging.x, isDragging.y + 20, 2, 'drip');
+      if (isDragging.chemicalId === 'phenolphthalein') {
+        target.contents.pp_drops += 1;
+        createParticles(isDragging.x, isDragging.y + 30, 2, 'drip');
+        console.log("SUCCESS: PP drops added to Brain. Count:", target.contents.pp_drops);
+      } else if (isDragging.chemicalId === 'methyl_orange') {
+        target.contents.mo_drops += 1;
+        createParticles(isDragging.x, isDragging.y + 30, 2, 'drip');
+        console.log("SUCCESS: MO drops added to Brain. Count:", target.contents.mo_drops);
+      }
+    } else {
+        console.log("HINT: Move bottle closer to the flask center to drop.");
     }
-  }
+}
 
   
   // 5. TITRATION (SPACE BAR)
@@ -1581,29 +1559,27 @@ function keyPressed() {
   // For continuous titration, the logic below is better placed in the draw() loop 
   // using keyIsDown(32), but here is the corrected logic for Phase 1:
   if (key === ' ' || keyCode === 32) {
-  const burette = Object.values(vessels).find(v => v.type === 'burette');
-  const receiver = Object.values(vessels).find(v => 
-    (v.type === 'beaker' || v.type === 'conical_flask') && 
-    dist(v.x, v.y, burette.x - 45, burette.y + 120) < 80
-  );
+    const burette = Object.values(vessels).find(v => v.type === 'burette');
+    const receiver = Object.values(vessels).find(v => 
+      (v.type === 'conical_flask' || v.type === 'beaker') && 
+      dist(v.x, v.y, burette.x - 45, burette.y + 120) < 80
+    );
 
-  if (burette && receiver) {
-    const flow = keyIsDown(SHIFT) ? 0.6 : 0.15;
-    
-    if (burette.targetVolume >= flow && receiver.targetVolume < receiver.capacity) {
-      // Logic updates
-      burette.targetVolume -= flow;
-      receiver.targetVolume += flow;
-      studentVolume += flow; // Live data panel
+    if (burette && receiver) {
+      const flow = keyIsDown(SHIFT) ? 0.4 : 0.1; // Slower for precision
+      if (burette.targetVolume >= flow && receiver.targetVolume < receiver.capacity) {
+        burette.targetVolume -= flow;
+        receiver.targetVolume += flow;
+        studentVolume += flow;
 
-      // Chemical Brain updates
-      receiver.contents.hcl_vol += flow; 
-      
-      // Visual feedback
-      drawPouringStream(burette.x - 45, burette.y + 110, receiver.x, receiver.y - 15, color(255, 160, 100));
+        // --- THE BRAIN FIX ---
+        // Record the HCl entering the flask for the color math
+        receiver.contents.hcl_vol += flow; 
+        
+        drawPouringStream(burette.x - 45, burette.y + 110, receiver.x, receiver.y - 15, color(255, 160, 100));
+      }
     }
   }
-}
 }
 
 //Burette filling logic
