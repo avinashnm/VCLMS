@@ -41,6 +41,7 @@ const LAB_SURFACES = {
   table: { y: 460, minX: 200, maxX: 820, shadowAlpha: 45 }
 };
 
+//experiment assessment
 class MarkingManager {
     constructor() {
         this.results = {
