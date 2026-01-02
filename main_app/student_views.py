@@ -892,11 +892,12 @@ def lab_experiment_simulation(request, slug):
            "milestones": [
     {"id": "fill_burette", "desc": "Fill burette with HCl", "points": 10},
     {"id": "zero_burette", "desc": "Adjust to 0.00 mL mark", "points": 10},
-    {"id": "pipette_mixture", "desc": "Pipette 20mL of analyte", "points": 15},
-    {"id": "add_pp", "desc": "Add Phenolphthalein", "points": 10},
-    {"id": "reach_v1", "desc": "Record V1 Endpoint (Colorless)", "points": 20},
-    {"id": "add_mo", "desc": "Add Methyl Orange", "points": 10},
-    {"id": "reach_v2", "desc": "Record V2 Endpoint (Red)", "points": 25},
+    {"id": "pipette_mixture", "desc": "Pipette 20mL of analyte", "points": 10},
+    {"id": "add_pp", "desc": "Add Phenolphthalein", "points": 5},
+    {"id": "reach_v1", "desc": "Enter V1 Observation", "points": 15},
+    {"id": "add_mo", "desc": "Add Methyl Orange", "points": 5},
+    {"id": "reach_v2", "desc": "Enter V2 Observation", "points": 20},
+    {"id": "submit_calc", "desc": "Submit Final Calculations", "points": 25}, # Significant points for math
 ],
             # THE SECRET TARGETS: Unique for every student session
             "targets": {
