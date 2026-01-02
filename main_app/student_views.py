@@ -889,15 +889,15 @@ def lab_experiment_simulation(request, slug):
             "objective": "Estimate sodium carbonate and bicarbonate using double indicator method.",
             "type": "double_indicator",
             # THE BRAIN: Define marks and success steps here
-            "milestones": [
-                {"id": "fill_burette", "desc": "Fill burette with HCl", "points": 10},
-                {"id": "zero_burette", "desc": "Adjust to 0.00 mL mark", "points": 15},
-                {"id": "pipette_mixture", "desc": "Pipette 20mL of analyte", "points": 15},
-                {"id": "add_pp", "desc": "Add Phenolphthalein", "points": 10},
-                {"id": "reach_v1", "desc": "Find V1 Endpoint (Colorless)", "points": 25},
-                {"id": "add_mo", "desc": "Add Methyl Orange", "points": 10},
-                {"id": "reach_v2", "desc": "Find V2 Endpoint (Red)", "points": 15},
-            ],
+           "milestones": [
+    {"id": "fill_burette", "desc": "Fill burette with HCl", "points": 10},
+    {"id": "zero_burette", "desc": "Adjust to 0.00 mL mark", "points": 10},
+    {"id": "pipette_mixture", "desc": "Pipette 20mL of analyte", "points": 15},
+    {"id": "add_pp", "desc": "Add Phenolphthalein", "points": 10},
+    {"id": "reach_v1", "desc": "Record V1 Endpoint (Colorless)", "points": 20},
+    {"id": "add_mo", "desc": "Add Methyl Orange", "points": 10},
+    {"id": "reach_v2", "desc": "Record V2 Endpoint (Red)", "points": 25},
+],
             # THE SECRET TARGETS: Unique for every student session
             "targets": {
                 "v1": round(random.uniform(9.5, 11.5), 2),  # Random V1 target

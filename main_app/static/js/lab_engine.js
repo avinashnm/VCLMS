@@ -33,6 +33,14 @@ let idCounter = 0;
 const sizeMultiplier = 0.50;
 let labSurfaces = null;
 const BURETTE_GLASS_X_OFFSET = -8;
+// Initialize from Django (passed via template)
+const experimentData = typeof EXPERIMENT_CONFIG !== 'undefined' ? EXPERIMENT_CONFIG : null;
+const TARGET_V1 = experimentData?.targets?.v1 || 10.0;
+const TARGET_V2 = experimentData?.targets?.v2 || 25.0;
+
+let currentStepIndex = 0; // Tracks which milestone we are on
+let penalties = [];       // List of strings explaining point losses
+let sessionMarks = 0;     // Current score
 // ======================================================
 // LAB SURFACES (continuous surfaces)
 // ======================================================
@@ -43,52 +51,132 @@ const LAB_SURFACES = {
 
 //experiment assessment
 class MarkingManager {
-    constructor() {
-        this.results = {
-            v1_observed: 0,
-            v2_observed: 0,
-            v1_marks: 0,
-            v2_marks: 0,
-            procedural_marks: 0,
-            errors: []
-        };
+    constructor(config) {
+        this.config = config;
+        this.milestones = config?.milestones || [];
+        this.completedIds = new Set();
+        this.mistakesMade = new Set();
     }
 
-    // Call this when the student clicks "Record V1"
+    // This MUST be called inside the p5.js draw() loop
+    update() {
+        const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
+        const burette = Object.values(vessels).find(v => v.type === 'burette');
+
+        // --- 1. BURETTE TASKS (Check if burette exists) ---
+        if (burette) {
+            // Check: Fill Burette
+            if (burette.targetVolume > 20) {
+                this.completeMilestone("fill_burette");
+            }
+
+            // Check: Zero Burette (Reading should be near 0.00)
+            let reading = abs(burette.capacity - burette.volume);
+            if (this.completedIds.has("fill_burette") && reading < 0.2) {
+                this.completeMilestone("zero_burette");
+            }
+
+             if (keyIsDown(32) && flask && dist(flask.x, flask.y, burette.x - 45, burette.y + 120) < 80) {
+            if (!this.completedIds.has("zero_burette") && reading > 0.5) {
+                this.addPenalty("no_zeroing", 15, "Titrating without zeroing the burette first.");
+            }
+        }
+            
+            // Penalty: Titrating without a funnel
+            if (keyIsDown(32) && !burette.hasFunnel) {
+                this.addPenalty("no_funnel", 5, "Started titration without using a funnel.");
+            }
+        }
+
+        // --- 2. FLASK TASKS (Check if flask exists) ---
+        if (flask) {
+            // Check: Pipette Analyte into Flask
+            if (flask.contents.mixture_vol >= 19.5) {
+                this.completeMilestone("pipette_mixture");
+            }
+
+            // Check: Add Phenolphthalein
+            if (this.completedIds.has("pipette_mixture") && flask.contents.pp_drops >= 1) {
+                this.completeMilestone("add_pp");
+            }
+
+            // Penalty: Adding Methyl Orange too early
+            if (flask.contents.mo_drops > 0 && !this.completedIds.has("reach_v1")) {
+                this.addPenalty("wrong_sequence", 15, "Added Methyl Orange before V1 endpoint.");
+            }
+
+            if (this.completedIds.has("reach_v1") && flask.contents.mo_drops >= 1) {
+            this.completeMilestone("add_mo");
+        }
+        }
+    }
+
+    completeMilestone(id) {
+        if (this.completedIds.has(id)) return;
+        let m = this.milestones.find(item => item.id === id);
+        if (m) {
+            this.completedIds.add(id);
+            sessionMarks += m.points;
+            currentStepIndex = Math.min(this.milestones.length - 1, this.completedIds.size);
+            console.log("Milestone Achieved:", m.desc);
+        }
+    }
+
+    addPenalty(id, points, reason) {
+        if (this.mistakesMade.has(id)) return;
+        this.mistakesMade.add(id);
+        sessionMarks -= points;
+        penalties.push(`-${points}: ${reason}`);
+    }
+
+    // Logic for the Buttons
     recordV1() {
         const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-        const target = TARGET_V1; // Our secret target
-        const observed = flask.contents.hcl_vol;
+        if (!flask) return;
         
-        this.results.v1_observed = observed;
-        let error = abs(observed - target);
-
-        if (error <= 0.1) this.results.v1_marks = 25;
-        else if (error <= 0.3) this.results.v1_marks = 15;
-        else this.results.v1_marks = 0;
-
-        markingLog.push(`V1 Endpoint Recorded: ${observed}mL (Target: ${target}mL)`);
+        // Target V1 is from the randomized Django config
+        const target = experimentData.targets.v1;
+        const userValue = flask.contents.hcl_vol;
+        
+        if (abs(userValue - target) < 0.5) {
+            this.completeMilestone("reach_v1");
+        } else {
+            this.addPenalty("bad_v1", 10, "Inaccurate V1 endpoint recording.");
+            this.completeMilestone("reach_v1"); // Move to next step anyway
+        }
     }
 
-    // Call this when the student clicks "Record V2"
     recordV2() {
         const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-        const target = TARGET_V2; 
-        const observed = flask.contents.hcl_vol;
-        
-        this.results.v2_observed = observed;
-        let error = abs(observed - target);
+        const target = experimentData.targets.v2;
+        const userValue = flask.contents.hcl_vol;
 
-        if (error <= 0.1) this.results.v2_marks = 25;
-        else if (error <= 0.3) this.results.v2_marks = 15;
-        else this.results.v2_marks = 0;
+        if (abs(userValue - target) < 0.5) {
+            this.completeMilestone("reach_v2");
+        } else {
+            this.addPenalty("bad_v2", 10, "Inaccurate V2 endpoint recording.");
+            this.completeMilestone("reach_v2");
+        }
+        this.saveResults(); // Automatically trigger save to Django
+    }
 
-        markingLog.push(`V2 Endpoint Recorded: ${observed}mL (Target: ${target}mL)`);
-        this.showFinalReport(); // Trigger Phase 3
+    saveResults() {
+        const payload = {
+            name: experimentData.name,
+            totalScore: sessionMarks,
+            log: penalties.join(" | ")
+        };
+        fetch("/save_lab_report/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        }).then(res => res.json()).then(data => alert("Report Saved! Score: " + sessionMarks));
     }
 }
 
-const assessment = new MarkingManager();
+// --- FIX 2: Initialize only ONE manager ---
+const manager = new MarkingManager(experimentData);
+function idIsDone(id) { return manager.completedIds.has(id); }
 
 function getLabSurfaces() {
   const scaleX = width / 1200;
@@ -840,6 +928,7 @@ function draw() {
   // Background
   imageMode(CORNER);
   image(imgLabBg, 0, 0, width, height);
+  manager.update();
 
   updateLabSurfaces();
 
@@ -1307,36 +1396,80 @@ function drawTooltip(v) {
 // UI PANELS
 // ======================================================
 function drawDataPanel() {
-  const panelW = 220, panelH = 160, margin = 40, panelX = width - panelW - margin;
+  const panelW = 280, margin = 20, panelX = width - panelW - margin;
+  
+  // 1. Background Panel
+  fill(15, 25, 45, 240); stroke(255, 30);
+  rect(panelX, 30, panelW, 550, 15);
 
-  fill(255, 255, 255, 235); stroke(210);
-  rect(panelX, 30, panelW, panelH, 12);
+  // 2. Header & Current Score
+  fill(255); textAlign(LEFT); textStyle(BOLD); textSize(16);
+  text("🧪 LAB ASSISTANT", panelX + 20, 60);
+  fill(100, 200, 255); textSize(14);
+  text(`Total Marks: ${sessionMarks}/100`, panelX + 20, 85);
 
-  noStroke(); fill(0); textAlign(LEFT);
-  textSize(15); textStyle(BOLD); text('Live Data', panelX + 15, 55);
+  // 3. THE LIVE CHECKLIST
+  let currentTask = manager.milestones[currentStepIndex];
   
-  textStyle(NORMAL); textSize(13);
-  // Only show the volume. No hints!
-  text('HCl Added (V): ' + nf(studentVolume, 1, 2) + ' mL', panelX + 15, 80);
-  
-  // Display procedural status instead of endpoint hints
-  let statusText = "Stage: Preparing Analyte";
-  if (vessels.conical_flask_1?.contents.mixture_vol > 19) statusText = "Stage: Stage 1 (PP)";
-  if (vessels.conical_flask_1?.contents.mo_drops > 0) statusText = "Stage: Stage 2 (MO)";
-  
-  fill(100);
-  text(statusText, panelX + 15, 110);
-  
-  // Score is hidden until the very end
-  fill(40, 60, 100);
-  text("Exam in progress...", panelX + 15, 140);
+  if (currentTask) {
+    fill(255, 230, 100); textSize(13);
+    text("CURRENT TASK:", panelX + 20, 120);
+    
+    fill(255); textStyle(NORMAL);
+    rect(panelX + 20, 130, panelW - 40, 60, 8); // Task Box
+    fill(0); textAlign(CENTER, CENTER);
+    text(currentTask.desc, panelX + panelW/2, 160);
 
-  const btnX = 40, btnY = height - 50, btnW = 200, btnH = 32;
-  fill(255, 255, 255, 235); stroke(180);
-  rect(btnX, btnY, btnW, btnH, 8);
-  noStroke(); fill(0); textAlign(CENTER, CENTER); textSize(13);
-  text(catalogVisible ? 'Hide Apparatus Catalog' : 'Show Apparatus Catalog', btnX + btnW/2, btnY + btnH/2);
-  catalogToggleButton = { x: btnX, y: btnY, w: btnW, h: btnH };
+    // 💡 HINT BOX
+    fill(40, 180, 255, 50); noStroke();
+    rect(panelX + 20, 200, panelW - 40, 90, 8);
+    fill(140, 220, 255); textAlign(LEFT, TOP); textSize(11);
+    let hints = {
+       "fill_burette": "From the catalog spawn the burette, funnel and the HCl. Fill the burette by dragging the HCl bottle on top of the burette and use UP/DOWN arrow keys to pour.",
+            "zero_burette": "Excess HCl is in the burette. Hold the 'S' key to open the stopcock and drain the liquid until the meniscus is exactly at 0.00.",
+            "pipette_mixture": "Spawn the Pipette and the 25% Mixture bottle. Drag pipette to bottle and hold SHIFT to suck 20mL. Then drag pipette to Conical Flask and hold SHIFT to pour.",
+            "add_pp": "Spawn Phenolphthalein. Drag it over your flask and press the 'D' key twice to add 2 drops. The solution should turn Pink.",
+            "reach_v1": "Snap the flask under the burette. Hold SPACE to titrate. Stop as soon as the pink color disappears. Then click 'RECORD V1' below.",
+            "add_mo": "Now add Methyl Orange indicator to the same flask using the 'D' key. The solution will turn Yellow.",
+            "reach_v2": "Continue titration (SPACE) until the yellow color turns Red/Orange. This is the final endpoint. Click 'RECORD V2'."
+    };
+let hintText = hints[currentTask.id] || "Follow the laboratory manual steps.";
+        text("💡 INSTRUCTION:\n" + hintText, panelX + 30, 210, panelW - 60);  } 
+        else {
+    fill(0, 255, 150); text("🎉 EXPERIMENT COMPLETE", panelX + 20, 130);
+  }
+
+  // 4. PENALTY LOG (Mistakes)
+  if (penalties.length > 0) {
+    fill(255, 100, 100); textStyle(BOLD); text("⚠️ MISTAKES:", panelX + 20, 280);
+    textSize(11); textStyle(NORMAL);
+    penalties.forEach((p, i) => {
+        text(p, panelX + 20, 305 + (i * 20));
+    });
+  }
+
+  // 5. ACTION BUTTONS (Confirm Endpoints)
+  drawEndpointButtons(panelX + 20, 480, panelW - 40);
+}
+
+function drawEndpointButtons(x, y, w) {
+    const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
+    if (!flask) return;
+
+    // Show "Confirm V1" only during Stage 1
+    if (idIsDone("add_pp") && !idIsDone("reach_v1")) {
+        drawButton(x, y, w, 40, "RECORD V1 READING", [255, 105, 180]);
+    }
+    // Show "Confirm V2" only during Stage 2
+    if (idIsDone("reach_v1") && flask.contents.mo_drops > 0 && !idIsDone("reach_v2")) {
+        drawButton(x, y, w, 40, "RECORD V2 READING", [255, 160, 0]);
+    }
+}
+
+function drawButton(x, y, w, h, label, col) {
+    fill(...col); rect(x, y, w, h, 8);
+    fill(255); textAlign(CENTER, CENTER); textStyle(BOLD); textSize(12);
+    text(label, x + w/2, y + h/2);
 }
 
 
@@ -1465,7 +1598,17 @@ function mousePressed() {
       }
     }
   }
-
+const panelW = 280, margin = 20, btnX = width - panelW - margin + 20;
+    if (mouseX > btnX && mouseX < btnX + (panelW - 40)) {
+        if (mouseY > 480 && mouseY < 520 && !idIsDone("reach_v1") && idIsDone("add_pp")) {
+            manager.recordV1();
+            return;
+        }
+        if (mouseY > 480 && mouseY < 520 && idIsDone("reach_v1") && !idIsDone("reach_v2")) {
+            manager.recordV2();
+            return;
+        }
+    }
   Object.values(vessels).forEach(v => {
     if (v.type === 'balance') {
       // Check if mouse is over the "TARE" button area (bottom right of the control panel)
