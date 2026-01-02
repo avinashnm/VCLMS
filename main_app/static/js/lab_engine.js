@@ -41,6 +41,54 @@ const LAB_SURFACES = {
   table: { y: 460, minX: 200, maxX: 820, shadowAlpha: 45 }
 };
 
+class MarkingManager {
+    constructor() {
+        this.results = {
+            v1_observed: 0,
+            v2_observed: 0,
+            v1_marks: 0,
+            v2_marks: 0,
+            procedural_marks: 0,
+            errors: []
+        };
+    }
+
+    // Call this when the student clicks "Record V1"
+    recordV1() {
+        const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
+        const target = TARGET_V1; // Our secret target
+        const observed = flask.contents.hcl_vol;
+        
+        this.results.v1_observed = observed;
+        let error = abs(observed - target);
+
+        if (error <= 0.1) this.results.v1_marks = 25;
+        else if (error <= 0.3) this.results.v1_marks = 15;
+        else this.results.v1_marks = 0;
+
+        markingLog.push(`V1 Endpoint Recorded: ${observed}mL (Target: ${target}mL)`);
+    }
+
+    // Call this when the student clicks "Record V2"
+    recordV2() {
+        const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
+        const target = TARGET_V2; 
+        const observed = flask.contents.hcl_vol;
+        
+        this.results.v2_observed = observed;
+        let error = abs(observed - target);
+
+        if (error <= 0.1) this.results.v2_marks = 25;
+        else if (error <= 0.3) this.results.v2_marks = 15;
+        else this.results.v2_marks = 0;
+
+        markingLog.push(`V2 Endpoint Recorded: ${observed}mL (Target: ${target}mL)`);
+        this.showFinalReport(); // Trigger Phase 3
+    }
+}
+
+const assessment = new MarkingManager();
+
 function getLabSurfaces() {
   const scaleX = width / 1200;
   const scaleY = height / 700;
@@ -1258,38 +1306,29 @@ function drawTooltip(v) {
 // UI PANELS
 // ======================================================
 function drawDataPanel() {
-  const panelW = 220, panelH = 180, margin = 40, panelX = width - panelW - margin;
+  const panelW = 220, panelH = 160, margin = 40, panelX = width - panelW - margin;
 
   fill(255, 255, 255, 235); stroke(210);
   rect(panelX, 30, panelW, panelH, 12);
 
   noStroke(); fill(0); textAlign(LEFT);
   textSize(15); textStyle(BOLD); text('Live Data', panelX + 15, 55);
+  
   textStyle(NORMAL); textSize(13);
-  text('Base added: ' + nf(studentVolume, 1, 2) + ' mL', panelX + 15, 80);
-
-  if (studentVolume > 0) {
-    const diff = abs(studentVolume - 25.0);
-    if (diff < 0.25) { 
-      fill(0, 150, 0); 
-      text('Perfect endpoint ✔', panelX + 15, 105); 
-      phStage = 2; 
-    }
-    else if (studentVolume > 26) { 
-      fill(200, 0, 0); 
-      text('Overshot endpoint ✖', panelX + 15, 105); 
-      phStage = 2; 
-    }
-    else { 
-      fill(120, 120, 0); 
-      text('Approaching endpoint…', panelX + 15, 105); 
-      phStage = 1; 
-    }
-  }
-
-  // Status
-  textSize(12); fill(0);
-  text(`pH Stage: ${phStage}`, panelX + 15, 135);
+  // Only show the volume. No hints!
+  text('HCl Added (V): ' + nf(studentVolume, 1, 2) + ' mL', panelX + 15, 80);
+  
+  // Display procedural status instead of endpoint hints
+  let statusText = "Stage: Preparing Analyte";
+  if (vessels.conical_flask_1?.contents.mixture_vol > 19) statusText = "Stage: Stage 1 (PP)";
+  if (vessels.conical_flask_1?.contents.mo_drops > 0) statusText = "Stage: Stage 2 (MO)";
+  
+  fill(100);
+  text(statusText, panelX + 15, 110);
+  
+  // Score is hidden until the very end
+  fill(40, 60, 100);
+  text("Exam in progress...", panelX + 15, 140);
 
   const btnX = 40, btnY = height - 50, btnW = 200, btnH = 32;
   fill(255, 255, 255, 235); stroke(180);
@@ -1299,7 +1338,8 @@ function drawDataPanel() {
   catalogToggleButton = { x: btnX, y: btnY, w: btnW, h: btnH };
 }
 
-function drawControlsPanel() {
+
+  function drawControlsPanel() {
   const panelW = 220, panelH = 150; // Taller panel
   const x = width - panelW - 20;
   const y = height - panelH - 20;
@@ -1397,19 +1437,34 @@ function mousePressed() {
       return;
     }
   }
-const burette = Object.values(vessels).find(v => v.type === 'burette');
-  if (burette && !userClosedZoom) {
-    const zoomX = burette.x + 160;
-    const zoomY = burette.y - 50;
-    const btnX = zoomX + 80; // (zoomSize/2 - 10)
-    const btnY = zoomY - 80; // (zoomSize/2 - 10)
-    
-    if (dist(mouseX, mouseY, btnX, btnY) < 20) {
-      userClosedZoom = true;
-      console.log("Zoom View Closed by User");
-      return; // Exit so we don't drag anything behind the button
+// --- CHECK CLOSE ZOOM BUTTON (Synced with new Top-Right position) ---
+    const burette = Object.values(vessels).find(v => v.type === 'burette');
+  
+  if (burette) {
+    if (userClosedZoom) {
+      // --- LOGIC TO OPEN (Circular Detection) ---
+      const iconX = burette.x + 35;
+      const iconY = burette.y - 120;
+      
+      if (dist(mouseX, mouseY, iconX, iconY) < 18) {
+        userClosedZoom = false;
+        console.log("Zoom View Restored");
+        return; 
+      }
+    } else {
+      // --- LOGIC TO CLOSE (Matches Draw Function) ---
+      const zoomX = burette.x + 180;
+      const zoomY = burette.y - 140;
+      const closeBtnX = zoomX + 65;
+      const closeBtnY = zoomY - 65;
+      
+      if (dist(mouseX, mouseY, closeBtnX, closeBtnY) < 15) {
+        userClosedZoom = true;
+        return;
+      }
     }
   }
+
   Object.values(vessels).forEach(v => {
     if (v.type === 'balance') {
       // Check if mouse is over the "TARE" button area (bottom right of the control panel)
@@ -1653,70 +1708,98 @@ function mouseWheel(event) {
 }
 
 function drawBuretteZoom(v) {
-  if (userClosedZoom) return; // Don't draw if user clicked 'X'
+  // Common coordinates relative to burette
+  const zoomX = v.x + 180; 
+  const zoomY = v.y - 140;
+  const zoomSize = 140;
 
-  // --- TWEAK: PLACED NEAR BURETTE ---
-  const zoomX = v.x + 160; 
-  const zoomY = v.y - 50;
-  const zoomSize = 180;
+  // --- MINIMIZED STATE: Show "Open Zoom" Button ---
+  if (userClosedZoom) {
+    push();
+    // Positioned right next to the burette tube for easy access
+    const iconX = v.x + 35; 
+    const iconY = v.y - 120; 
+    translate(iconX, iconY);
 
-  // Visibility logic
-  const reading = v.capacity - v.volume;
-  const isInteracting = isDragging || keyIsDown(83) || keyIsDown(UP_ARROW);
-  if (!isInteracting && reading > 5) return;
+    // 1. Subtle Shadow
+    noStroke(); fill(0, 50);
+    circle(2, 2, 36);
 
+    // 2. Icon Body (Matches your professional dark blue theme)
+    fill(40, 80, 150); 
+    stroke(255, 200); 
+    strokeWeight(2);
+    circle(0, 0, 36);
+
+    // 3. Magnifying Glass Icon
+    fill(255);
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(18);
+    text("🔍", 0, 0); 
+    
+    // 4. Hover effect
+    if (dist(mouseX, mouseY, iconX, iconY) < 18) {
+      fill(255, 50);
+      circle(0, 0, 36);
+    }
+    pop();
+    return;
+  }
+
+  // --- OPEN STATE: The full precision view ---
   push();
-  // 1. Draw Label Background Rect
-  fill(0, 0, 0, 180); noStroke();
-  rect(zoomX - 100, zoomY + zoomSize/2, 200, 60, 8);
+  // 1. Label Background
+  fill(15, 25, 45, 200); noStroke();
+  rect(zoomX - 75, zoomY + zoomSize/2 + 5, 150, 45, 8);
 
-  // 2. Draw Zoom Circle
-  fill(255); stroke(40); strokeWeight(4);
+  // 2. Zoom Circle & Masking
+  fill(255); stroke(40); strokeWeight(3);
   circle(zoomX, zoomY, zoomSize);
-  
-  // 3. Magnifying Logic
-  clip(() => { circle(zoomX, zoomY, zoomSize); });
+  drawingContext.save();
+  noFill(); circle(zoomX, zoomY, zoomSize);
+  drawingContext.clip();
+
   translate(zoomX, zoomY);
   scale(6);
   
   // Tube & Scale
-  noFill(); stroke(100, 150); strokeWeight(0.4);
+  const reading = v.capacity - v.volume;
+  noFill(); stroke(100, 100); strokeWeight(0.4);
   rect(-10, -50, 20, 100);
-  const spacingPerML = 20; 
-  for (let i = 0; i <= 60; i++) {
+
+  const spacing = 20; 
+  let startML = max(0, floor(reading) - 2);
+  let endML = min(v.capacity, ceil(reading) + 2);
+
+  for (let i = startML * 10; i <= endML * 10; i++) {
     let val = i / 10;
-    let lineY = (val - reading) * spacingPerML;
-    if (lineY > -50 && lineY < 50) {
-      stroke(0, 180);
-      if (i % 10 === 0) { line(-10, lineY, 0, lineY); fill(0); noStroke(); textSize(3.5); text(nf(val, 1, 0), 2, lineY); }
-      else if (i % 5 === 0) { line(-10, lineY, -4, lineY); }
-      else { line(-10, lineY, -7, lineY); }
-    }
+    let lineY = (val - reading) * spacing;
+    stroke(0, 180);
+    if (i % 10 === 0) {
+      line(-10, lineY, 0, lineY); fill(0); noStroke(); textSize(3); text(nf(val, 1, 0), 2, lineY + 1);
+    } else if (i % 5 === 0) line(-10, lineY, -4, lineY);
+    else line(-10, lineY, -7, lineY);
   }
 
   // Liquid
   let c = v.color ? color(...v.color) : color(255, 120, 80);
-  fill(red(c), green(c), blue(c), 150); noStroke();
-  rect(-10, 0, 20, 100);
-  fill(red(c), green(c), blue(c), 230);
-  arc(0, 0, 20, 5, 0, PI);
+  fill(red(c), green(c), blue(c), 140); noStroke();
+  rect(-10, 0, 20, 100); 
+  fill(red(c), green(c), blue(c), 200); arc(0, 0, 20, 5, 0, PI);
   
+  drawingContext.restore();
   pop();
 
-  // 4. DRAW CLOSE BUTTON ('X')
-  fill(200, 0, 0); stroke(255); strokeWeight(2);
-  circle(zoomX + zoomSize/2 - 10, zoomY - zoomSize/2 + 10, 24);
-  fill(255); noStroke(); textAlign(CENTER, CENTER); textSize(14); textStyle(BOLD);
-  text("X", zoomX + zoomSize/2 - 10, zoomY - zoomSize/2 + 10);
+  // 3. DRAW CLOSE BUTTON ('X')
+  fill(200, 0, 0); stroke(255); strokeWeight(1.5);
+  circle(zoomX + 65, zoomY - 65, 18);
+  fill(255); noStroke(); textAlign(CENTER, CENTER); textSize(10); text("X", zoomX + 65, zoomY - 65);
 
-  // 5. Labels on the Background Rect
-  fill(255); textAlign(CENTER); textSize(12);
-  if (reading < 0) {
-    fill(255, 100, 100);
-    text(`READING: OVERFILLED (${nf(reading, 1, 2)})`, zoomX, zoomY + zoomSize/2 + 25);
-  } else {
-    text(`READING: ${nf(reading, 1, 2)} mL`, zoomX, zoomY + zoomSize/2 + 25);
-  }
+  // 4. Reading Text
+  fill(255); textAlign(CENTER); textSize(11);
+  text(`V: ${nf(reading, 1, 2)} mL`, zoomX, zoomY + zoomSize/2 + 22);
+  textSize(9); fill(180); text("Read bottom of meniscus", zoomX, zoomY + zoomSize/2 + 38);
 }
 // ======================================================
 // SPAWN APPARATUS
