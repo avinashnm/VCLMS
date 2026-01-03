@@ -175,7 +175,6 @@ def student_view_profile(request):
 
     return render(request, "student_template/student_view_profile.html", context)
 
-# --- NEW VIEW: Save the student's lab result ---
 @csrf_exempt
 def save_lab_report(request):
     if request.method == 'POST':
@@ -183,21 +182,19 @@ def save_lab_report(request):
             data = json.loads(request.body)
             student = get_object_or_404(Student, admin=request.user)
             
-            # Logic to save to your database
-            # Example (Assuming you have a LabReport model):
-            # LabReport.objects.create(
-            #     student=student,
-            #     experiment_name=data.get('name'),
-            #     score=data.get('totalScore'),
-            #     v1_observed=data.get('v1'),
-            #     v2_observed=data.get('v2'),
-            #     log=data.get('log')
-            # )
-            
-            return JsonResponse({"status": "success", "message": "Experiment report saved successfully!"})
+            VirtualLabSubmission.objects.create(
+                student=student,
+                experiment_name=data.get('name'),
+                v1_observed=data.get('v1_observed'),
+                v2_observed=data.get('v2_observed'),
+                calc_na2co3=data.get('calc_na2co3'),
+                calc_nahco3=data.get('calc_nahco3'),
+                total_score=data.get('totalScore'),
+                penalty_log=data.get('log')
+            )
+            return JsonResponse({"status": "success", "message": "Experiment saved!"})
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=400)
-    return HttpResponseNotAllowed(['POST'])
 
 @csrf_exempt
 def student_fcmtoken(request):
@@ -889,15 +886,16 @@ def lab_experiment_simulation(request, slug):
             "objective": "Estimate sodium carbonate and bicarbonate using double indicator method.",
             "type": "double_indicator",
             # THE BRAIN: Define marks and success steps here
-            "milestones": [
-                {"id": "fill_burette", "desc": "Fill burette with HCl", "points": 10},
-                {"id": "zero_burette", "desc": "Adjust to 0.00 mL mark", "points": 15},
-                {"id": "pipette_mixture", "desc": "Pipette 20mL of analyte", "points": 15},
-                {"id": "add_pp", "desc": "Add Phenolphthalein", "points": 10},
-                {"id": "reach_v1", "desc": "Find V1 Endpoint (Colorless)", "points": 25},
-                {"id": "add_mo", "desc": "Add Methyl Orange", "points": 10},
-                {"id": "reach_v2", "desc": "Find V2 Endpoint (Red)", "points": 15},
-            ],
+           "milestones": [
+    {"id": "fill_burette", "desc": "Fill burette with HCl", "points": 10},
+    {"id": "zero_burette", "desc": "Adjust to 0.00 mL mark", "points": 10},
+    {"id": "pipette_mixture", "desc": "Pipette 20mL of analyte", "points": 10},
+    {"id": "add_pp", "desc": "Add Phenolphthalein", "points": 5},
+    {"id": "reach_v1", "desc": "Enter V1 Observation", "points": 15},
+    {"id": "add_mo", "desc": "Add Methyl Orange", "points": 5},
+    {"id": "reach_v2", "desc": "Enter V2 Observation", "points": 20},
+    {"id": "submit_calc", "desc": "Submit Final Calculations", "points": 25}, # Significant points for math
+],
             # THE SECRET TARGETS: Unique for every student session
             "targets": {
                 "v1": round(random.uniform(9.5, 11.5), 2),  # Random V1 target

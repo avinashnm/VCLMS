@@ -38,6 +38,8 @@ class Session(models.Model):
         return "From " + str(self.start_year) + " to " + str(self.end_year)
 
 
+
+
 class CustomUser(AbstractUser):
     USER_TYPE = ((1, "HOD"), (2, "Staff"), (3, "Student"))
     GENDER = [("M", "Male"), ("F", "Female")]
@@ -399,3 +401,17 @@ class Experiment(models.Model):
     graph_image = models.ImageField(upload_to='graph_images/')
     experience_review = models.TextField()
    
+class VirtualLabSubmission(models.Model):
+    # Wrap Student in quotes 'Student' to make it a string reference
+    student = models.ForeignKey('Student', on_delete=models.CASCADE) 
+    experiment_name = models.CharField(max_length=200)
+    v1_observed = models.FloatField()
+    v2_observed = models.FloatField()
+    calc_na2co3 = models.FloatField()
+    calc_nahco3 = models.FloatField()
+    total_score = models.IntegerField()
+    penalty_log = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.student.admin.first_name} - {self.experiment_name}"
