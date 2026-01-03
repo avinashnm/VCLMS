@@ -3,82 +3,100 @@
 
 {% block content %}
 <style>
-  body {
-    overflow: hidden;
-  }
+  body { overflow: hidden; margin: 0; }
 
-  /* Hide the whole left sidebar/profile area for this page */
-  /* Adjust selectors to your base.html structure */
-  #sidebar,
-  .sidebar,
-  .sidebar-wrapper,
-  .main-sidebar,
-  .app-sidebar,          /* fallback names, one of these will match */
-  .page-sidebar {
+  #sidebar, .main-sidebar, .sidebar, 
+  .main-header, .navbar, .nav-header,
+  .navbar-toggler, .nav-link[data-widget="pushmenu"], 
+  .sidebar-toggle, .hamburger-menu {
     display: none !important;
-  }
-
-  /* Ensure main content spans full width */
-  .content-wrapper,
-  .main-panel,
-  .page-content,
-  #content {
-    margin-left: 0 !important;
-    padding-left: 0 !important;
   }
 
   .lab-root {
     position: fixed;
     inset: 0;
     background: #f4f5fb;
-    z-index: 999;              /* above sidebar */
+    z-index: 1000;
     display: flex;
     flex-direction: column;
   }
 
   .lab-header {
-    flex: 0 0 48px;
+    flex: 0 0 55px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 20px;
-    background: #ffffff;
-    border-bottom: 1px solid #e0e0e0;
+    padding: 0 25px;
+    background: #1a237e; /* Professional Deep Blue */
+    color: white;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
   }
 
   .lab-title {
-    font-size: 18px;
-    font-weight: 600;
+    font-size: 19px;
+    font-weight: 500;
     margin: 0;
+    letter-spacing: 0.5px;
   }
 
-  .lab-main {
-    position: relative;
-    flex: 1 1 auto;
+  .header-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
   }
 
-  #simulation-canvas {
-    position: absolute;
-    inset: 0;
+  /* Professional Toggle Button */
+  .btn-lab-toggle {
+    background: #3949ab;
+    color: white;
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: 0.2s;
   }
+  .btn-lab-toggle:hover { background: #5c6bc0; }
+
+  .lab-main { position: relative; flex: 1; }
+  #simulation-canvas { position: absolute; inset: 0; }
 </style>
 
 <div class="lab-root">
   <div class="lab-header">
-    <h2 class="lab-title">{{ experiment.name }}</h2>
-    <a href="{% url 'lab_experiment' slug %}" class="btn btn-outline-secondary btn-sm">
-      ← Back to Info
-    </a>
+    <h2 class="lab-title">🧪 {{ experiment.name }}</h2>
+    
+    <div class="header-actions">
+        <!-- New Manual Toggles -->
+        <button class="btn-lab-toggle" onclick="toggleCatalog()">📦 Apparatus Catalog</button>
+        <button class="btn-lab-toggle" onclick="toggleControls()">⌨️ Controls Guide</button>
+        <a href="{% url 'lab_experiment' slug %}" class="btn btn-danger btn-sm" style="font-weight: bold;">
+          Exit Lab
+        </a>
+    </div>
   </div>
 
   <div class="lab-main">
-    <!-- p5.js will mount the canvas here; slug tells JS which experiment -->
-    <div id="simulation-canvas"
-         data-experiment-slug="{{ slug }}">
-    </div>
+    <div id="simulation-canvas" data-experiment-slug="{{ slug }}"></div>
   </div>
 </div>
 <script>
+    // Link HTML buttons to p5.js engine variables
+    function toggleCatalog() { 
+        if (typeof catalogVisible !== 'undefined') {
+            catalogVisible = !catalogVisible; 
+        }
+    }
+    
+    function toggleControls() { 
+        if (typeof controlsVisible !== 'undefined') {
+            controlsVisible = !controlsVisible; 
+        }
+    }
+</script>
+
+<script>
+  
     // 1. Capture the rules from Django
     const EXPERIMENT_CONFIG = JSON.parse('{{ config_json|safe }}');
     

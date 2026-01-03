@@ -24,9 +24,10 @@ let imgBeaker, imgBottle, imgBurette, imgPipette;
 let imgConical, imgVolumetric, imgFunnel, imgWash, imgBunsen;
 let imgBalance, imgCrucible, imgHotplate, imgLiebig, imgMeltingPoint, imgPHMeter, imgSepFunnel, imgTLC;
 
-let catalogVisible = true;
+let catalogVisible = false;
 let catalogToggleButton = null;
 let catalogPanelBounds = null;
+let controlsVisible = false;
 
 let currentPositions = null;
 let idCounter = 0;
@@ -990,28 +991,20 @@ function drawTitrationZone() {
   const burette = Object.values(vessels).find(v => v.type === 'burette');
   if (!burette || isDragging) return;
   
-  // Center of the snap point
-  const zoneX = burette.x - 45;
-  const zoneY = burette.y + 155; 
+  const snapX = burette.x + BURETTE_GLASS_X_OFFSET;
+  const snapY = burette.y + 158; 
   
   const receiver = Object.values(vessels).find(v => 
-    (v.type === 'beaker' || v.type === 'conical_flask') && dist(v.x, v.y, zoneX, zoneY) < 10
+    (v.type === 'beaker' || v.type === 'conical_flask') && dist(v.x, v.y, snapX, snapY) < 10
   );
   
-  // If something is snapped, don't draw the guide; if not, show where to place it
   if (!receiver) {
     noFill();
     stroke(100, 255, 100, 150);
     strokeWeight(2);
-    drawingContext.setLineDash([5, 5]); // Dashed line for guide
-    circle(zoneX, zoneY - 20, 60);
-    drawingContext.setLineDash([]); 
-    
-    fill(100, 255, 100, 150);
-    noStroke();
-    textAlign(CENTER, CENTER);
-    textSize(10);
-    text('PLACE FLASK', zoneX, zoneY - 20);
+    circle(snapX, snapY - 20, 60);
+    fill(100, 255, 100); noStroke(); textAlign(CENTER); textSize(10);
+    text('PLACE FLASK', snapX, snapY - 20);
   }
 }
 
@@ -1574,14 +1567,15 @@ function drawButton(x, y, w, h, label, col) {
 
 
   function drawControlsPanel() {
-  const panelW = 220, panelH = 150; // Taller panel
-  const x = width - panelW - 20;
+  if (!controlsVisible) return;
+
+  const panelW = 220, panelH = 150;
+  // POSITION: Bottom-Center (Shifted right of the catalog)
+  const x = 380; 
   const y = height - panelH - 20;
 
-  // Modern Dark UI
   fill(15, 25, 45, 230); 
   stroke(255, 50);
-  strokeWeight(2);
   rect(x, y, panelW, panelH, 12);
 
   fill(255); noStroke(); textAlign(LEFT);
@@ -1591,7 +1585,6 @@ function drawButton(x, y, w, h, label, col) {
   textSize(11); textStyle(NORMAL);
   fill(200, 220, 255);
   
-  // Use a proper Y-increment to prevent overlapping (22 pixels apart)
   let startY = y + 50;
   text('↑ / ↓      : Tilt Bottle', x + 15, startY);
   text('S (Hold)   : Drain / Zeroing', x + 15, startY + 22);
@@ -1628,7 +1621,7 @@ function drawCatalogPanel() {
   // Active catalog content
   const innerX = panelX + 20, innerY = panelY + 55;
   const activeCatalog = currentCatalogTab === 'apparatus' ? apparatusCatalog : chemicalCatalog;
-  activeCatalog.drawPanel(innerX, innerY, 300, height - 140);
+  activeCatalog.drawPanel(innerX, innerY, 300, height - 160);
 }
 
 
@@ -1766,15 +1759,17 @@ function mouseReleased() {
 
       // 2. PRECISION BEAKER/FLASK SNAP (BOTTOM)
       if (isDragging.type === 'beaker' || isDragging.type === 'conical_flask') {
-        // The drip tip is at (burette.x - 45, burette.y + 120) based on your titration zone
-        const dripTipX = burette.x - 45;
+        // ALIGNMENT FIX: Snaps exactly under the glass tube offset
+        const snapX = burette.x + BURETTE_GLASS_X_OFFSET; 
         const dripTipY = burette.y + 120;
         
-        if (dist(isDragging.x, isDragging.y, dripTipX, dripTipY) < 60) {
-          isDragging.x = dripTipX;
-          isDragging.y = burette.y + 160; // Locked to the stand base
+        if (dist(isDragging.x, isDragging.y, snapX, dripTipY) < 70) {
+          isDragging.x = snapX;
+          // Vertical: flask base sits on the shelf relative to the burette rod
+          isDragging.y = burette.y + 158; 
           isDragging.vy = 0;
-          console.log("Beaker Snapped under Burette");
+          isDragging.surface = null;
+          console.log("Receiver locked below tube");
         }
       }
     }
