@@ -459,175 +459,163 @@ def student_reports(request):
 
 
 
-#from reportlab.lib.colors import HexColor
-#from reportlab.lib.pagesizes import letter, portrait
-#from reportlab.lib import colors
-#from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph,Spacer
-#from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.colors import HexColor
+from reportlab.lib.pagesizes import letter, portrait
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph,Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse
 from io import BytesIO
 #from reportlab.pdfgen import canvas
 #from reportlab.platypus import Image
-#from reportlab.lib.units import inch
+from reportlab.lib.units import inch
 # Get the sample style sheet object
-#styles = getSampleStyleSheet()
+styles = getSampleStyleSheet()
 
 def generate_reports(request, student_id):
     # Get the student object
     student = get_object_or_404(Student, id=student_id)
 
-    # Get the attendance details of the student
+    # Get the details from various models
     attendances = AttendanceReport.objects.filter(student=student)
-
-    # Get the marks details of the student
     marks = StudentResult.objects.filter(student=student)
-
-    # Get the quiz results of the student
     quiz_results = QuizResult.objects.filter(student=student)
+    
+    # NEW: Get the Virtual Lab Simulation results
+    lab_submissions = VirtualLabSubmission.objects.filter(student=student)
 
     # Generate the PDF report
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=portrait(letter))
-    # Define the heading for the student personal details table
-    heading = Paragraph('Student Personal Details', styles['Heading4'])
-    
-    # Create a list of the student personal details
-    student_data = [['Name:', '{} {}'.format(student.admin.first_name, student.admin.last_name)],
-                    ['Email:', '{}'.format(student.admin.email)],
-                    ['ID.:', '{}'.format(student.id)],
-                   
-                    ]
+    story = []
 
-    # Create a table for student personal details and style it
-    student_table = Table([ [heading], *student_data ], colWidths=[200,150,100])
+    # 1. Heading: Student Personal Details
+    heading_p = Paragraph('Student Personal Details', styles['Heading4'])
+    student_data = [
+        ['Name:', f'{student.admin.first_name} {student.admin.last_name}'],
+        ['Email:', f'{student.admin.email}'],
+        ['ID:', f'{student.id}'],
+    ]
+    student_table = Table([[heading_p], *student_data], colWidths=[200, 250])
     student_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#4CAF50')),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 14),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
-        ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#4CAF50')),
         ('BACKGROUND', (0, 0), (-1, 0), HexColor('#F5F5F5')),
-        ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
     ]))
-    # Create a list of the attendance details for the table
-    
-    # Create a list of the quiz results for the table
-    heading = Paragraph('Student Quiz Details', styles['Heading4'])
-    quiz_data = [['Quiz Name', 'Subject','Marks','Percentage']]
-    for result in quiz_results:
-        quiz_data.append([result.quiz.title,result.quiz.subject, result.score,result.percentage])
+    story.append(student_table)
+    story.append(Spacer(1, 25))
 
-    # Create the table for quiz results and style it
-    quiz_table = Table([[heading],*quiz_data], colWidths=[250,150, 100,100])
+    # 2. Virtual Lab Assessment Results (Simulation Data)
+    heading_lab = Paragraph('Virtual Lab (Titration) Performance', styles['Heading4'])
+    lab_data = [['Experiment', 'V1 (mL)', 'V2 (mL)', 'Calc Na2CO3', 'Calc NaHCO3', 'Score']]
+    
+    for sub in lab_submissions:
+        lab_data.append([
+            sub.experiment_name, 
+            sub.v1_observed, 
+            sub.v2_observed, 
+            f"{sub.calc_na2co3}g", 
+            f"{sub.calc_nahco3}g", 
+            f"{sub.total_score}/100"
+        ])
+
+    # If no simulation data exists yet
+    if not lab_submissions.exists():
+        lab_data.append(["No simulations submitted", "-", "-", "-", "-", "-"])
+
+    lab_table = Table([[heading_lab], *lab_data], colWidths=[150, 60, 60, 80, 80, 70])
+    lab_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#2196F3')), # Blue theme for Lab
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('BACKGROUND', (0, 1), (-1, -1), HexColor('#E3F2FD')),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+    ]))
+    story.append(lab_table)
+    story.append(Spacer(1, 25))
+
+    # 3. Student Quiz Details
+    heading_q = Paragraph('Student Quiz Details', styles['Heading4'])
+    quiz_data = [['Quiz Name', 'Subject', 'Marks', 'Percentage']]
+    for result in quiz_results:
+        quiz_data.append([result.quiz.title, result.quiz.subject, result.score, result.percentage])
+
+    quiz_table = Table([[heading_q], *quiz_data], colWidths=[200, 120, 80, 100])
     quiz_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), HexColor('#4CAF50')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#FFFFFF')),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('BACKGROUND', (0, 1), (-1, -1), HexColor('#F5F5F5')),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 10),
-        ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
-        ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-    ]))
-    
-    
-    
-        
-        # Create a list of the quiz results for the table
-    heading = Paragraph('Student Mark Details', styles['Heading4'])
-    m_data = [
-        ['Video Score', '20'],
-        ['Procedure Score', '20'],
-        ['Experiment Score', '10'],
-        ['Feedback Score', '10']
-    ]
-
-    mark_data = [['Quiz Score', '']]  # Add an empty cell for the value of quiz score
-    quiz_scores = []  # Keep track of quiz scores separately
-
-    for result in quiz_results:
-        mark_data[0][1] = result.score  # Add an empty cell followed by the score
-        quiz_scores.append(int(result.score))  # Append the score to the quiz_scores list
-
-    # Calculate the total score
-    total_score = sum(int(score) for _, score in m_data) + sum(quiz_scores)
-
-    # Add the "Total Score" row
-    mark_data.append(['Total Score', str(total_score)])
-
-    # Create the table for mark details and style it
-    m_table = Table([[heading], *m_data, *mark_data], colWidths=[250, 100, 100])
-    m_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#4CAF50')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#FFFFFF')),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
         ('BACKGROUND', (0, 1), (-1, -1), HexColor('#F5F5F5')),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 10),
-        ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
-        ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
     ]))
+    story.append(quiz_table)
+    story.append(Spacer(1, 25))
 
-
-    # Create a list of the experiment details for the table
-    heading = Paragraph('Student Experiment Details', styles['Heading4'])
+    # 4. Student Experiment Details (Manual Review/Graph Image)
+    heading_e = Paragraph('Student Manual Review & Graph', styles['Heading4'])
     experiment_data = [['Experience Review', 'Graph Image']]
-    experiments = Experiment.objects.filter(student_id=student_id)
+    experiments = Experiment.objects.filter(student_id=student)
+    
     import os
-
-
     for experiment in experiments:
-        image_path = os.path.abspath(experiment.graph_image.path)
-        experiment_data.append([experiment.experience_review, Image(image_path, width=2*inch, height=1.5*inch)])
-    # Create the table for experiment details and style it
-    experiment_table = Table([[heading], *experiment_data], colWidths=[250, 250])
+        try:
+            image_path = os.path.abspath(experiment.graph_image.path)
+            img = Image(image_path, width=2*inch, height=1.5*inch)
+        except:
+            img = "Image Not Found"
+        experiment_data.append([experiment.experience_review, img])
+
+    experiment_table = Table([[heading_e], *experiment_data], colWidths=[250, 250])
     experiment_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4CAF50')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#FFFFFF')),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F5F5F5')),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 10),
-        ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
-        ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
+        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#4CAF50')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story.append(experiment_table)
+    story.append(Spacer(1, 25))
+
+    # 5. Final Marks Table
+    heading_m = Paragraph('Consolidated Mark Details', styles['Heading4'])
+    # Calculate simulation score from database instead of hardcoded 20
+    latest_sim_score = lab_submissions.latest('created_at').total_score if lab_submissions.exists() else 0
+    
+    m_data = [
+        ['Virtual Lab Simulation Score', f'{latest_sim_score}'],
+        ['Manual Experiment Score', '10'],
+        ['Feedback Participation', '10'],
+    ]
+    
+    quiz_total = sum(int(r.score) for r in quiz_results)
+    m_data.append(['Quiz Total Score', f'{quiz_total}'])
+    
+    overall_total = latest_sim_score + 10 + 10 + quiz_total
+    m_data.append(['TOTAL SCORE', f'{overall_total}'])
+
+    m_table = Table([[heading_m], *m_data], colWidths=[350, 150])
+    m_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#333333')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (-1, -1), (-1, -1), 'Helvetica-Bold'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
     ]))
+    story.append(m_table)
 
-
-
-    # Build the PDF
-    story = []
-    story.extend([
-    student_table,
-    Spacer(0, 50),
-    quiz_table,
-    Spacer(0, 50),
-    experiment_table,
-    Spacer(0,50),
-    m_table,
-])
-
-   
+    # Build PDF
     doc.build(story)
 
-    # Retrieve the value of the BytesIO buffer and return the response
+    # Return response
     buffer.seek(0)
     response = HttpResponse(buffer, content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="{} {}.pdf"'.format(student.admin.first_name, student.admin.last_name)
+    response['Content-Disposition'] = f'attachment; filename="{student.admin.first_name}_{student.admin.last_name}_Report.pdf"'
     return response

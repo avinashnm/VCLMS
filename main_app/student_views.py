@@ -175,7 +175,6 @@ def student_view_profile(request):
 
     return render(request, "student_template/student_view_profile.html", context)
 
-# --- NEW VIEW: Save the student's lab result ---
 @csrf_exempt
 def save_lab_report(request):
     if request.method == 'POST':
@@ -183,21 +182,19 @@ def save_lab_report(request):
             data = json.loads(request.body)
             student = get_object_or_404(Student, admin=request.user)
             
-            # Logic to save to your database
-            # Example (Assuming you have a LabReport model):
-            # LabReport.objects.create(
-            #     student=student,
-            #     experiment_name=data.get('name'),
-            #     score=data.get('totalScore'),
-            #     v1_observed=data.get('v1'),
-            #     v2_observed=data.get('v2'),
-            #     log=data.get('log')
-            # )
-            
-            return JsonResponse({"status": "success", "message": "Experiment report saved successfully!"})
+            VirtualLabSubmission.objects.create(
+                student=student,
+                experiment_name=data.get('name'),
+                v1_observed=data.get('v1_observed'),
+                v2_observed=data.get('v2_observed'),
+                calc_na2co3=data.get('calc_na2co3'),
+                calc_nahco3=data.get('calc_nahco3'),
+                total_score=data.get('totalScore'),
+                penalty_log=data.get('log')
+            )
+            return JsonResponse({"status": "success", "message": "Experiment saved!"})
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=400)
-    return HttpResponseNotAllowed(['POST'])
 
 @csrf_exempt
 def student_fcmtoken(request):

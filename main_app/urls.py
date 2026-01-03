@@ -203,7 +203,7 @@ path("staff/send/student/notifications/", staff_views.send_student_notifications
   path('generate_report/<int:student_id>',student_views.generate_report, name='generate_report'),
   path('generate_reports/<int:student_id>',staff_views.generate_reports,name='generate_reports'),
   path('successful',student_views.successful,name='successful'),
-  
+path('save_lab_report/', student_views.save_lab_report, name='save_lab_report'),
     
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
