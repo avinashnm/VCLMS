@@ -473,149 +473,155 @@ from reportlab.lib.units import inch
 # Get the sample style sheet object
 styles = getSampleStyleSheet()
 
+
 def generate_reports(request, student_id):
-    # Get the student object
     student = get_object_or_404(Student, id=student_id)
-
-    # Get the details from various models
-    attendances = AttendanceReport.objects.filter(student=student)
-    marks = StudentResult.objects.filter(student=student)
     quiz_results = QuizResult.objects.filter(student=student)
-    
-    # NEW: Get the Virtual Lab Simulation results
     lab_submissions = VirtualLabSubmission.objects.filter(student=student)
-
-    # Generate the PDF report
+    experiments = Experiment.objects.filter(student_id=student)
+    
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=portrait(letter))
+    doc = SimpleDocTemplate(buffer, pagesize=portrait(letter), leftMargin=40, rightMargin=40)
     story = []
+    styles = getSampleStyleSheet()
+    
+    # Create a custom style for table cells to allow wrapping and small font
+    table_style = styles['Normal']
+    table_style.fontSize = 9
+    table_style.leading = 11
 
-    # 1. Heading: Student Personal Details
-    heading_p = Paragraph('Student Personal Details', styles['Heading4'])
-    student_data = [
-        ['Name:', f'{student.admin.first_name} {student.admin.last_name}'],
-        ['Email:', f'{student.admin.email}'],
-        ['ID:', f'{student.id}'],
+    # --- Helper to format chemical formulas for Paragraphs ---
+    def clean_chem(text):
+        if not text: return ""
+        # 1. Replace the Unicode subscripts (the boxes) with tags
+        text = text.replace("₂", "<sub>2</sub>").replace("₃", "<sub>3</sub>")
+        # 2. Replace standard text versions
+        text = text.replace("Na2CO3", "Na<sub>2</sub>CO<sub>3</sub>")
+        text = text.replace("NaHCO3", "NaHCO<sub>3</sub>")
+        return text
+    # --- 1. Student Personal Details ---
+    story.append(Paragraph("<b>STUDENT REPORT CARD</b>", styles['Heading2']))
+    story.append(Spacer(1, 15))
+
+    p_data = [
+        ['Name:', f"{student.admin.first_name} {student.admin.last_name}"],
+        ['Email:', student.admin.email],
+        ['Student ID:', str(student.id)],
+        ['Course:', student.course.name]
     ]
-    student_table = Table([[heading_p], *student_data], colWidths=[200, 250])
-    student_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#4CAF50')),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 14),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
-        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#F5F5F5')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+    p_table = Table(p_data, colWidths=[1.5*inch, 4*inch])
+    p_table.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('BACKGROUND', (0, 0), (0, -1), colors.whitesmoke),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('PADDING', (0, 0), (-1, -1), 6),
     ]))
-    story.append(student_table)
-    story.append(Spacer(1, 25))
+    story.append(p_table)
+    story.append(Spacer(1, 20))
 
-    # 2. Virtual Lab Assessment Results (Simulation Data)
-    heading_lab = Paragraph('Virtual Lab (Titration) Performance', styles['Heading4'])
-    lab_data = [['Experiment', 'V1 (mL)', 'V2 (mL)', 'Calc Na2CO3', 'Calc NaHCO3', 'Score']]
+    # --- 2. Virtual Lab Assessment (Titration) ---
+    story.append(Paragraph("<b>Virtual Lab Performance</b>", styles['Heading3']))
+    story.append(Spacer(1, 5))
+    
+    # Header row wrapped in Paragraphs to render subscripts
+    headers = [
+        Paragraph("<b>Experiment</b>", table_style),
+        Paragraph("<b>V1</b>", table_style),
+        Paragraph("<b>V2</b>", table_style),
+        Paragraph(f"<b>Calc {clean_chem('Na2CO3')}</b>", table_style),
+        Paragraph(f"<b>Calc {clean_chem('NaHCO3')}</b>", table_style),
+        Paragraph("<b>Score</b>", table_style)
+    ]
+    
+    lab_data = [headers]
     
     for sub in lab_submissions:
         lab_data.append([
-            sub.experiment_name, 
-            sub.v1_observed, 
-            sub.v2_observed, 
-            f"{sub.calc_na2co3}g", 
-            f"{sub.calc_nahco3}g", 
+            Paragraph(clean_chem(sub.experiment_name), table_style), 
+            f"{sub.v1_observed} mL", 
+            f"{sub.v2_observed} mL", 
+            f"{sub.calc_na2co3} g", 
+            f"{sub.calc_nahco3} g", 
             f"{sub.total_score}/100"
         ])
 
-    # If no simulation data exists yet
-    if not lab_submissions.exists():
-        lab_data.append(["No simulations submitted", "-", "-", "-", "-", "-"])
-
-    lab_table = Table([[heading_lab], *lab_data], colWidths=[150, 60, 60, 80, 80, 70])
+    # Adjusted widths to give the formulas more room and prevent overlap
+    lab_table = Table(lab_data, colWidths=[1.8*inch, 0.6*inch, 0.6*inch, 1.2*inch, 1.2*inch, 0.8*inch])
     lab_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#2196F3')), # Blue theme for Lab
+        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#2196F3')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('BACKGROUND', (0, 1), (-1, -1), HexColor('#E3F2FD')),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('FONTSIZE', (0, 1), (-1, -1), 9),
     ]))
     story.append(lab_table)
-    story.append(Spacer(1, 25))
+    story.append(Spacer(1, 20))
 
-    # 3. Student Quiz Details
-    heading_q = Paragraph('Student Quiz Details', styles['Heading4'])
+    # --- 3. Mistakes Section ---
+    story.append(Paragraph("<b>Procedural Mistakes & Penalties</b>", styles['Heading4']))
+    story.append(Spacer(1, 5))
+    
+    mistake_data = [[Paragraph("<b>Description of Mistake</b>", table_style)]]
+    if lab_submissions.exists():
+        latest_log = lab_submissions.latest('created_at').penalty_log
+        if latest_log:
+            logs = latest_log.split(" | ")
+            for entry in logs:
+                mistake_data.append([Paragraph(f"• {entry}", table_style)])
+        else:
+            mistake_data.append(["No procedural mistakes recorded."])
+    
+    mistake_table = Table(mistake_data, colWidths=[6.2*inch])
+    mistake_table.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.red),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.red),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lavenderblush),
+        ('PADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(mistake_table)
+    story.append(Spacer(1, 20))
+
+    # --- 4. Quizzes ---
+    story.append(Paragraph("<b>Academic Quiz Results</b>", styles['Heading3']))
     quiz_data = [['Quiz Name', 'Subject', 'Marks', 'Percentage']]
-    for result in quiz_results:
-        quiz_data.append([result.quiz.title, result.quiz.subject, result.score, result.percentage])
-
-    quiz_table = Table([[heading_q], *quiz_data], colWidths=[200, 120, 80, 100])
+    for r in quiz_results:
+        quiz_data.append([r.quiz.title, r.quiz.subject.name, r.score, f"{r.percentage}%"])
+    
+    quiz_table = Table(quiz_data, colWidths=[2.2*inch, 1.5*inch, 1*inch, 1.5*inch])
     quiz_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), HexColor('#4CAF50')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('BACKGROUND', (0, 1), (-1, -1), HexColor('#F5F5F5')),
     ]))
     story.append(quiz_table)
     story.append(Spacer(1, 25))
 
-    # 4. Student Experiment Details (Manual Review/Graph Image)
-    heading_e = Paragraph('Student Manual Review & Graph', styles['Heading4'])
-    experiment_data = [['Experience Review', 'Graph Image']]
-    experiments = Experiment.objects.filter(student_id=student)
-    
-    import os
-    for experiment in experiments:
-        try:
-            image_path = os.path.abspath(experiment.graph_image.path)
-            img = Image(image_path, width=2*inch, height=1.5*inch)
-        except:
-            img = "Image Not Found"
-        experiment_data.append([experiment.experience_review, img])
-
-    experiment_table = Table([[heading_e], *experiment_data], colWidths=[250, 250])
-    experiment_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#4CAF50')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    story.append(experiment_table)
-    story.append(Spacer(1, 25))
-
-    # 5. Final Marks Table
-    heading_m = Paragraph('Consolidated Mark Details', styles['Heading4'])
-    # Calculate simulation score from database instead of hardcoded 20
-    latest_sim_score = lab_submissions.latest('created_at').total_score if lab_submissions.exists() else 0
-    
-    m_data = [
-        ['Virtual Lab Simulation Score', f'{latest_sim_score}'],
-        ['Manual Experiment Score', '10'],
-        ['Feedback Participation', '10'],
-    ]
-    
+    # --- 5. Final Consolidated Marks ---
+    story.append(Paragraph("<b>Final Grade Calculation</b>", styles['Heading3']))
+    latest_score = lab_submissions.latest('created_at').total_score if lab_submissions.exists() else 0
     quiz_total = sum(int(r.score) for r in quiz_results)
-    m_data.append(['Quiz Total Score', f'{quiz_total}'])
     
-    overall_total = latest_sim_score + 10 + 10 + quiz_total
-    m_data.append(['TOTAL SCORE', f'{overall_total}'])
-
-    m_table = Table([[heading_m], *m_data], colWidths=[350, 150])
-    m_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#333333')),
+    total_data = [
+        ['Assessment Type', 'Score'],
+        ['Virtual Lab Simulation', str(latest_score)],
+        ['Manual Review Score', '10'],
+        ['Quiz Total', str(quiz_total)],
+        ['TOTAL CONSOLIDATED MARKS', f"{latest_score + 10 + quiz_total}"]
+    ]
+    total_table = Table(total_data, colWidths=[4.2*inch, 2*inch])
+    total_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.black),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (-1, -1), (-1, -1), 'Helvetica-Bold'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.yellow),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
     ]))
-    story.append(m_table)
+    story.append(total_table)
 
-    # Build PDF
     doc.build(story)
-
-    # Return response
     buffer.seek(0)
     response = HttpResponse(buffer, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{student.admin.first_name}_{student.admin.last_name}_Report.pdf"'
+    response['Content-Disposition'] = f'attachment; filename="Report_{student.admin.last_name}.pdf"'
     return response
