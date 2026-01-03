@@ -990,23 +990,29 @@ function drawTitrationZone() {
   const burette = Object.values(vessels).find(v => v.type === 'burette');
   if (!burette || isDragging) return;
   
+  // Center of the snap point
   const zoneX = burette.x - 45;
-  const zoneY = burette.y + 120;
-  const beaker = Object.values(vessels).find(v => v.type === 'beaker');
+  const zoneY = burette.y + 155; 
   
-  const zoneColor = beaker && dist(beaker.x, beaker.y, zoneX, zoneY) < 40 
-    ? [255, 100, 100, 150] : [100, 255, 100, 100];
+  const receiver = Object.values(vessels).find(v => 
+    (v.type === 'beaker' || v.type === 'conical_flask') && dist(v.x, v.y, zoneX, zoneY) < 10
+  );
   
-  noFill();
-  stroke(...zoneColor);
-  strokeWeight(3);
-  circle(zoneX, zoneY, 80);
-  
-  fill(...zoneColor);
-  noStroke();
-  textAlign(CENTER, CENTER);
-  textSize(12);
-  text('DROP', zoneX, zoneY);
+  // If something is snapped, don't draw the guide; if not, show where to place it
+  if (!receiver) {
+    noFill();
+    stroke(100, 255, 100, 150);
+    strokeWeight(2);
+    drawingContext.setLineDash([5, 5]); // Dashed line for guide
+    circle(zoneX, zoneY - 20, 60);
+    drawingContext.setLineDash([]); 
+    
+    fill(100, 255, 100, 150);
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(10);
+    text('PLACE FLASK', zoneX, zoneY - 20);
+  }
 }
 
 // ======================================================
