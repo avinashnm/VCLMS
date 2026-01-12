@@ -15,8 +15,8 @@ let phStage = 0;
 let beakerTargetVol = 0;
 let pipetteTargetVol = 0;
 let buretteTargetVol = 0;
-let userClosedZoom = false; 
-let buretteReading = 0; 
+let userClosedZoom = false;
+let buretteReading = 0;
 
 let apparatusCatalog, chemicalCatalog;
 let currentCatalogTab = 'apparatus';
@@ -54,213 +54,226 @@ const LAB_SURFACES = {
 
 //experiment assessment
 class MarkingManager {
-    constructor(config) {
-        this.config = config;
-        this.milestones = config?.milestones || [];
-        this.completedIds = new Set();
-        this.mistakesMade = new Set();
+  constructor(config) {
+    this.config = config;
+    this.milestones = config?.milestones || [];
+    this.completedIds = new Set();
+    this.mistakesMade = new Set();
 
-        // Stored observations for the calculation phase
-        this.recordedV1 = 0;
-        this.recordedV2 = 0;
-    }
+    // Stored observations for the calculation phase
+    this.recordedV1 = 0;
+    this.recordedV2 = 0;
+    this.swirlNeglectTimer = 0; // Track lack of swirling
+  }
 
-    // This MUST be called inside the p5.js draw() loop
-    update() {
-        const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-        const burette = Object.values(vessels).find(v => v.type === 'burette');
+  // This MUST be called inside the p5.js draw() loop
+  update() {
+    const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
+    const burette = Object.values(vessels).find(v => v.type === 'burette');
 
-        // --- 1. BURETTE TASKS ---
-        if (burette) {
-            // Check: Fill Burette (Minimum 20mL to start)
-            if (burette.targetVolume > 20) {
-                this.completeMilestone("fill_burette");
-            }
+    // --- 1. BURETTE TASKS ---
+    if (burette) {
+      // Check: Fill Burette (Minimum 20mL to start)
+      if (burette.targetVolume > 24) {
+        this.completeMilestone("fill_burette");
+      }
 
-            // Check: Zero Burette (Meniscus at 0.00)
-            let reading = abs(burette.capacity - burette.volume);
-            if (this.completedIds.has("fill_burette") && reading < 0.2) {
-                this.completeMilestone("zero_burette");
-            }
+      // Check: Zero Burette (Meniscus at 0.00)
+      let reading = abs(burette.capacity - burette.volume);
+      if (this.completedIds.has("fill_burette") && reading < 0.2) {
+        this.completeMilestone("zero_burette");
+      }
 
-            // Penalty: Titrating without Zeroing
-            if (keyIsDown(32) && flask && dist(flask.x, flask.y, burette.x - 45, burette.y + 120) < 80) {
-                if (!this.completedIds.has("zero_burette") && reading > 0.5) {
-                    this.addPenalty("no_zeroing", 15, "Titrating without zeroing the burette first.");
-                }
-            }
-            
-            // Penalty: Titrating without removing funnel
-            if (keyIsDown(32) && !burette.hasFunnel) {
-                this.addPenalty("no_funnel", 5, "Started titration without using a funnel (or funnel is missing).");
-            }
+      // Penalty: Titrating without Zeroing
+      if (keyIsDown(32) && flask && dist(flask.x, flask.y, burette.x - 45, burette.y + 120) < 80) {
+        if (!this.completedIds.has("zero_burette") && reading > 0.5) {
+          this.addPenalty("no_zeroing", 15, "Titrating without zeroing the burette first.");
         }
+      }
 
-        // --- 2. FLASK TASKS ---
-        if (flask) {
-            // Check: Pipette 20mL Analyte into Flask
-            if (flask.contents.mixture_vol >= 19.5) {
-                this.completeMilestone("pipette_mixture");
-            }
+      // Penalty: Titrating without removing funnel
+      if (keyIsDown(32) && !burette.hasFunnel) {
+        this.addPenalty("no_funnel", 5, "Started titration without using a funnel (or funnel is missing).");
+      }
 
-            // Check: Add Phenolphthalein
-            if (this.completedIds.has("pipette_mixture") && flask.contents.pp_drops >= 1) {
-                this.completeMilestone("add_pp");
-            }
-
-            // Penalty: Adding Methyl Orange too early
-            if (flask.contents.mo_drops > 0 && !this.completedIds.has("reach_v1")) {
-                this.addPenalty("wrong_sequence", 15, "Added Methyl Orange before V1 endpoint.");
-            }
-
-            // Check: Add Methyl Orange (Only after V1 is finished)
-            if (this.completedIds.has("reach_v1") && flask.contents.mo_drops >= 1) {
-                this.completeMilestone("add_mo");
-            }
+      // Penalty: Titrating without Swirling (Lack of Agitation)
+      // If Space is held (titrating) but W is NOT held (no swirl)
+      if (keyIsDown(32) && !keyIsDown(87)) {
+        this.swirlNeglectTimer++;
+        if (this.swirlNeglectTimer > 180) { // ~3 seconds of neglect
+          this.addPenalty("no_swirl", 10, "Titrating without swirling the flask regularly.");
         }
+      } else {
+        // Reset timer if they swirl
+        if (keyIsDown(87)) this.swirlNeglectTimer = 0;
+      }
     }
 
-    completeMilestone(id) {
-        if (this.completedIds.has(id)) return;
-        let m = this.milestones.find(item => item.id === id);
-        if (m) {
-            this.completedIds.add(id);
-            sessionMarks += m.points;
-            currentStepIndex = Math.min(this.milestones.length - 1, this.completedIds.size);
-            console.log("Milestone Achieved:", m.desc);
-        }
+    // --- 2. FLASK TASKS ---
+    if (flask) {
+      // Check: Pipette 20mL Analyte into Flask
+      if (flask.contents.mixture_vol >= 19.5) {
+        this.completeMilestone("pipette_mixture");
+      }
+
+      // Check: Add Phenolphthalein
+      if (this.completedIds.has("pipette_mixture") && flask.contents.pp_drops >= 1) {
+        this.completeMilestone("add_pp");
+      }
+
+      // Penalty: Adding Methyl Orange too early
+      if (flask.contents.mo_drops > 0 && !this.completedIds.has("reach_v1")) {
+        this.addPenalty("wrong_sequence", 15, "Added Methyl Orange before V1 endpoint.");
+      }
+
+      // Check: Add Methyl Orange (Only after V1 is finished)
+      if (this.completedIds.has("reach_v1") && flask.contents.mo_drops >= 1) {
+        this.completeMilestone("add_mo");
+      }
+    }
+  }
+
+  completeMilestone(id) {
+    if (this.completedIds.has(id)) return;
+    let m = this.milestones.find(item => item.id === id);
+    if (m) {
+      this.completedIds.add(id);
+      sessionMarks += m.points;
+      currentStepIndex = Math.min(this.milestones.length - 1, this.completedIds.size);
+      console.log("Milestone Achieved:", m.desc);
+    }
+  }
+
+  addPenalty(id, points, reason) {
+    if (this.mistakesMade.has(id)) return;
+    this.mistakesMade.add(id);
+    sessionMarks -= points;
+    penalties.push(`-${points}: ${reason}`);
+  }
+
+  // --- MANUAL ENTRY: V1 ---
+  openV1Input() {
+    let val = window.prompt("LAB OBSERVATION:\nEnter the Phenolphthalein endpoint (V1) reading in mL:");
+    if (val !== null && val !== "") {
+      let userV1 = parseFloat(val);
+      const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
+      let trueV1 = flask.contents.hcl_vol; // The real volume added in simulation
+
+      // Mark accuracy of observation (within 0.2 mL tolerance)
+      if (abs(userV1 - trueV1) > 0.2) {
+        this.addPenalty("obs_v1", 10, `Inaccurate V1 observation. Entered: ${userV1}, Actual: ${trueV1.toFixed(2)}`);
+      }
+      this.recordedV1 = userV1;
+      this.completeMilestone("reach_v1");
+    }
+  }
+
+  // --- MANUAL ENTRY: V2 ---
+  openV2Input() {
+    let val = window.prompt("LAB OBSERVATION:\nEnter the Methyl Orange endpoint (V2) reading in mL:");
+    if (val !== null && val !== "") {
+      let userV2 = parseFloat(val);
+      const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
+      let trueV2 = flask.contents.hcl_vol;
+
+      // Mark accuracy of observation (within 0.2 mL tolerance)
+      if (abs(userV2 - trueV2) > 0.2) {
+        this.addPenalty("obs_v2", 10, `Inaccurate V2 observation. Entered: ${userV2}, Actual: ${trueV2.toFixed(2)}`);
+      }
+      this.recordedV2 = userV2;
+      this.completeMilestone("reach_v2");
+    }
+  }
+
+  // --- FINAL CHECKPOINT: CALCULATIONS ---
+  openCalculationModal() {
+    // Brief delay ensures the click event is finished before browser prompts open
+    setTimeout(() => {
+      const confirmed = confirm("TITRATION COMPLETE\n\nAre you ready to submit your final mass calculations based on your V1 and V2 observations?");
+      if (!confirmed) return;
+
+      let m1 = window.prompt(`Step 1: Use your V1 (${this.recordedV1} mL) to calculate:\nMass of Na2CO3 in grams:`);
+      let m2 = window.prompt(`Step 2: Use your V2 (${this.recordedV2} mL) to calculate:\nMass of NaHCO3 in grams:`);
+
+      if (m1 !== null && m2 !== null && m1 !== "" && m2 !== "") {
+        this.verifyCalculations(parseFloat(m1), parseFloat(m2));
+      } else {
+        alert("Submission cancelled. Please calculate and enter both values.");
+      }
+    }, 100);
+  }
+
+  verifyCalculations(massNa2CO3, massNaHCO3) {
+    // --- Chemistry Formulae ---
+    // Vol for Na2CO3 = 2 * V1
+    // Vol for NaHCO3 = V2 - 2*V1
+    // Mass = (Volume * Molarity * Eq.Wt) / 1000
+
+    const M = 0.1;
+    const trueV1 = TARGET_V1; // Using simulated targets for absolute marking
+    const trueV2 = TARGET_V2;
+
+    let expectedNa2CO3 = (2 * trueV1 * M * 53) / 1000;
+    let expectedNaHCO3 = ((trueV2 - (2 * trueV1)) * M * 84) / 1000;
+
+    let mathErrors = [];
+
+    // Mark Na2CO3 Math (within 0.05g tolerance)
+    if (abs(massNa2CO3 - expectedNa2CO3) < 0.05) {
+      console.log("Carbonate math correct");
+    } else {
+      this.addPenalty("calc_na2co3", 12, "Incorrect Mass calculation for Sodium Carbonate.");
     }
 
-    addPenalty(id, points, reason) {
-        if (this.mistakesMade.has(id)) return;
-        this.mistakesMade.add(id);
-        sessionMarks -= points;
-        penalties.push(`-${points}: ${reason}`);
+    // Mark NaHCO3 Math (within 0.05g tolerance)
+    if (abs(massNaHCO3 - expectedNaHCO3) < 0.05) {
+      console.log("Bicarbonate math correct");
+    } else {
+      this.addPenalty("calc_nahco3", 13, "Incorrect Mass calculation for Sodium Bicarbonate.");
     }
 
-    // --- MANUAL ENTRY: V1 ---
-    openV1Input() {
-        let val = window.prompt("LAB OBSERVATION:\nEnter the Phenolphthalein endpoint (V1) reading in mL:");
-        if (val !== null && val !== "") {
-            let userV1 = parseFloat(val);
-            const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-            let trueV1 = flask.contents.hcl_vol; // The real volume added in simulation
+    this.completeMilestone("submit_calc");
+    this.saveResults(massNa2CO3, massNaHCO3);
+  }
 
-            // Mark accuracy of observation (within 0.2 mL tolerance)
-            if (abs(userV1 - trueV1) > 0.2) {
-                this.addPenalty("obs_v1", 10, `Inaccurate V1 observation. Entered: ${userV1}, Actual: ${trueV1.toFixed(2)}`);
-            }
-            this.recordedV1 = userV1;
-            this.completeMilestone("reach_v1");
-        }
-    }
+  saveResults(m1, m2) {
+    const payload = {
+      name: experimentData.name,
+      totalScore: sessionMarks,
+      v1_observed: this.recordedV1,
+      v2_observed: this.recordedV2,
+      calc_na2co3: m1,
+      calc_nahco3: m2,
+      log: penalties.join(" | ")
+    };
 
-    // --- MANUAL ENTRY: V2 ---
-    openV2Input() {
-        let val = window.prompt("LAB OBSERVATION:\nEnter the Methyl Orange endpoint (V2) reading in mL:");
-        if (val !== null && val !== "") {
-            let userV2 = parseFloat(val);
-            const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-            let trueV2 = flask.contents.hcl_vol;
-
-            // Mark accuracy of observation (within 0.2 mL tolerance)
-            if (abs(userV2 - trueV2) > 0.2) {
-                this.addPenalty("obs_v2", 10, `Inaccurate V2 observation. Entered: ${userV2}, Actual: ${trueV2.toFixed(2)}`);
-            }
-            this.recordedV2 = userV2;
-            this.completeMilestone("reach_v2");
-        }
-    }
-
-    // --- FINAL CHECKPOINT: CALCULATIONS ---
-    openCalculationModal() {
-        // Brief delay ensures the click event is finished before browser prompts open
-        setTimeout(() => {
-            const confirmed = confirm("TITRATION COMPLETE\n\nAre you ready to submit your final mass calculations based on your V1 and V2 observations?");
-            if (!confirmed) return;
-
-            let m1 = window.prompt(`Step 1: Use your V1 (${this.recordedV1} mL) to calculate:\nMass of Na2CO3 in grams:`);
-            let m2 = window.prompt(`Step 2: Use your V2 (${this.recordedV2} mL) to calculate:\nMass of NaHCO3 in grams:`);
-
-            if (m1 !== null && m2 !== null && m1 !== "" && m2 !== "") {
-                this.verifyCalculations(parseFloat(m1), parseFloat(m2));
-            } else {
-                alert("Submission cancelled. Please calculate and enter both values.");
-            }
-        }, 100);
-    }
-
-    verifyCalculations(massNa2CO3, massNaHCO3) {
-        // --- Chemistry Formulae ---
-        // Vol for Na2CO3 = 2 * V1
-        // Vol for NaHCO3 = V2 - 2*V1
-        // Mass = (Volume * Molarity * Eq.Wt) / 1000
-        
-        const M = 0.1; 
-        const trueV1 = TARGET_V1; // Using simulated targets for absolute marking
-        const trueV2 = TARGET_V2;
-
-        let expectedNa2CO3 = (2 * trueV1 * M * 53) / 1000;
-        let expectedNaHCO3 = ((trueV2 - (2 * trueV1)) * M * 84) / 1000;
-
-        let mathErrors = [];
-        
-        // Mark Na2CO3 Math (within 0.05g tolerance)
-        if (abs(massNa2CO3 - expectedNa2CO3) < 0.05) {
-            console.log("Carbonate math correct");
-        } else {
-            this.addPenalty("calc_na2co3", 12, "Incorrect Mass calculation for Sodium Carbonate.");
-        }
-
-        // Mark NaHCO3 Math (within 0.05g tolerance)
-        if (abs(massNaHCO3 - expectedNaHCO3) < 0.05) {
-            console.log("Bicarbonate math correct");
-        } else {
-            this.addPenalty("calc_nahco3", 13, "Incorrect Mass calculation for Sodium Bicarbonate.");
-        }
-
-        this.completeMilestone("submit_calc");
-        this.saveResults(massNa2CO3, massNaHCO3);
-    }
-
-    saveResults(m1, m2) {
-        const payload = {
-            name: experimentData.name,
-            totalScore: sessionMarks,
-            v1_observed: this.recordedV1,
-            v2_observed: this.recordedV2,
-            calc_na2co3: m1,
-            calc_nahco3: m2,
-            log: penalties.join(" | ")
-        };
-        
-        fetch("/save_lab_report/", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        })
-        .then(res => res.json())
-        .then(data => {
-            alert(`Assessment Complete!\nFinal Score: ${sessionMarks}/100\nYour report has been submitted to the instructor.`);
-        })
-        .catch(err => console.error("Save error:", err));
-    }
+    fetch("/save_lab_report/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+      .then(res => res.json())
+      .then(data => {
+        alert(`Assessment Complete!\nFinal Score: ${sessionMarks}/100\nYour report has been submitted to the instructor.`);
+      })
+      .catch(err => console.error("Save error:", err));
+  }
 }
 
 function drawEndpointButtons(x, y, w) {
-    const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-        if (!flask || flask.contents.mixture_vol < 1) return;
+  const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
+  if (!flask || flask.contents.mixture_vol < 1) return;
 
 
-    if (idIsDone("add_pp") && !idIsDone("reach_v1")) {
-        drawButton(x, y, w, 40, "ENTER V1 READING", [255, 105, 180]);
-    }
-    if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
-        drawButton(x, y, w, 40, "ENTER V2 READING", [255, 160, 0]);
-    }
-    if (idIsDone("reach_v2") && !idIsDone("submit_calc")) {
-        drawButton(x, y, w, 40, "SUBMIT CALCULATIONS", [0, 200, 100]);
-    }
+  if (idIsDone("add_pp") && !idIsDone("reach_v1")) {
+    drawButton(x, y, w, 40, "ENTER V1 READING", [255, 105, 180]);
+  }
+  if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
+    drawButton(x, y, w, 40, "ENTER V2 READING", [255, 160, 0]);
+  }
+  if (idIsDone("reach_v2") && !idIsDone("submit_calc")) {
+    drawButton(x, y, w, 40, "SUBMIT CALCULATIONS", [0, 200, 100]);
+  }
 }
 
 // --- FIX 2: Initialize only ONE manager ---
@@ -271,17 +284,17 @@ function getLabSurfaces() {
   const scaleX = width / 1200;
   const scaleY = height / 700;
   return {
-    shelf: { 
-      y: 360 * scaleY, 
+    shelf: {
+      y: 360 * scaleY,
       minX: 150 * scaleX,      // Full coverage left
-      maxX: width * 0.99,       
-      shadowAlpha: 30 
+      maxX: width * 0.99,
+      shadowAlpha: 30
     },
-    table: { 
-      y: 460 * scaleY, 
+    table: {
+      y: 460 * scaleY,
       minX: 100 * scaleX,      // Wider coverage
-      maxX: width * 0.99, 
-      shadowAlpha: 45 
+      maxX: width * 0.99,
+      shadowAlpha: 45
     }
   };
 }
@@ -309,12 +322,12 @@ const CHEMICALS = {
 
 // Big vs Small apparatus classification
 const BIG_APPARATUS = [
-  'burette', 'bunsen_burner', 'wash_bottle', 'hotplate', 'balance', 
+  'burette', 'bunsen_burner', 'wash_bottle', 'hotplate', 'balance',
   'liebig_condensor', 'separatory_funnel', 'pH_meter', 'meltingpoint_apparatus'
 ];
 
 const SMALL_APPARATUS = [
-  'beaker', 'pipette', 'bottle', 'funnel', 'conical_flask', 
+  'beaker', 'pipette', 'bottle', 'funnel', 'conical_flask',
   'volumetric_flask', 'crucible', 'TLC_plate'
 ];
 
@@ -394,64 +407,64 @@ function setup() {
   pipetteTargetVol = 0;
   buretteTargetVol = 0;
 
-  updateLabSurfaces(); 
+  updateLabSurfaces();
 
   updateResponsivePositions();
 
- apparatusCatalog = new LabCatalog({ scale: 0.75 });
-apparatusCatalog.initSprites({
-  beaker: imgBeaker, pipette: imgPipette, bottle: imgBottle,
-  burette: imgBurette, conical_flask: imgConical,
-  volumetric_flask: imgVolumetric, funnel: imgFunnel,
-  wash_bottle: imgWash, bunsen_burner: imgBunsen,
-  balance: imgBalance, crucible: imgCrucible,
-  hotplate: imgHotplate, liebig_condensor: imgLiebig,
-  meltingpoint_apparatus: imgMeltingPoint, pH_meter: imgPHMeter,
-  separatory_funnel: imgSepFunnel, TLC_plate: imgTLC
-});
+  apparatusCatalog = new LabCatalog({ scale: 0.75 });
+  apparatusCatalog.initSprites({
+    beaker: imgBeaker, pipette: imgPipette, bottle: imgBottle,
+    burette: imgBurette, conical_flask: imgConical,
+    volumetric_flask: imgVolumetric, funnel: imgFunnel,
+    wash_bottle: imgWash, bunsen_burner: imgBunsen,
+    balance: imgBalance, crucible: imgCrucible,
+    hotplate: imgHotplate, liebig_condensor: imgLiebig,
+    meltingpoint_apparatus: imgMeltingPoint, pH_meter: imgPHMeter,
+    separatory_funnel: imgSepFunnel, TLC_plate: imgTLC
+  });
 
-chemicalCatalog = new ChemicalCatalog([
-  { 
-    id: 'na2co3_nahco3', 
-    label: '25% Na₂CO₃+NaHCO₃', 
-    name: 'Sodium Carbonate + Bicarbonate', 
-    formula: 'Na₂CO₃ + NaHCO₃', 
-    conc: '25%', 
-    color: [220, 180, 100] 
-  },
-  { 
-    id: 'hcl_0_1M', 
-    label: '0.1M HCl (Burette)', 
-    name: 'Hydrochloric Acid', 
-    formula: 'HCl', 
-    conc: '0.1M', 
-    color: [255, 120, 80] 
-  },
-  { 
-    id: 'phenolphthalein', 
-    label: 'Phenolphthalein', 
-    name: 'Phenolphthalein', 
-    formula: 'C₂₀H₁₄O₄', 
-    conc: '', 
-    color: [255, 180, 220] 
-  },
-  { 
-    id: 'methyl_orange', 
-    label: 'Methyl Orange', 
-    name: 'Methyl Orange', 
-    formula: 'C₁₄H₁₄N₃NaO₃S', 
-    conc: '', 
-    color: [255, 160, 60] 
-  },
-  { 
-    id: 'distilled_water', 
-    label: 'Distilled Water', 
-    name: 'Distilled Water', 
-    formula: 'H₂O', 
-    conc: '', 
-    color: [200, 220, 255] 
-  }
-]);
+  chemicalCatalog = new ChemicalCatalog([
+    {
+      id: 'na2co3_nahco3',
+      label: '25% Na₂CO₃+NaHCO₃',
+      name: 'Sodium Carbonate + Bicarbonate',
+      formula: 'Na₂CO₃ + NaHCO₃',
+      conc: '25%',
+      color: [220, 180, 100]
+    },
+    {
+      id: 'hcl_0_1M',
+      label: '0.1M HCl (Burette)',
+      name: 'Hydrochloric Acid',
+      formula: 'HCl',
+      conc: '0.1M',
+      color: [255, 120, 80]
+    },
+    {
+      id: 'phenolphthalein',
+      label: 'Phenolphthalein',
+      name: 'Phenolphthalein',
+      formula: 'C₂₀H₁₄O₄',
+      conc: '',
+      color: [255, 180, 220]
+    },
+    {
+      id: 'methyl_orange',
+      label: 'Methyl Orange',
+      name: 'Methyl Orange',
+      formula: 'C₁₄H₁₄N₃NaO₃S',
+      conc: '',
+      color: [255, 160, 60]
+    },
+    {
+      id: 'distilled_water',
+      label: 'Distilled Water',
+      name: 'Distilled Water',
+      formula: 'H₂O',
+      conc: '',
+      color: [200, 220, 255]
+    }
+  ]);
 
 }
 
@@ -512,15 +525,15 @@ function askChemical(kind) {
 // ======================================================
 function smartSpawnPosition(type) {
   // Use dynamic lab surfaces (no more fixed LAB_ZONES!)
-  if (!labSurfaces) return { x: width/2, y: height/2 };
-  
+  if (!labSurfaces) return { x: width / 2, y: height / 2 };
+
   const isBig = BIG_APPARATUS.includes(type);
   const spawnSurface = isBig ? labSurfaces.table : labSurfaces.shelf;
-  
+
   // Spawn at center of surface with slight random offset
   const centerX = (spawnSurface.minX + spawnSurface.maxX) / 2;
   const centerY = spawnSurface.y;
-  
+
   // Find collision-free spot near center
   return findCollisionFreePosition(centerX + random(-50, 50), centerY, type);
 }
@@ -530,20 +543,20 @@ function findCollisionFreePosition(targetX, targetY, type) {
   let attempts = 0;
   const scaleX = width / 1200;
   const scaleY = height / 700;
-  
+
   while (attempts < 20) {
     let testX = targetX + random(-80, 80);
     let testY = targetY + random(-20, 20);
-    
+
     // Keep within lab surface bounds
     const isBig = BIG_APPARATUS.includes(type);
     const bounds = isBig ? labSurfaces.table : labSurfaces.shelf;
-    
+
     if (testX < bounds.minX || testX > bounds.maxX || testY > bounds.y + 20) {
       attempts++;
       continue;
     }
-    
+
     // Check collision with other vessels
     let collision = false;
     Object.values(vessels).forEach(other => {
@@ -551,15 +564,15 @@ function findCollisionFreePosition(targetX, targetY, type) {
         collision = true;
       }
     });
-    
+
     if (!collision) return { x: testX, y: testY };
     attempts++;
   }
-  
+
   // Fallback: surface center
-  return { 
-    x: constrain(targetX, labSurfaces.table.minX + 50, labSurfaces.table.maxX - 50), 
-    y: labSurfaces.table.y 
+  return {
+    x: constrain(targetX, labSurfaces.table.minX + 50, labSurfaces.table.maxX - 50),
+    y: labSurfaces.table.y
   };
 }
 
@@ -570,7 +583,7 @@ function applySloshPhysics(v) {
 
   // Target tilt is based on speed (inertia)
   let targetTilt = constrain(horizontalMove * 0.12, -0.6, 0.6);
-  
+
   // Spring-damping physics for the liquid surface
   let springForce = (targetTilt - v.tilt) * 0.15;
   v.tiltVel += springForce;
@@ -580,6 +593,12 @@ function applySloshPhysics(v) {
   // Return to level if not moving
   if (!v.dragging) {
     v.tilt = lerp(v.tilt, 0, 0.05);
+  }
+
+  // Turbulence Decay (Ripples settle down)
+  if (v.turbulence > 0) {
+    v.turbulence = lerp(v.turbulence, 0, 0.05);
+    if (v.turbulence < 0.01) v.turbulence = 0;
   }
 }
 
@@ -601,14 +620,15 @@ function makeVessel(id, x, y, w, h, title, chem, vtype, vol, cap) {
     x: x, y: y, w: w, h: h,
     vx: 0, vy: 0,
     lastX: x, tilt: 0, tiltVel: 0,
+    turbulence: 0, // NEW: For liquid surface ripples
     surface: null,
-    
+
     // --- INDEPENDENT VOLUME LOGIC ---
     volume: vol,           // Visual volume (animated)
     targetVolume: vol,     // Actual volume (logic)
     capacity: cap,
-    
-    hasFunnel: false, 
+
+    hasFunnel: false,
     tiltAngle: 0,
     isDraining: false,
     dragging: false,
@@ -623,19 +643,19 @@ function makeVessel(id, x, y, w, h, title, chem, vtype, vol, cap) {
       mixture_vol: 0,       // Volume of Na2CO3 + NaHCO3 (Analyte)
       hcl_vol: 0,           // Volume of HCl added (Titrant)
       water_vol: 0,         // For rinsing/dilution checks
-      
+
       // Indicator Tracking
       pp_drops: 0,          // Phenolphthalein drops
       mo_drops: 0,          // Methyl Orange drops
-      
+
       // Assessment Flags (Procedural Marking)
       isRinsed: false,      // Did student clean it before use?
       isContaminated: false, // Flagged if wrong chemicals mixed
       titrationStage: 1,    // 1 = V1 (PP), 2 = V2 (MO)
-      
+
       // Target values (Updated dynamically during experiment)
-      theoreticalV1: 10.0,  
-      theoreticalV2: 25.0   
+      theoreticalV1: 10.0,
+      theoreticalV2: 25.0
     }
   };
 }
@@ -655,14 +675,14 @@ function getTitrationColor(v) {
   const targetV2 = (typeof THEORETICAL_V2 !== 'undefined') ? THEORETICAL_V2 : 25.0;
 
   // 1. If flask is basically empty, show water
-  if (c.mixture_vol < 0.5) return [200, 220, 255, 100]; 
+  if (c.mixture_vol < 0.5) return [200, 220, 255, 100];
 
   // 2. Stage 1: Phenolphthalein (Analyte + PP = PINK)
   if (c.pp_drops > 0 && c.mo_drops === 0) {
     if (c.hcl_vol < targetV1) {
       // Fade intensity near the endpoint
       let intensity = map(c.hcl_vol, targetV1 - 1.5, targetV1, 220, 30, true);
-      return [255, 105, 180, intensity]; 
+      return [255, 105, 180, intensity];
     } else {
       return [245, 245, 255, 100]; // Endpoint reached: Colorless
     }
@@ -686,14 +706,14 @@ function proximityCheck() {
   Object.values(vessels).forEach(v => {
     v.glow = 0;
     v.hint = '';
-    
+
     if (v.type === 'pipette') {
       const bottle = Object.values(vessels).find(b => b.type === 'bottle' || b.type === 'chemical_bottle');
       // Fix: Find any receiver (beaker OR conical flask)
-      const receiver = Object.values(vessels).find(r => 
+      const receiver = Object.values(vessels).find(r =>
         (r.type === 'beaker' || r.type === 'conical_flask') && near(v, r, 60)
       );
-      
+
       if (bottle && near(v, bottle, 50)) {
         v.glow = 1;
         v.hint = 'SHIFT = Suck';
@@ -702,7 +722,7 @@ function proximityCheck() {
         v.hint = 'SHIFT = Pour'; // This now works for conical flasks too
       }
     }
-    
+
     if (v.type === 'pH_meter') {
       const beaker = Object.values(vessels).find(b => b.type === 'beaker');
       if (beaker && near(v, beaker, 50)) {
@@ -720,7 +740,7 @@ function instrumentReadings() {
   let totalPhysicalWeight = 0;
   Object.values(vessels).forEach(v => {
     if (v.id === balance.id) return;
-    
+
     // Check if on pan
     const onPan = dist(v.x, v.y, balance.x, balance.y - balance.h * 0.4) < 40;
     v.isOnBalance = onPan; // Flag to hide labels later
@@ -736,22 +756,22 @@ function instrumentReadings() {
 
   // --- ANALYTICAL STABILIZATION LOGIC ---
   if (balance.displayWeight === undefined) balance.displayWeight = 0;
-  
+
   // Smoothly glide toward the target weight
   balance.displayWeight = lerp(balance.displayWeight, targetWeight, 0.1);
 
-  
+
 }
 
 function drawBalanceDisplay(v) {
   push();
   const lcdX = -v.w * 0.25;
-  const lcdY = v.h * 0.01; 
+  const lcdY = v.h * 0.01;
 
   fill(0);
   textAlign(RIGHT, CENTER);
   textSize(v.h * 0.10);
-  
+
   // Make sure you don't have a variable named 'text' here
   let displayVal = nf(v.displayWeight || 0, 1, 3) + "g";
   text(displayVal, lcdX + v.w * 0.38, lcdY + v.h * 0.1);
@@ -769,7 +789,7 @@ function applyLabPhysics(v) {
       v.x = parent.x;
       v.y = parent.y - (parent.h * 0.46);
       v.vy = 0; // Disable gravity for attached items
-      return; 
+      return;
     } else {
       v.isAttachedTo = null; // Parent was deleted
     }
@@ -780,13 +800,13 @@ function applyLabPhysics(v) {
   const balance = Object.values(vessels).find(b => b.type === 'balance');
   let snappedToBalance = false;
 
-  if (balance && v.id !== balance.id && !isNaN(balance.x) && 
-      dist(v.x, v.y, balance.x, balance.y - balance.h * 0.4) < 60) {
-    
-    v.x = lerp(v.x, balance.x, 0.2); 
-    v.y = lerp(v.y, balance.y - balance.h * 0.45, 0.2); 
+  if (balance && v.id !== balance.id && !isNaN(balance.x) &&
+    dist(v.x, v.y, balance.x, balance.y - balance.h * 0.4) < 60) {
+
+    v.x = lerp(v.x, balance.x, 0.2);
+    v.y = lerp(v.y, balance.y - balance.h * 0.45, 0.2);
     v.vy = 0;
-    v.surface = null; 
+    v.surface = null;
     snappedToBalance = true;
     v.isOnBalance = true; // NEW: Set this flag to hide labels
   } else {
@@ -802,7 +822,7 @@ function applyLabPhysics(v) {
 
   let closestSurface = null;
   let minDist = Infinity;
-  
+
   if (labSurfaces) {
     Object.values(labSurfaces).forEach(surf => {
       const d = abs(v.y - surf.y);
@@ -814,13 +834,13 @@ function applyLabPhysics(v) {
     v.y = closestSurface.y;
     v.vy = 0;
     v.surface = closestSurface;
-    
+
     // Auto-arrangement logic
     const spacing = v.w * 1.3;
-    const neighbors = Object.values(vessels).filter(other => 
+    const neighbors = Object.values(vessels).filter(other =>
       other !== v && other.surface === closestSurface && abs(other.y - v.y) < 15
     );
-    
+
     neighbors.forEach(n => {
       const dx = v.x - n.x;
       const overlap = spacing - abs(dx);
@@ -839,7 +859,7 @@ function drawShadow(v) {
   if (v.dragging || !v.surface) return;
 
   push();
-  translate(v.x, v.y + v.h / 2); 
+  translate(v.x, v.y + v.h / 2);
   noStroke();
 
   fill(0, 60);
@@ -881,7 +901,7 @@ function updateParticles() {
     p.y += p.vy;
     p.vy += 0.1;
     p.life--;
-    
+
     if (p.life <= 0) {
       particles.splice(i, 1);
     }
@@ -907,7 +927,7 @@ function easeVolumes() {
       // Allow burette to overfill by 2mL logically
       let maxCap = (v.type === 'burette') ? v.capacity + 4 : v.capacity;
       v.targetVolume = constrain(v.targetVolume, 0, maxCap);
-      
+
       v.volume = lerp(v.volume, v.targetVolume, 0.15);
       if (abs(v.volume - v.targetVolume) < 0.01) v.volume = v.targetVolume;
     }
@@ -919,10 +939,10 @@ function near(a, b, radius) {
 }
 function handleIndicatorDrops() {
   if (!isDragging || !mouseIsPressed) return;
-  
+
   const flask = Object.values(vessels).find(v => v.type === 'conical_flask' && near(isDragging, v, 70));
   if (flask && (isDragging.chemicalId === 'phenolphthalein' || isDragging.chemicalId === 'methyl_orange')) {
-    
+
     // Slow down drop rate
     if (frameCount % 30 === 0) {
       if (isDragging.chemicalId === 'phenolphthalein') flask.contents.pp_drops++;
@@ -936,11 +956,11 @@ function handleIndicatorDrops() {
 function handlePipetteInteraction() {
   if (!isDragging || isDragging.type !== 'pipette') return;
   const pipette = isDragging;
-  
-  const source = Object.values(vessels).find(v => 
+
+  const source = Object.values(vessels).find(v =>
     (v.type === 'bottle' || v.type === 'chemical_bottle' || v.type === 'beaker') && v.targetVolume > 0.01 && near(pipette, v, 60));
-    
-  const receiver = Object.values(vessels).find(v => 
+
+  const receiver = Object.values(vessels).find(v =>
     (v.type === 'beaker' || v.type === 'conical_flask') && near(pipette, v, 60));
 
   if (source && keyIsDown(SHIFT)) {
@@ -955,49 +975,53 @@ function handlePipetteInteraction() {
       pipette.chem = source.chem;
     }
   }
-  
+
   if (receiver && keyIsDown(SHIFT)) {
     let rate = 0.5 * (deltaTime / 50);
     if (pipette.targetVolume > 0.01 && receiver.targetVolume < receiver.capacity) {
       let amt = min(rate, pipette.targetVolume, receiver.capacity - receiver.targetVolume);
       pipette.targetVolume -= amt;
       receiver.targetVolume += amt;
-      
+
       // --- MIXING LOGIC: Don't overwrite the flask if it's already an Analyte ---
       const isIndicator = pipette.chemicalId === 'phenolphthalein' || pipette.chemicalId === 'methyl_orange';
-      
+
       if (pipette.chemicalId === 'na2co3_nahco3') {
-          receiver.contents.mixture_vol += amt;
-          receiver.chemicalId = pipette.chemicalId;
-          receiver.chem = "Analyte Mixture";
-          receiver.color = pipette.color;
+        receiver.contents.mixture_vol += amt;
+        receiver.chemicalId = pipette.chemicalId;
+        receiver.chem = "Analyte Mixture";
+        receiver.color = pipette.color;
       } else if (isIndicator) {
-          // Update the "Brain" counts only
-          if (pipette.chemicalId === 'phenolphthalein') receiver.contents.pp_drops += (amt * 10);
-          if (pipette.chemicalId === 'methyl_orange') receiver.contents.mo_drops += (amt * 10);
-          // Note: We DO NOT change receiver.chem or receiver.color here
+        // Update the "Brain" counts only
+        if (pipette.chemicalId === 'phenolphthalein') receiver.contents.pp_drops += (amt * 10);
+        if (pipette.chemicalId === 'methyl_orange') receiver.contents.mo_drops += (amt * 10);
+        // Note: We DO NOT change receiver.chem or receiver.color here
       }
 
-      drawPouringStream(pipette.x, pipette.y + 20, receiver.x, receiver.y - 15, color(...(pipette.color || [255,255,255])));
+      // ADD TURBULENCE (Ripples) - MORE SUBTLE
+      receiver.turbulence = min((receiver.turbulence || 0) + 0.5, 3);
+
+      // Thinner stream for pipette - ORIGIN AT TIP (v.h/2)
+      drawPouringStream(pipette.x, pipette.y + pipette.h / 2 - 5, receiver.x, receiver.y - 15, color(...(pipette.color || [255, 255, 255])), 2);
     }
   }
 }
 
 function drawSnapGuides() {
-  
+
 }
 
 function drawTitrationZone() {
   const burette = Object.values(vessels).find(v => v.type === 'burette');
   if (!burette || isDragging) return;
-  
+
   const snapX = burette.x + BURETTE_GLASS_X_OFFSET;
-  const snapY = burette.y + 158; 
-  
-  const receiver = Object.values(vessels).find(v => 
+  const snapY = burette.y + 158;
+
+  const receiver = Object.values(vessels).find(v =>
     (v.type === 'beaker' || v.type === 'conical_flask') && dist(v.x, v.y, snapX, snapY) < 10
   );
-  
+
   if (!receiver) {
     noFill();
     stroke(100, 255, 100, 150);
@@ -1026,18 +1050,41 @@ function draw() {
   Object.values(vessels).forEach(v => applyLabPhysics(v));
   easeVolumes();
   handlePipetteInteraction();
-    handleBuretteFilling(); 
-      handleBuretteDrainage();  // Draining from the bottom
+  handleBuretteFilling();
+  handleBuretteDrainage();  // Draining from the bottom
   handleIndicatorDrops();
   instrumentReadings();
 
+  // --- NEW: SWIRL FLASK (W Key) ---
+  if (keyIsDown(87)) { // 'W' Key
+    const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
+    if (flask && flask.volume > 0) {
+      flask.turbulence = 6; // High turbulence
+      flask.tilt = sin(frameCount * 0.1) * 0.10; // Tilt (Slower)
+
+      // PHYSICAL ORBITAL SWIRL
+      //temporary render offset to simulate circular motion
+      flask.renderOffsetX = cos(frameCount * 0.4) * 4; // Slower orbit
+      flask.renderOffsetY = sin(frameCount * 0.4) * 2;
+
+      flask.hint = "Swirling...";
+    }
+  } else {
+    // Reset offsets when not swirling
+    const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
+    if (flask) {
+      flask.renderOffsetX = 0;
+      flask.renderOffsetY = 0;
+    }
+  }
+
   // Draw shadows first, then vessels
   Object.values(vessels).forEach(v => drawShadow(v));
-Object.values(vessels).forEach(v => {
+  Object.values(vessels).forEach(v => {
     drawVessel(v);
     if (v.type === 'burette') drawBuretteZoom(v); // Call the zoom here
   });
-  
+
   drawTitrationZone();
   drawSnapGuides();  // ✨ Visual feedback!
 
@@ -1045,7 +1092,7 @@ Object.values(vessels).forEach(v => {
   drawParticles();
 
   // UI
-  
+
   if (hoverVessel) drawTooltip(hoverVessel);
   if (catalogVisible) drawCatalogPanel();
   drawDataPanel();
@@ -1059,23 +1106,27 @@ function getChemicalInfo(chemicalId) {
     { id: 'methyl_orange', name: 'Methyl Orange', formula: 'C₁₄H₁₄N₃NaO₃S', conc: '' },
     { id: 'distilled_water', name: 'Distilled Water', formula: 'H₂O', conc: '' }
   ];
-  return catalog.find(c => c.id === chemicalId) || 
-         { name: 'Unknown', formula: '—', conc: '' };
+  return catalog.find(c => c.id === chemicalId) ||
+    { name: 'Unknown', formula: '—', conc: '' };
 }
 
 // ======================================================
 // ENHANCED VESSEL DRAWING (with glow, liquid, pH color)
 // ======================================================
 function drawVessel(v) {
-  const over = mouseX > v.x - v.w/2 && mouseX < v.x + v.w/2 &&
-              mouseY > v.y - v.h/2 && mouseY < v.y + v.h/2;
+  const over = mouseX > v.x - v.w / 2 && mouseX < v.x + v.w / 2 &&
+    mouseY > v.y - v.h / 2 && mouseY < v.y + v.h / 2;
 
   if (over && !isDragging) {
     hoverVessel = v;
   }
 
   push();
-  translate(v.x, v.y);
+  // Apply render offsets if they exist (for Swirling)
+  let rx = v.x + (v.renderOffsetX || 0);
+  let ry = v.y + (v.renderOffsetY || 0);
+
+  translate(rx, ry);
   imageMode(CENTER);
 
   // Proximity glow effect
@@ -1093,7 +1144,7 @@ function drawVessel(v) {
     }
     image(imgBottle, 0, 0, v.w, v.h);
     drawRealisticLiquid(v, v.color || color(100, 200, 255));
-    
+
     if (v.chemicalId) {
       push(); translate(-1, 8);
       const chemInfo = getChemicalInfo(v.chemicalId);
@@ -1107,17 +1158,17 @@ function drawVessel(v) {
   // --- SPRITE RENDERING ---
   else if (v.type === 'beaker') {
     image(imgBeaker, 0, 0, v.w, v.h);
-    drawRealisticLiquid(v, color(100, 200, 255)); 
-  } 
+    drawRealisticLiquid(v, color(100, 200, 255));
+  }
   else if (v.type === 'burette') {
     image(imgBurette, 0, 0, v.w, v.h);
-    
+
     // --- STOPCOCK ANIMATION ---
     if (keyIsDown(83)) { // If 'S' is pressed
       push();
       fill(255, 0, 0); noStroke();
       // Draw a small red "valve" indicator near the stopcock
-      circle(0, v.h * 0.35, 5); 
+      circle(0, v.h * 0.35, 5);
       pop();
       v.hint = "Stopcock Open";
     }
@@ -1126,20 +1177,21 @@ function drawVessel(v) {
   }
   else if (v.type === 'pipette') {
     image(imgPipette, 0, 0, v.w, v.h);
-    drawRealisticLiquid(v, color(200, 200, 200));
+    // FIX: Use v.color if available, otherwise default grey
+    drawRealisticLiquid(v, v.color ? color(...v.color) : color(200, 200, 200));
   }
-  
+
   else if (v.type === 'balance') {
     image(imgBalance, 0, 0, v.w, v.h);
     drawBalanceDisplay(v); // Integrated realistic meter
-  }  
-else if (v.type === 'conical_flask') {
-  image(imgConical, 0, 0, v.w, v.h);
-  
-  // NEW: Calculate dynamic titration color
-    drawRealisticLiquid(v, color(...getTitrationColor(v))); 
-} 
- else if (v.type === 'volumetric_flask') image(imgVolumetric, 0, 0, v.w, v.h);
+  }
+  else if (v.type === 'conical_flask') {
+    image(imgConical, 0, 0, v.w, v.h);
+
+    // NEW: Calculate dynamic titration color
+    drawRealisticLiquid(v, color(...getTitrationColor(v)));
+  }
+  else if (v.type === 'volumetric_flask') image(imgVolumetric, 0, 0, v.w, v.h);
   else if (v.type === 'funnel') image(imgFunnel, 0, 0, v.w, v.h);
   else if (v.type === 'wash_bottle') image(imgWash, 0, 0, v.w, v.h);
   else if (v.type === 'bunsen_burner') image(imgBunsen, 0, 0, v.w, v.h);
@@ -1152,7 +1204,7 @@ else if (v.type === 'conical_flask') {
   else if (v.type === 'TLC_plate') image(imgTLC, 0, 0, v.w, v.h);
   else {
     fill(200, 200, 220); stroke(100); strokeWeight(2);
-    rect(-v.w/2, -v.h/2, v.w, v.h, 8);
+    rect(-v.w / 2, -v.h / 2, v.w, v.h, 8);
     fill(0); textAlign(CENTER, CENTER); textSize(12); text(v.type, 0, 0);
   }
 
@@ -1165,9 +1217,9 @@ else if (v.type === 'conical_flask') {
   if (!shouldHideLabel) {
     textAlign(CENTER);
     textSize(11); fill(30);
-    text(v.title || v.type, 0, v.h/2 + 15);
+    text(v.title || v.type, 0, v.h / 2 + 15);
     textSize(10);
-    text(v.chem || 'Empty', 0, v.h/2 + 28);
+    text(v.chem || 'Empty', 0, v.h / 2 + 28);
   }
 
   // --- INSTRUMENT OVERLAYS ---
@@ -1177,40 +1229,72 @@ else if (v.type === 'conical_flask') {
   // Note: The green balance display was removed from here to fix the duplication issue.
 
   if (v.hint) {
-        drawHintBubble(0, -v.h/2 - 25, v.hint);
+    drawHintBubble(0, -v.h / 2 - 25, v.hint);
   }
 
   pop();
 }
 
-function drawPouringStream(startX, startY, endX, endY, col) {
+function drawPouringStream(startX, startY, endX, endY, col, thickness = 3) {
   push();
   const r = red(col), g = green(col), b = blue(col);
-  
-  // Outer Glow
-  stroke(r, g, b, 100);
-  strokeWeight(6);
+
+  // Dynamic Stream fluctuations - SUBTLE now
+  const time = frameCount * 0.2;
+  const wiggle = sin(time) * 1.5; // Reduced from 3 to 1.5
+  const midX = (startX + endX) / 2 + wiggle;
+  const midY = (startY + endY) / 2;
+
+  // Outer Glow (Wider & Dynamic)
+  stroke(r, g, b, 60); // Less opaque
+  strokeWeight(thickness + 2 + sin(time * 2)); // Slight pulse
   noFill();
-  
-  // Use a Bezier curve for a gravity-affected stream
+
   beginShape();
   vertex(startX, startY);
-  // Control points create the "arc" of the pour
-  bezierVertex(startX, startY + 40, endX, endY - 40, endX, endY);
+  bezierVertex(startX, startY + 20, midX, midY, endX, endY);
   endShape();
-  
+
   // Inner Core
-  stroke(r, g, b, 220);
-  strokeWeight(2.5);
+  stroke(r, g, b, 240);
+  strokeWeight(thickness);
   beginShape();
   vertex(startX, startY);
-  bezierVertex(startX, startY + 40, endX, endY - 40, endX, endY);
+  bezierVertex(startX, startY + 20, midX, midY, endX, endY);
   endShape();
-  
-  // Splash particles at the impact point
-  if (frameCount % 2 === 0) {
-    createParticles(endX, endY, 2, 'drip');
+
+  // Splash particles (Reduced frequency)
+  if (frameCount % 4 === 0) {
+    createParticles(endX + random(-2, 2), endY, 1, 'drip');
   }
+  pop();
+}
+
+// NEW: Droplet animation for titration
+function drawDroplets(startX, startY, endX, endY, col) {
+  push();
+  const r = red(col), g = green(col), b = blue(col);
+
+  // Create a predictable "droplet" path
+  const t = (frameCount % 20) / 20; // 0 to 1 loop every 20 frames
+  const dropX = startX;
+  const dropY = lerp(startY, endY, t * t); // Gravity acceleration simulation
+
+  fill(r, g, b, 240);
+  noStroke();
+
+  // Draw the main drop - LARGER & OPAQUE
+  if (t < 0.95) {
+    ellipse(dropX, dropY, 6, 9); // Bigger Teardrop
+  }
+
+  // Splash when it hits
+  if (t > 0.9) {
+    stroke(r, g, b, 200); // More visible splash
+    noFill();
+    ellipse(endX, endY, 6 * (t - 0.9) * 15, 3); // Wider ring
+  }
+
   pop();
 }
 
@@ -1229,40 +1313,52 @@ function drawRealisticLiquid(v, col) {
 
   // Visual safety: don't draw if basically empty
   if (v.volume <= 0.01) return;
-  
+
   applySloshPhysics(v);
-  
+
   push();
   const fillRatio = constrain(v.volume / v.capacity, 0, 1);
   const r = red(activeCol), g = green(activeCol), b = blue(activeCol);
   const slosh = (v.w * 0.4) * v.tilt;
 
   if (v.type === 'beaker') {
-    const w = v.w * 0.75; 
+    const w = v.w * 0.75;
     const hMax = v.h * 0.70;
-    const bottomY = v.h * 0.44; 
-    const topY = bottomY - (hMax * fillRatio);
+    const bottomY = v.h * 0.44;
+
+    // RIPPLE EFFECT
+    let ripple = 0;
+    if (v.turbulence > 0) {
+      ripple = sin(frameCount * 0.8) * v.turbulence * 0.4; // Dampened
+    }
+    const topY = bottomY - (hMax * fillRatio) + ripple;
 
     fill(r, g, b, 180);
     noStroke();
     beginShape();
-    vertex(-w/2, bottomY); 
-    vertex(w/2, bottomY);  
-    vertex(w/2, topY - slosh); 
-    bezierVertex(w/4, topY - slosh + 5, -w/4, topY + slosh + 5, -w/2, topY + slosh);
+    vertex(-w / 2, bottomY);
+    vertex(w / 2, bottomY);
+    vertex(w / 2, topY - slosh);
+    bezierVertex(w / 4, topY - slosh + 5, -w / 4, topY + slosh + 5, -w / 2, topY + slosh);
     endShape(CLOSE);
-    
+
     // Meniscus Highlight
     stroke(255, 100); strokeWeight(1); noFill();
     arc(0, topY, w, 6 + abs(slosh), PI, 0);
 
-  } 
+  }
   else if (v.type === 'conical_flask') {
     // --- CONICAL FLASK LIQUID (TRAPEZOID) ---
     const hMax = v.h * 0.65;
     const bottomY = v.h * 0.42;
-    const topY = bottomY - (hMax * fillRatio);
-    
+
+    // RIPPLE EFFECT
+    let ripple = 0;
+    if (v.turbulence > 0) {
+      ripple = sin(frameCount * 0.8) * v.turbulence * 0.4; // Dampened
+    }
+    const topY = bottomY - (hMax * fillRatio) + ripple;
+
     // Geometry: bottom is wider than the neck
     const bottomW = v.w * 0.8;
     const neckW = v.w * 0.25;
@@ -1270,72 +1366,72 @@ function drawRealisticLiquid(v, col) {
 
     fill(r, g, b, 180); noStroke();
     beginShape();
-    vertex(-bottomW/2, bottomY); 
-    vertex(bottomW/2, bottomY);  
-    vertex(currentTopW/2, topY - slosh); 
-    vertex(-currentTopW/2, topY + slosh);
+    vertex(-bottomW / 2, bottomY);
+    vertex(bottomW / 2, bottomY);
+    vertex(currentTopW / 2, topY - slosh);
+    vertex(-currentTopW / 2, topY + slosh);
     endShape(CLOSE);
-    
+
     // Meniscus
-    stroke(255, 120); strokeWeight(1); noFill(); 
+    stroke(255, 120); strokeWeight(1); noFill();
     ellipse(0, topY, currentTopW, 4 + abs(slosh));
 
   }
   else if (v.type === 'pipette') {
-    const w = v.w * 0.105; 
-    const tipY = v.h * 0.40; 
+    const w = v.w * 0.105;
+    const tipY = v.h * 0.40;
     const neckHeight = v.h * 0.85;
     const topY = tipY - (neckHeight * fillRatio);
 
     fill(r, g, b, 220); // More opaque for thin tube
     noStroke();
-    rect(-w/2, topY, w, tipY - topY, 1);
-    
+    rect(-w / 2, topY, w, tipY - topY, 1);
+
     fill(r, g, b, 255);
     ellipse(0, topY, w, 3);
 
   } else if (v.type === 'bottle' || v.type === 'chemical_bottle') {
-    const w = v.w * 0.72; 
+    const w = v.w * 0.72;
     const hMax = v.h * 0.50;
-    const bottomY = v.h * 0.42; 
+    const bottomY = v.h * 0.42;
     const topY = bottomY - (hMax * fillRatio);
 
     fill(r, g, b, 150);
     noStroke();
     beginShape();
-    vertex(-w/2, bottomY);
-    vertex(w/2, bottomY);
-    vertex(w/2, topY - slosh);
-    bezierVertex(0, topY + 4, -w/4, topY + 4, -w/2, topY + slosh);
+    vertex(-w / 2, bottomY);
+    vertex(w / 2, bottomY);
+    vertex(w / 2, topY - slosh);
+    bezierVertex(0, topY + 4, -w / 4, topY + 4, -w / 2, topY + slosh);
     endShape(CLOSE);
   }
   else if (v.type === 'burette') {
-    const tubeWidth = v.w * 0.10; 
-    const bottomLimit = v.h * 0.25; 
-    const hMax = v.h * 0.70;    
+    const tubeWidth = v.w * 0.10;
+    const bottomLimit = v.h * 0.25;
+    const hMax = v.h * 0.70;
     const topRim = bottomLimit - hMax;
     const topY = bottomLimit - (hMax * fillRatio);
 
     push();
     translate(BURETTE_GLASS_X_OFFSET, 0);
-    
+
     // Main Column (Capped at top rim)
-    fill(r, g, b, 160); 
+    fill(r, g, b, 160);
     noStroke();
     let renderTopY = max(topY, topRim);
-    rect(-tubeWidth/2, renderTopY, tubeWidth, bottomLimit - renderTopY);
-    
+    rect(-tubeWidth / 2, renderTopY, tubeWidth, bottomLimit - renderTopY);
+
     // Tapered Bottom Tip
     beginShape();
-    vertex(-tubeWidth/2, bottomLimit);
-    vertex(tubeWidth/2, bottomLimit);
+    vertex(-tubeWidth / 2, bottomLimit);
+    vertex(tubeWidth / 2, bottomLimit);
     vertex(0, bottomLimit + 10);
     endShape(CLOSE);
 
     // Surface Meniscus
     if (topY > topRim) {
-        fill(r, g, b, 255);
-        ellipse(0, topY, tubeWidth, 3);
+      fill(r, g, b, 255);
+      ellipse(0, topY, tubeWidth, 3);
     }
     pop();
   }
@@ -1345,56 +1441,56 @@ function drawRealisticLiquid(v, col) {
 
 function drawBeakerRealistic(v, col, fillRatio) {
   const liquidTop = -25 + (70 * (1 - fillRatio));  // BOTTOM UP!
-  
+
   // 1. MAIN LIQUID (clipped to beaker shape)
   drawingContext.save();
   drawingContext.clip();  // Use vessel image as mask
-  
+
   fill(red(col), green(col), blue(col), 220);
   noStroke();
   // Perfect cylindrical fill - BOTTOM UP
-  rect(-v.w*0.28, liquidTop, v.w*0.56, 70, v.w*0.22);
-  
+  rect(-v.w * 0.28, liquidTop, v.w * 0.56, 70, v.w * 0.22);
+
   drawingContext.restore();
-  
+
   // 2. MENISCUS CURVE (highlight)
   fill(red(col), green(col), blue(col), 240);
-  arc(0, liquidTop, v.w*0.48, v.w*0.48 + 6, PI, 0);
+  arc(0, liquidTop, v.w * 0.48, v.w * 0.48 + 6, PI, 0);
 }
 
 
 function drawBuretteRealistic(v, col, fillRatio) {
   const tubeHeight = 180 * fillRatio;
   const tubeTop = -110 + (180 - tubeHeight);  // DROPS FROM TOP
-  
+
   drawingContext.save();
   // Narrow tube mask (center 15% width)
-  rect(-v.w*0.075, tubeTop, v.w*0.15, tubeHeight);
+  rect(-v.w * 0.075, tubeTop, v.w * 0.15, tubeHeight);
   drawingContext.clip();
-  
+
   fill(red(col), green(col), blue(col), 230);
-  rect(-v.w*0.075, tubeTop, v.w*0.15, tubeHeight);
+  rect(-v.w * 0.075, tubeTop, v.w * 0.15, tubeHeight);
   drawingContext.restore();
-  
+
   // Meniscus
   fill(red(col), green(col), blue(col), 255);
-  arc(0, tubeTop, v.w*0.2, v.w*0.2 + 3, PI, 0);
+  arc(0, tubeTop, v.w * 0.2, v.w * 0.2 + 3, PI, 0);
 }
 
 
 function drawBottleRealistic(v, col, fillRatio) {
   const liquidHeight = 55 * fillRatio;
   const liquidTop = 35 + (55 - liquidHeight);  // BOTTOM UP
-  
+
   // Curved base liquid
   fill(red(col), green(col), blue(col), 200);
   noStroke();
-  rect(-v.w*0.22, liquidTop, v.w*0.44, liquidHeight, 
-       v.w*0.18, v.w*0.18, 0, v.w*0.18);
-  
+  rect(-v.w * 0.22, liquidTop, v.w * 0.44, liquidHeight,
+    v.w * 0.18, v.w * 0.18, 0, v.w * 0.18);
+
   // Shine highlight
   fill(255, 255, 255, 80);
-  arc(-v.w*0.12, liquidTop + 8, v.w*0.15, v.w*0.15, 0, PI);
+  arc(-v.w * 0.12, liquidTop + 8, v.w * 0.15, v.w * 0.15, 0, PI);
 }
 
 
@@ -1402,7 +1498,7 @@ function drawGenericLiquid(v, col, fillRatio) {
   // Fallback for other vessels
   const h = 60 * fillRatio;
   fill(red(col), green(col), blue(col), 180);
-  rect(-v.w*0.3, 20, v.w*0.6, h, v.w*0.2);
+  rect(-v.w * 0.3, 20, v.w * 0.6, h, v.w * 0.2);
 }
 
 
@@ -1411,15 +1507,15 @@ function drawDigitalDisplay(x, y, label) { // Change 'text' to 'label' here
   fill(0, 50);
   stroke(100);
   strokeWeight(1);
-  rect(x-5, y-5, 80, 22, 4);
-  
+  rect(x - 5, y - 5, 80, 22, 4);
+
   // Digital text
   fill(0, 255, 0);
   noStroke();
   textAlign(LEFT, CENTER);
   textSize(11);
   // This now correctly calls the p5.js text() function
-  text(label, x, y); 
+  text(label, x, y);
 }
 
 // ======================================================
@@ -1432,30 +1528,30 @@ function drawTooltip(v) {
 
   fill(255, 255, 255, 240); stroke(180);
   rect(x, y, boxW, boxH, 8);
-  
+
   noStroke(); fill(0); textAlign(LEFT);
-  textSize(14); textStyle(BOLD); 
+  textSize(14); textStyle(BOLD);
   text(v.title, x + 12, y + 22);
-  
+
   textSize(12); textStyle(NORMAL);
 
   // CHEMICAL INFO SECTION (enhanced!)
   if (v.chemicalId) {
     const chemInfo = getChemicalInfo(v.chemicalId);
-    
+
     // Color indicator
     if (v.color) {
-      fill(...v.color); noStroke(); 
+      fill(...v.color); noStroke();
       rect(x + 12, y + 38, 14, 14);
-      fill(0); 
+      fill(0);
     }
-    
+
     // Full chemical details
     textSize(11);
     text(`${chemInfo.name}`, x + 32, y + 42);
     textSize(10); fill(60);
     text(`Formula: ${chemInfo.formula}`, x + 12, y + 58);
-    
+
     if (chemInfo.conc) {
       text(`Concentration: ${chemInfo.conc}`, x + 12, y + 72);
     }
@@ -1467,11 +1563,11 @@ function drawTooltip(v) {
   // Volume & other info
   textSize(12); fill(0);
   text('Volume: ' + nf(v.volume || 0, 1, 2) + ' mL', x + 12, y + 92);
-  
+
   if (v.capacity) {
     text(`Capacity: ${v.capacity} mL`, x + 12, y + 108);
   }
-  
+
   if (v.hint) {
     fill(0, 150, 0); textSize(11);
     text('💡 ' + v.hint, x + 12, y + 126);
@@ -1483,114 +1579,115 @@ function drawTooltip(v) {
 // UI PANELS
 // ======================================================
 function drawDataPanel() {
-    const panelW = 280, margin = 20, panelX = width - panelW - margin;
-    
-    // 1. Dynamic Background Panel (Increased height slightly to accommodate)
-    fill(15, 25, 45, 240); stroke(255, 30);
-    rect(panelX, 30, panelW, 580, 15);
+  const panelW = 280, margin = 20, panelX = width - panelW - margin;
 
-    // 2. Header
-    fill(255); textAlign(LEFT); textStyle(BOLD); textSize(16);
-    text("🧪 LAB ASSISTANT", panelX + 20, 60);
-    fill(100, 200, 255); textSize(14);
-    text(`Total Marks: ${sessionMarks}/100`, panelX + 20, 85);
+  // 1. Dynamic Background Panel (Increased height slightly to accommodate)
+  fill(15, 25, 45, 240); stroke(255, 30);
+  rect(panelX, 30, panelW, 580, 15);
 
-    // 3. Current Task Box
-    let currentTask = manager.milestones[currentStepIndex];
-    if (currentTask) {
-        fill(255, 230, 100); textSize(13);
-        text("CURRENT TASK:", panelX + 20, 115);
-        
-        fill(255); textStyle(NORMAL);
-        rect(panelX + 20, 125, panelW - 40, 50, 8); 
-        fill(0); textAlign(CENTER, CENTER);
-        text(currentTask.desc, panelX + panelW/2, 150);
+  // 2. Header
+  fill(255); textAlign(LEFT); textStyle(BOLD); textSize(16);
+  text("🧪 LAB ASSISTANT", panelX + 20, 60);
+  fill(100, 200, 255); textSize(14);
+  text(`Total Marks: ${sessionMarks}/100`, panelX + 20, 85);
 
-        // 4. Instructions Box (Cleanly positioned)
-        fill(40, 180, 255, 40); noStroke();
-        rect(panelX + 20, 185, panelW - 40, 100, 8);
-        fill(140, 220, 255); textAlign(LEFT, TOP); textSize(11);
-        
-        let hints = {
-            "fill_burette": "From the catalog spawn the burette, funnel and the HCl. Fill the burette by dragging the HCl bottle on top of the burette and use UP/DOWN arrow keys to pour.",
-            "zero_burette": "Excess HCl is in the burette. Hold the 'S' key to open the stopcock and drain the liquid until the meniscus is exactly at 0.00.",
-            "pipette_mixture": "Spawn the Pipette and the 25% Mixture bottle. Suck 20mL from the amber bottle (SHIFT) and pour into the Conical Flask.",
-            "add_pp": "Spawn Phenolphthalein. Drag it over your flask and press the 'D' key twice to add 2 drops.",
-            "reach_v1": "Titrate until the pink color disappears. Then click the PINK button below to enter your reading.",
-            "add_mo": "Now add Methyl Orange indicator (D key). The solution will turn Yellow.",
-            "reach_v2": "Titrate until the yellow turns Red. Click the ORANGE button to enter your final reading.",
-            "submit_calc": "Titration complete! Click the GREEN button below. You must calculate the mass of Carbonate/Bicarbonate using your readings."
-        };
-        let hintText = hints[currentTask.id] || "Follow the laboratory manual steps.";
-        text("💡 INSTRUCTION:\n" + hintText, panelX + 30, 195, panelW - 60);
-    }
+  // 3. Current Task Box
+  let currentTask = manager.milestones[currentStepIndex];
+  if (currentTask) {
+    fill(255, 230, 100); textSize(13);
+    text("CURRENT TASK:", panelX + 20, 115);
 
-    // 5. Mistakes Log (Moved lower and limited to avoid overlap)
-    if (penalties.length > 0) {
-        fill(255, 100, 100); textStyle(BOLD); textSize(13);
-        text("⚠️ MISTAKES:", panelX + 20, 310);
-        
-        // Use a smaller font and limit display to last 4 mistakes
-        textSize(10); textStyle(NORMAL);
-        let displayList = penalties.slice(-4); 
-        displayList.forEach((p, i) => {
-            text(p, panelX + 20, 335 + (i * 18));
-        });
-    }
+    fill(255); textStyle(NORMAL);
+    rect(panelX + 20, 125, panelW - 40, 50, 8);
+    fill(0); textAlign(CENTER, CENTER);
+    text(currentTask.desc, panelX + panelW / 2, 150);
 
-    // 6. Action Buttons are drawn by drawEndpointButtons at Y=500
-    drawEndpointButtons(panelX + 20, 510, panelW - 40);
+    // 4. Instructions Box (Cleanly positioned)
+    fill(40, 180, 255, 40); noStroke();
+    rect(panelX + 20, 185, panelW - 40, 100, 8);
+    fill(140, 220, 255); textAlign(LEFT, TOP); textSize(11);
+
+    let hints = {
+      "fill_burette": "From the catalog spawn the burette, funnel and the HCl. Fill the burette by dragging the HCl bottle on top of the burette and use UP/DOWN arrow keys to pour.",
+      "zero_burette": "Excess HCl is in the burette. Hold the 'S' key to open the stopcock and drain the liquid until the meniscus is exactly at 0.00.",
+      "pipette_mixture": "Spawn the Pipette and the 25% Mixture bottle. Suck 20mL from the amber bottle (SHIFT) and pour into the Conical Flask.",
+      "add_pp": "Spawn Phenolphthalein. Drag it over your flask and press the 'D' key twice to add 2 drops.",
+      "reach_v1": "Titrate until the pink color disappears. Then click the PINK button below to enter your reading.",
+      "add_mo": "Now add Methyl Orange indicator (D key). The solution will turn Yellow.",
+      "reach_v2": "Titrate until the yellow turns Red. Click the ORANGE button to enter your final reading.",
+      "submit_calc": "Titration complete! Click the GREEN button below. You must calculate the mass of Carbonate/Bicarbonate using your readings."
+    };
+    let hintText = hints[currentTask.id] || "Follow the laboratory manual steps.";
+    text("💡 INSTRUCTION:\n" + hintText, panelX + 30, 195, panelW - 60);
+  }
+
+  // 5. Mistakes Log (Moved lower and limited to avoid overlap)
+  if (penalties.length > 0) {
+    fill(255, 100, 100); textStyle(BOLD); textSize(13);
+    text("⚠️ MISTAKES:", panelX + 20, 310);
+
+    // Use a smaller font and limit display to last 4 mistakes
+    textSize(10); textStyle(NORMAL);
+    let displayList = penalties.slice(-4);
+    displayList.forEach((p, i) => {
+      text(p, panelX + 20, 335 + (i * 18));
+    });
+  }
+
+  // 6. Action Buttons are drawn by drawEndpointButtons at Y=500
+  drawEndpointButtons(panelX + 20, 510, panelW - 40);
 }
 
 function drawEndpointButtons(x, y, w) {
-    const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-    // Allow button even if volume is small to avoid logic traps
-    if (!flask) return;
+  const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
+  // Allow button even if volume is small to avoid logic traps
+  if (!flask) return;
 
-    if (idIsDone("add_pp") && !idIsDone("reach_v1")) {
-        drawButton(x, y, w, 45, "ENTER V1 READING", [255, 105, 180]);
-    }
-    else if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
-        drawButton(x, y, w, 45, "ENTER V2 READING", [255, 160, 0]);
-    }
-    else if (idIsDone("reach_v2") && !idIsDone("submit_calc")) {
-        // Vibrant green to ensure it's noticed
-        drawButton(x, y, w, 45, "SUBMIT CALCULATIONS", [0, 200, 100]);
-    }
+  if (idIsDone("add_pp") && !idIsDone("reach_v1")) {
+    drawButton(x, y, w, 45, "ENTER V1 READING", [255, 105, 180]);
+  }
+  else if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
+    drawButton(x, y, w, 45, "ENTER V2 READING", [255, 160, 0]);
+  }
+  else if (idIsDone("reach_v2") && !idIsDone("submit_calc")) {
+    // Vibrant green to ensure it's noticed
+    drawButton(x, y, w, 45, "SUBMIT CALCULATIONS", [0, 200, 100]);
+  }
 }
 
 function drawButton(x, y, w, h, label, col) {
-    fill(...col); rect(x, y, w, h, 8);
-    fill(255); textAlign(CENTER, CENTER); textStyle(BOLD); textSize(12);
-    text(label, x + w/2, y + h/2);
+  fill(...col); rect(x, y, w, h, 8);
+  fill(255); textAlign(CENTER, CENTER); textStyle(BOLD); textSize(12);
+  text(label, x + w / 2, y + h / 2);
 }
 
 
-  function drawControlsPanel() {
+function drawControlsPanel() {
   if (!controlsVisible) return;
 
-  const panelW = 220, panelH = 150;
+  const panelW = 220, panelH = 175; // Increased height
   // POSITION: Bottom-Center (Shifted right of the catalog)
-  const x = 380; 
+  const x = 380;
   const y = height - panelH - 20;
 
-  fill(15, 25, 45, 230); 
+  fill(15, 25, 45, 230);
   stroke(255, 50);
   rect(x, y, panelW, panelH, 12);
 
   fill(255); noStroke(); textAlign(LEFT);
   textSize(14); textStyle(BOLD);
   text('⌨️ CONTROLS', x + 15, y + 25);
-  
+
   textSize(11); textStyle(NORMAL);
   fill(200, 220, 255);
-  
+
   let startY = y + 50;
   text('↑ / ↓      : Tilt Bottle', x + 15, startY);
   text('S (Hold)   : Drain / Zeroing', x + 15, startY + 22);
   text('SPACE      : Titrate into Flask', x + 15, startY + 44);
   text('D Key      : Add Indicator Drop', x + 15, startY + 66);
   text('R / T      : Remove / Tare', x + 15, startY + 88);
+  text('W (Hold)   : Swirl Flask', x + 15, startY + 110); // NEW
 }
 
 function drawCatalogPanel() {
@@ -1606,16 +1703,16 @@ function drawCatalogPanel() {
     { id: 'apparatus', label: '🧪 APPARATUS', active: currentCatalogTab === 'apparatus' },
     { id: 'chemicals', label: '🧴 CHEMICALS (5)', active: currentCatalogTab === 'chemicals' }
   ];
-  
+
   tabs.forEach((tab, i) => {
     fill(tab.active ? [100, 180, 255] : [240, 240, 240]);
     stroke(tab.active ? [0, 120, 200] : 170);
     strokeWeight(tab.active ? 3 : 1);
     rect(panelX + i * tabW, tabY, tabW, tabH, 6);
-    
+
     fill(tab.active ? 0 : 100); noStroke();
     textAlign(CENTER, CENTER); textSize(13);
-    text(tab.label, panelX + i * tabW + tabW/2, tabY + tabH/2);
+    text(tab.label, panelX + i * tabW + tabW / 2, tabY + tabH / 2);
   });
 
   // Active catalog content
@@ -1631,30 +1728,30 @@ function drawCatalogPanel() {
 function mousePressed() {
   // Toggle catalog
   if (catalogToggleButton &&
-      mouseX > catalogToggleButton.x && mouseX < catalogToggleButton.x + catalogToggleButton.w &&
-      mouseY > catalogToggleButton.y && mouseY < catalogToggleButton.y + catalogToggleButton.h) {
+    mouseX > catalogToggleButton.x && mouseX < catalogToggleButton.x + catalogToggleButton.w &&
+    mouseY > catalogToggleButton.y && mouseY < catalogToggleButton.y + catalogToggleButton.h) {
     catalogVisible = !catalogVisible;
     return;
   }
 
   // TAB SWITCHING
   if (catalogVisible && catalogPanelBounds &&
-      mouseY > catalogPanelBounds.y + 10 && mouseY < catalogPanelBounds.y + 45 &&
-      mouseX > catalogPanelBounds.x && mouseX < catalogPanelBounds.x + 340) {
+    mouseY > catalogPanelBounds.y + 10 && mouseY < catalogPanelBounds.y + 45 &&
+    mouseX > catalogPanelBounds.x && mouseX < catalogPanelBounds.x + 340) {
     currentCatalogTab = mouseX < catalogPanelBounds.x + 170 ? 'apparatus' : 'chemicals';
     return;
   }
 
   // CATALOG CLICK
   if (catalogVisible && catalogPanelBounds &&
-      mouseX > catalogPanelBounds.x && mouseX < catalogPanelBounds.x + catalogPanelBounds.w &&
-      mouseY > catalogPanelBounds.y + 55 && mouseY < catalogPanelBounds.y + catalogPanelBounds.h) {
-    
+    mouseX > catalogPanelBounds.x && mouseX < catalogPanelBounds.x + catalogPanelBounds.w &&
+    mouseY > catalogPanelBounds.y + 55 && mouseY < catalogPanelBounds.y + catalogPanelBounds.h) {
+
     const localX = mouseX - catalogPanelBounds.x - 20;
     const localY = mouseY - (catalogPanelBounds.y + 55);
     const item = (currentCatalogTab === 'apparatus' ? apparatusCatalog : chemicalCatalog)
-                .handleClick(localX, localY);
-    
+      .handleClick(localX, localY);
+
     if (item) {
       if (currentCatalogTab === 'apparatus') {
         spawnApparatusFromCatalog(item);
@@ -1664,19 +1761,19 @@ function mousePressed() {
       return;
     }
   }
-// --- CHECK CLOSE ZOOM BUTTON (Synced with new Top-Right position) ---
-    const burette = Object.values(vessels).find(v => v.type === 'burette');
-  
+  // --- CHECK CLOSE ZOOM BUTTON (Synced with new Top-Right position) ---
+  const burette = Object.values(vessels).find(v => v.type === 'burette');
+
   if (burette) {
     if (userClosedZoom) {
       // --- LOGIC TO OPEN (Circular Detection) ---
       const iconX = burette.x + 35;
       const iconY = burette.y - 120;
-      
+
       if (dist(mouseX, mouseY, iconX, iconY) < 18) {
         userClosedZoom = false;
         console.log("Zoom View Restored");
-        return; 
+        return;
       }
     } else {
       // --- LOGIC TO CLOSE (Matches Draw Function) ---
@@ -1684,32 +1781,32 @@ function mousePressed() {
       const zoomY = burette.y - 140;
       const closeBtnX = zoomX + 65;
       const closeBtnY = zoomY - 65;
-      
+
       if (dist(mouseX, mouseY, closeBtnX, closeBtnY) < 15) {
         userClosedZoom = true;
         return;
       }
     }
   }
-const panelW = 280, margin = 20, btnX = width - panelW - margin + 20;
-// We check Y=510 to 560 now to match the new DataPanel layout
-if (mouseX > btnX && mouseX < btnX + (panelW - 40) && mouseY > 510 && mouseY < 560) {
+  const panelW = 280, margin = 20, btnX = width - panelW - margin + 20;
+  // We check Y=510 to 560 now to match the new DataPanel layout
+  if (mouseX > btnX && mouseX < btnX + (panelW - 40) && mouseY > 510 && mouseY < 560) {
     if (idIsDone("add_pp") && !idIsDone("reach_v1")) {
-        manager.openV1Input();
+      manager.openV1Input();
     } else if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
-        manager.openV2Input();
+      manager.openV2Input();
     } else if (idIsDone("reach_v2") && !idIsDone("submit_calc")) {
-        console.log("Opening Calculation Modal...");
-        manager.openCalculationModal();
+      console.log("Opening Calculation Modal...");
+      manager.openCalculationModal();
     }
     return;
-}
+  }
   Object.values(vessels).forEach(v => {
     if (v.type === 'balance') {
       // Check if mouse is over the "TARE" button area (bottom right of the control panel)
       const isOverTare = mouseX > v.x + v.w * 0.1 && mouseX < v.x + v.w * 0.4 &&
-                         mouseY > v.y + v.h * 0.1 && mouseY < v.y + v.h * 0.4;
-      
+        mouseY > v.y + v.h * 0.1 && mouseY < v.y + v.h * 0.4;
+
       if (isOverTare) {
         // Taring: Set the offset to the current raw weight
         v.tareOffset = v.rawWeight;
@@ -1721,8 +1818,8 @@ if (mouseX > btnX && mouseX < btnX + (panelW - 40) && mouseY > 510 && mouseY < 5
   const keys = Object.keys(vessels);
   for (let i = keys.length - 1; i >= 0; i--) {
     const v = vessels[keys[i]];
-    if (mouseX > v.x - v.w/2 && mouseX < v.x + v.w/2 &&
-        mouseY > v.y - v.h/2 && mouseY < v.y + v.h/2) {
+    if (mouseX > v.x - v.w / 2 && mouseX < v.x + v.w / 2 &&
+      mouseY > v.y - v.h / 2 && mouseY < v.y + v.h / 2) {
       v.dragging = true;
       v.surface = null;
       v.vy = 0;
@@ -1743,30 +1840,30 @@ function mouseDragged() {
 function mouseReleased() {
   if (isDragging) {
     const burette = Object.values(vessels).find(v => v.type === 'burette');
-    
+
     if (burette) {
       // 1. PRECISION FUNNEL SNAP (TOP)
       if (isDragging.type === 'funnel') {
-    const snapDist = dist(isDragging.x, isDragging.y, burette.x + BURETTE_GLASS_X_OFFSET, burette.y - burette.h * 0.46);
-    if (snapDist < 50) {
-      isDragging.x = burette.x + BURETTE_GLASS_X_OFFSET; // Snaps to glass
-      isDragging.y = burette.y - burette.h * 0.51; 
-      isDragging.isAttachedTo = burette.id;
-      burette.hasFunnel = true;
-      return;
-    }
-}
+        const snapDist = dist(isDragging.x, isDragging.y, burette.x + BURETTE_GLASS_X_OFFSET, burette.y - burette.h * 0.46);
+        if (snapDist < 50) {
+          isDragging.x = burette.x + BURETTE_GLASS_X_OFFSET; // Snaps to glass
+          isDragging.y = burette.y - burette.h * 0.51;
+          isDragging.isAttachedTo = burette.id;
+          burette.hasFunnel = true;
+          return;
+        }
+      }
 
       // 2. PRECISION BEAKER/FLASK SNAP (BOTTOM)
       if (isDragging.type === 'beaker' || isDragging.type === 'conical_flask') {
         // ALIGNMENT FIX: Snaps exactly under the glass tube offset
-        const snapX = burette.x + BURETTE_GLASS_X_OFFSET; 
+        const snapX = burette.x + BURETTE_GLASS_X_OFFSET;
         const dripTipY = burette.y + 120;
-        
+
         if (dist(isDragging.x, isDragging.y, snapX, dripTipY) < 70) {
           isDragging.x = snapX;
           // Vertical: flask base sits on the shelf relative to the burette rod
-          isDragging.y = burette.y + 158; 
+          isDragging.y = burette.y + 158;
           isDragging.vy = 0;
           isDragging.surface = null;
           console.log("Receiver locked below tube");
@@ -1780,7 +1877,7 @@ function mouseReleased() {
 }
 
 function handleBuretteDrainage() {
-  if (!keyIsDown(83)) return; 
+  if (!keyIsDown(83)) return;
   const b = Object.values(vessels).find(v => v.type === 'burette');
   if (!b || b.targetVolume <= 0) return;
 
@@ -1791,6 +1888,7 @@ function handleBuretteDrainage() {
   b.targetVolume = max(0, b.targetVolume - amt);
   if (waste && waste.targetVolume < waste.capacity) {
     waste.targetVolume += amt;
+    waste.turbulence = min((waste.turbulence || 0) + 1, 3); // Ripples in waste beaker
     b.hint = "Draining into Beaker";
   }
 }
@@ -1827,13 +1925,13 @@ function keyPressed() {
 
   // 4. ADD INDICATOR DROP (Crucial for Phase 1 Testing)
   // Logic: If you are dragging an indicator bottle over a flask/beaker, press 'D' to add a drop.
-   // Inside keyPressed()
-if (keyL === 'd' && isDragging) {
+  // Inside keyPressed()
+  if (keyL === 'd' && isDragging) {
     // Use a wider distance (120) because students drag bottles loosely
-    const target = Object.values(vessels).find(v => 
+    const target = Object.values(vessels).find(v =>
       (v.type === 'conical_flask' || v.type === 'beaker') && dist(isDragging.x, isDragging.y, v.x, v.y) < 120
     );
-    
+
     if (target) {
       if (isDragging.chemicalId === 'phenolphthalein') {
         target.contents.pp_drops += 1;
@@ -1845,19 +1943,19 @@ if (keyL === 'd' && isDragging) {
         console.log("SUCCESS: MO drops added to Brain. Count:", target.contents.mo_drops);
       }
     } else {
-        console.log("HINT: Move bottle closer to the flask center to drop.");
+      console.log("HINT: Move bottle closer to the flask center to drop.");
     }
-}
+  }
 
-  
+
   // 5. TITRATION (SPACE BAR)
   // Note: In p5.js, keyPressed only fires ONCE per press. 
   // For continuous titration, the logic below is better placed in the draw() loop 
   // using keyIsDown(32), but here is the corrected logic for Phase 1:
   if (key === ' ' || keyCode === 32) {
     const burette = Object.values(vessels).find(v => v.type === 'burette');
-    const receiver = Object.values(vessels).find(v => 
-      (v.type === 'conical_flask' || v.type === 'beaker') && 
+    const receiver = Object.values(vessels).find(v =>
+      (v.type === 'conical_flask' || v.type === 'beaker') &&
       dist(v.x, v.y, burette.x - 45, burette.y + 120) < 80
     );
 
@@ -1870,9 +1968,13 @@ if (keyL === 'd' && isDragging) {
 
         // --- THE BRAIN FIX ---
         // Record the HCl entering the flask for the color math
-        receiver.contents.hcl_vol += flow; 
-        
-        drawPouringStream(burette.x - 45, burette.y + 110, receiver.x, receiver.y - 15, color(255, 160, 100));
+        receiver.contents.hcl_vol += flow;
+
+        // ADD TURBULENCE (Titration Ripples) - VERY SUBTLE
+        receiver.turbulence = min((receiver.turbulence || 0) + 0.3, 2);
+
+        // USE DROPLETS INSTEAD OF STREAM
+        drawDroplets(burette.x - 45, burette.y + 110, receiver.x, receiver.y - 15, color(255, 160, 100));
       }
     }
   }
@@ -1881,12 +1983,12 @@ if (keyL === 'd' && isDragging) {
 //Burette filling logic
 function handleBuretteFilling() {
   if (!isDragging || isDragging.type !== 'bottle') return;
-  
+
   const burette = Object.values(vessels).find(v => v.type === 'burette');
   if (!burette) return;
 
   // Align target with the glass tube instead of the stand rod
-  const buretteTopX = burette.x + BURETTE_GLASS_X_OFFSET; 
+  const buretteTopX = burette.x + BURETTE_GLASS_X_OFFSET;
   const buretteTopY = burette.y - (burette.h * 0.46);
   const distance = dist(mouseX, mouseY, buretteTopX, buretteTopY);
 
@@ -1916,25 +2018,25 @@ function handleBuretteFilling() {
     // 4. Flow Calculation
     // Max flow is capped for precision; actualFlow uses deltaTime for frame-rate independence
     let flowRate = map(isDragging.tiltAngle || 0, 30, 85, 0, 0.25, true);
-    let actualFlow = flowRate * (deltaTime / 60); 
+    let actualFlow = flowRate * (deltaTime / 60);
 
     if (flowRate > 0 && isDragging.targetVolume > 0) {
       // NEW: Allow filling up to 2mL past capacity so student can make mistakes
       if (burette.targetVolume < burette.capacity + 2) {
-        
+
         burette.targetVolume += actualFlow;
         isDragging.targetVolume -= actualFlow;
-        
+
         // Sync Chemical Metadata to the Burette
         burette.color = isDragging.color;
         burette.chemicalId = isDragging.chemicalId;
         burette.chem = isDragging.chem;
 
-        // Visual Feedback
-        drawPouringStream(isDragging.x, isDragging.y, buretteTopX, buretteTopY - 5, color(...isDragging.color));
-        
+        // Visual Feedback - Thinner stream for filling
+        drawPouringStream(isDragging.x, isDragging.y, buretteTopX, buretteTopY - 5, color(...isDragging.color), 3);
+
         // Auto-reopen zoom so the student can see the level relative to the 0.00 mark
-        userClosedZoom = false; 
+        userClosedZoom = false;
       }
     }
   }
@@ -1950,7 +2052,7 @@ function mouseWheel(event) {
 
 function drawBuretteZoom(v) {
   // Common coordinates relative to burette
-  const zoomX = v.x + 180; 
+  const zoomX = v.x + 180;
   const zoomY = v.y - 140;
   const zoomSize = 140;
 
@@ -1958,8 +2060,8 @@ function drawBuretteZoom(v) {
   if (userClosedZoom) {
     push();
     // Positioned right next to the burette tube for easy access
-    const iconX = v.x + 35; 
-    const iconY = v.y - 120; 
+    const iconX = v.x + 35;
+    const iconY = v.y - 120;
     translate(iconX, iconY);
 
     // 1. Subtle Shadow
@@ -1967,8 +2069,8 @@ function drawBuretteZoom(v) {
     circle(2, 2, 36);
 
     // 2. Icon Body (Matches your professional dark blue theme)
-    fill(40, 80, 150); 
-    stroke(255, 200); 
+    fill(40, 80, 150);
+    stroke(255, 200);
     strokeWeight(2);
     circle(0, 0, 36);
 
@@ -1977,8 +2079,8 @@ function drawBuretteZoom(v) {
     noStroke();
     textAlign(CENTER, CENTER);
     textSize(18);
-    text("🔍", 0, 0); 
-    
+    text("🔍", 0, 0);
+
     // 4. Hover effect
     if (dist(mouseX, mouseY, iconX, iconY) < 18) {
       fill(255, 50);
@@ -1992,7 +2094,7 @@ function drawBuretteZoom(v) {
   push();
   // 1. Label Background
   fill(15, 25, 45, 200); noStroke();
-  rect(zoomX - 75, zoomY + zoomSize/2 + 5, 150, 45, 8);
+  rect(zoomX - 75, zoomY + zoomSize / 2 + 5, 150, 45, 8);
 
   // 2. Zoom Circle & Masking
   fill(255); stroke(40); strokeWeight(3);
@@ -2003,13 +2105,13 @@ function drawBuretteZoom(v) {
 
   translate(zoomX, zoomY);
   scale(6);
-  
+
   // Tube & Scale
   const reading = v.capacity - v.volume;
   noFill(); stroke(100, 100); strokeWeight(0.4);
   rect(-10, -50, 20, 100);
 
-  const spacing = 20; 
+  const spacing = 20;
   let startML = max(0, floor(reading) - 2);
   let endML = min(v.capacity, ceil(reading) + 2);
 
@@ -2026,9 +2128,9 @@ function drawBuretteZoom(v) {
   // Liquid
   let c = v.color ? color(...v.color) : color(255, 120, 80);
   fill(red(c), green(c), blue(c), 140); noStroke();
-  rect(-10, 0, 20, 100); 
+  rect(-10, 0, 20, 100);
   fill(red(c), green(c), blue(c), 200); arc(0, 0, 20, 5, 0, PI);
-  
+
   drawingContext.restore();
   pop();
 
@@ -2039,8 +2141,8 @@ function drawBuretteZoom(v) {
 
   // 4. Reading Text
   fill(255); textAlign(CENTER); textSize(11);
-  text(`V: ${nf(reading, 1, 2)} mL`, zoomX, zoomY + zoomSize/2 + 22);
-  textSize(9); fill(180); text("Read bottom of meniscus", zoomX, zoomY + zoomSize/2 + 38);
+  text(`V: ${nf(reading, 1, 2)} mL`, zoomX, zoomY + zoomSize / 2 + 22);
+  textSize(9); fill(180); text("Read bottom of meniscus", zoomX, zoomY + zoomSize / 2 + 38);
 }
 // ======================================================
 // SPAWN APPARATUS
@@ -2055,7 +2157,7 @@ function spawnApparatusFromCatalog(item) {
 
   // Prevent duplicates for unique instruments
   if (['burette', 'bunsen_burner', 'balance', 'pH_meter', 'meltingpoint_apparatus', 'hotplate'].includes(type) &&
-      Object.values(vessels).some(v => v.type === type)) {
+    Object.values(vessels).some(v => v.type === type)) {
     console.log(`${type} already exists!`);
     return;
   }
@@ -2096,11 +2198,11 @@ function spawnApparatusFromCatalog(item) {
     const cap = askCapacity('burette') || 50;
     const spawnPos = { x: currentPositions.burette_stand.x, y: currentPositions.burette_stand.y };
     const size = currentPositions.sizes.burette;
-    
+
     // START AT 0 VOLUME for Phase 1 realism
     v = makeVessel(nextId('burette'), spawnPos.x, spawnPos.y, size.w, size.h,
       `${cap} mL Burette`, 'Empty', 'burette', 0, cap);
-      
+
     v.targetVolume = 0; // Target is now 0
     v.contents.hcl_vol = 0;
   }
@@ -2135,16 +2237,16 @@ function spawnApparatusFromCatalog(item) {
     v = makeResponsiveVessel(nextId('bunsen_burner'), 'bunsen_burner');
     if (v) v.title = 'Bunsen Burner';
   }
-   else if (type === 'balance') {
-  v = makeResponsiveVessel(nextId('balance'), 'balance');
-  if (v) {
-    v.title = 'Analytical Balance';
-    v.tareOffset = 0;   // Explicitly initialize
-    v.rawWeight = 0;    // Explicitly initialize
-    v.displayWeight = 0; // Explicitly initialize
-    v.mass = 0;         // For backwards compatibility
+  else if (type === 'balance') {
+    v = makeResponsiveVessel(nextId('balance'), 'balance');
+    if (v) {
+      v.title = 'Analytical Balance';
+      v.tareOffset = 0;   // Explicitly initialize
+      v.rawWeight = 0;    // Explicitly initialize
+      v.displayWeight = 0; // Explicitly initialize
+      v.mass = 0;         // For backwards compatibility
+    }
   }
-}
   else if (type === 'crucible') {
     v = makeResponsiveVessel(nextId('crucible'), 'crucible');
     if (v) {
@@ -2202,10 +2304,10 @@ function drawHintBubble(x, y, txt) {
 
   push();
   translate(x, y);
-  
+
   // 1. Calculate breathing effect for scale and glow
   let pulse = sin(frameCount * 0.1) * 5;
-  
+
   // 2. Measure text width for dynamic bubble sizing
   textSize(12);
   let txtW = textWidth(txt) + 24;
@@ -2214,24 +2316,24 @@ function drawHintBubble(x, y, txt) {
   // 3. Draw Shadow
   noStroke();
   fill(0, 40);
-  rect(-txtW/2 + 2, -txtH/2 + 2, txtW, txtH, 12);
+  rect(-txtW / 2 + 2, -txtH / 2 + 2, txtW, txtH, 12);
 
   // 4. Draw Bubble (Dark Slate Blue looks very professional)
-  fill(40, 60, 100, 230); 
+  fill(40, 60, 100, 230);
   stroke(255, 100);
   strokeWeight(1);
-  rect(-txtW/2, -txtH/2, txtW, txtH, 12);
+  rect(-txtW / 2, -txtH / 2, txtW, txtH, 12);
 
   // 5. Draw Text
   fill(255);
   noStroke();
   textAlign(CENTER, CENTER);
   textStyle(BOLD);
-  
+
   // Replace standard arrows with cleaner symbols if they exist in string
   let cleanTxt = txt.replace('UP', '↑').replace('DOWN', '↓');
   text(cleanTxt, 0, 0);
-  
+
   pop();
 }
 
@@ -2250,23 +2352,23 @@ function resetExperiment() {
 function spawnChemicalBottle(chem) {
   const bottle = makeResponsiveVessel(nextId('chemical_bottle'), 'bottle');
   if (!bottle) return;
-  
+
   bottle.chem = chem.label;
   bottle.chemicalId = chem.id;
   bottle.color = chem.color;
   bottle.volume = 100;
-  bottle.targetVolume = 100; 
+  bottle.targetVolume = 100;
   bottle.capacity = 250;
   bottle.isChemical = true;
-  
- switch(chem.id) {
+
+  switch (chem.id) {
     case 'na2co3_nahco3': bottle.title = '25% Carbonate Mixture'; break;
     case 'hcl_0_1M': bottle.title = '0.1M HCl (Titration)'; break;
     case 'phenolphthalein': bottle.title = 'Phenolphthalein'; break;
     case 'methyl_orange': bottle.title = 'Methyl Orange'; break;
     default: bottle.title = chem.label;
   }
-  
+
   vessels[bottle.id] = bottle;
   console.log(`Spawned: ${bottle.title}`);
 }

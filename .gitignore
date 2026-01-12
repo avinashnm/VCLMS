@@ -3,3 +3,5 @@
 *.pyo
 venv/
 .env
+db.sqlite3
+media/

@@ -26,10 +26,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'f2zx8*lb*em*-*b+!&1lpp&$_9q9kmkar+l3x90do@s(+sr&x7'  # Consider using your secret key
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-# ALLOWED_HOSTS = ['smswithdjango.herokuapp.com']
-ALLOWED_HOSTS = ['127.0.0.1']  # Not recommended but useful in dev mode
+# Allow all hosts for cloud deployment convenience
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -37,6 +37,12 @@ ALLOWED_HOSTS = ['127.0.0.1']  # Not recommended but useful in dev mode
 INSTALLED_APPS = [
     # Django Apps
     'django.contrib.admin',
+# ... (skip unchanged lines) ...
+# ...
+# ...
+# ...
+
+
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -194,7 +200,9 @@ EMAIL_ALIASES = {
 
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-#prod_db = dj_database_url.config(conn_max_age=500)
-#DATABASES['default'].update(prod_db)
+# Configure Database from DATABASE_URL if available (Heroku/Render/Railway)
+import dj_database_url
+db_from_env = dj_database_url.config(conn_max_age=500)
+DATABASES['default'].update(db_from_env)
 
 
