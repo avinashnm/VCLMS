@@ -70,6 +70,7 @@
         <!-- New Manual Toggles -->
         <button class="btn-lab-toggle" onclick="toggleCatalog()">📦 Apparatus Catalog</button>
         <button class="btn-lab-toggle" onclick="toggleControls()">⌨️ Controls Guide</button>
+        <button class="btn-lab-toggle" onclick="toggleAssistant()">🧪 Lab Assistant</button>
         <a href="{% url 'lab_experiment' slug %}" class="btn btn-danger btn-sm" style="font-weight: bold;">
           Exit Lab
         </a>
@@ -91,6 +92,12 @@
     function toggleControls() { 
         if (typeof controlsVisible !== 'undefined') {
             controlsVisible = !controlsVisible; 
+        }
+    }
+
+    function toggleAssistant() {
+        if (typeof assistantVisible !== 'undefined') {
+            assistantVisible = !assistantVisible;
         }
     }
 </script>

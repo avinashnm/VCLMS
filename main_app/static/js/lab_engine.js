@@ -28,6 +28,8 @@ let catalogVisible = false;
 let catalogToggleButton = null;
 let catalogPanelBounds = null;
 let controlsVisible = false;
+let assistantVisible = true;
+let clearShelfButton = null;
 
 let currentPositions = null;
 let idCounter = 0;
@@ -649,6 +651,7 @@ function makeVessel(id, x, y, w, h, title, chem, vtype, vol, cap) {
     isDraining: false,
     dragging: false,
     isOnBalance: false,
+    vanish: 1.0, // 1.0 = normal, 0.0 = gone (for animations)
     color: [200, 220, 255, 150],
 
     // ======================================================
@@ -1147,8 +1150,9 @@ function draw() {
 
   if (hoverVessel) drawTooltip(hoverVessel);
   if (catalogVisible) drawCatalogPanel();
-  drawDataPanel();
+  if (assistantVisible) drawDataPanel();
   drawControlsPanel();
+  drawClearShelfButton(); // Magic button on the shelf
 }
 function getChemicalInfo(chemicalId) {
   const catalog = [
@@ -1166,6 +1170,15 @@ function getChemicalInfo(chemicalId) {
 // ENHANCED VESSEL DRAWING (with glow, liquid, pH color)
 // ======================================================
 function drawVessel(v) {
+  // If vanishing, scale down
+  if (v.vanish < 1.0) {
+    v.vanish -= 0.1;
+    if (v.vanish <= 0) {
+      delete vessels[v.id];
+      return;
+    }
+  }
+
   const over = mouseX > v.x - v.w / 2 && mouseX < v.x + v.w / 2 &&
     mouseY > v.y - v.h / 2 && mouseY < v.y + v.h / 2;
 
@@ -1179,6 +1192,8 @@ function drawVessel(v) {
   let ry = v.y + (v.renderOffsetY || 0);
 
   translate(rx, ry);
+  if (v.vanish < 1.0) scale(max(0, v.vanish)); // Apply "Poof" scale
+
   imageMode(CENTER);
 
   // Proximity glow effect
@@ -1742,6 +1757,71 @@ function drawControlsPanel() {
   text('W (Hold)   : Swirl Flask', x + 15, startY + 110); // NEW
 }
 
+function drawClearShelfButton() {
+  if (!labSurfaces) return;
+
+  const shelf = labSurfaces.shelfTop;
+  const x = shelf.maxX - 25;
+  const y = shelf.y - 35;
+  const r = 24;
+
+  clearShelfButton = { x, y, r };
+
+  // Only show if there are items on shelves
+  const itemsOnShelves = Object.values(vessels).some(v =>
+    v.surface && (v.surface === labSurfaces.shelfTop || v.surface === labSurfaces.shelfBottom)
+  );
+
+  if (!itemsOnShelves) return;
+
+  const hover = dist(mouseX, mouseY, x, y) < r;
+
+  push();
+  // Glassmorphic background
+  fill(hover ? [100, 200, 255, 180] : [255, 255, 255, 120]);
+  stroke(255, 150);
+  strokeWeight(2);
+  if (hover) {
+    drawingContext.shadowColor = 'rgba(100, 200, 255, 0.8)';
+    drawingContext.shadowBlur = 15;
+  }
+  circle(x, y, r * 2);
+
+  // Icon (Broom/Sweep)
+  textAlign(CENTER, CENTER);
+  textSize(20);
+  text('🧹', x, y);
+
+  if (hover) {
+    drawHintBubble(x - 60, y, "Sweep shelves clean");
+  }
+  pop();
+}
+
+function clearShelves() {
+  if (!labSurfaces) return;
+  let clearedCount = 0;
+
+  Object.values(vessels).forEach(v => {
+    const isOnShelf = v.surface && (
+      v.surface === labSurfaces.shelfTop ||
+      v.surface === labSurfaces.shelfBottom
+    );
+
+    if (isOnShelf) {
+      // Start the "Poof" animation
+      v.vanish = 0.99;
+      // Add particles
+      createParticles(v.x, v.y, 10, 'bubble');
+      clearedCount++;
+    }
+  });
+
+  if (clearedCount > 0) {
+    console.log(`Magically cleared ${clearedCount} items from shelves.`);
+  }
+}
+
 function drawCatalogPanel() {
   const panelX = 20, panelY = 30, panelW = 340, panelH = height - 80;
   catalogPanelBounds = { x: panelX, y: panelY, w: panelW, h: panelH };
@@ -1778,6 +1858,14 @@ function drawCatalogPanel() {
 // EVENTS
 // ======================================================
 function mousePressed() {
+  // --- CLICK: CLEAR SHELF BUTTON ---
+  if (clearShelfButton) {
+    if (dist(mouseX, mouseY, clearShelfButton.x, clearShelfButton.y) < clearShelfButton.r) {
+      clearShelves();
+      return;
+    }
+  }
+
   // Toggle catalog
   if (catalogToggleButton &&
     mouseX > catalogToggleButton.x && mouseX < catalogToggleButton.x + catalogToggleButton.w &&
