@@ -31,7 +31,7 @@ let controlsVisible = false;
 
 let currentPositions = null;
 let idCounter = 0;
-const sizeMultiplier = 0.50;
+const sizeMultiplier = 0.45; // Slightly reduced for better fit on shelves
 let labSurfaces = null;
 const BURETTE_GLASS_X_OFFSET = -8;
 // Initialize from Django (passed via template)
@@ -48,8 +48,9 @@ let activeModal = null; // Tracks if an input box is open
 // LAB SURFACES (continuous surfaces)
 // ======================================================
 const LAB_SURFACES = {
-  shelf: { y: 360, minX: 250, maxX: 650, shadowAlpha: 30 },
-  table: { y: 460, minX: 200, maxX: 820, shadowAlpha: 45 }
+  shelfTop: { y: 85, minX: 280, maxX: 950, shadowAlpha: 30 },
+  shelfBottom: { y: 175, minX: 280, maxX: 950, shadowAlpha: 30 },
+  table: { y: 335, minX: 50, maxX: 1150, shadowAlpha: 45 }
 };
 
 //experiment assessment
@@ -284,15 +285,21 @@ function getLabSurfaces() {
   const scaleX = width / 1200;
   const scaleY = height / 700;
   return {
-    shelf: {
-      y: 360 * scaleY,
-      minX: 150 * scaleX,      // Full coverage left
-      maxX: width * 0.99,
+    shelfTop: {
+      y: 85 * scaleY,
+      minX: 280 * scaleX,
+      maxX: 950 * scaleX,
+      shadowAlpha: 30
+    },
+    shelfBottom: {
+      y: 175 * scaleY,
+      minX: 280 * scaleX,
+      maxX: 950 * scaleX,
       shadowAlpha: 30
     },
     table: {
-      y: 460 * scaleY,
-      minX: 100 * scaleX,      // Wider coverage
+      y: 335 * scaleY,
+      minX: 50 * scaleX,      // Wider coverage
       maxX: width * 0.99,
       shadowAlpha: 45
     }
@@ -367,7 +374,7 @@ function getResponsivePositions() {
 // PRELOAD
 // ======================================================
 function preload() {
-  imgLabBg = loadImage('/static/images/lab-bg.jpg');
+  imgLabBg = loadImage('/static/images/new-lab-bg-1.png');
   imgBeaker = loadImage('/static/img/catalog/beaker.png');
   imgBottle = loadImage('/static/img/catalog/bottle.png');
   imgBurette = loadImage('/static/img/catalog/burette.png');
@@ -527,15 +534,22 @@ function smartSpawnPosition(type) {
   // Use dynamic lab surfaces (no more fixed LAB_ZONES!)
   if (!labSurfaces) return { x: width / 2, y: height / 2 };
 
+  // ALL items spawn on specific surfaces now
   const isBig = BIG_APPARATUS.includes(type);
-  const spawnSurface = isBig ? labSurfaces.table : labSurfaces.shelf;
 
-  // Spawn at center of surface with slight random offset
-  const centerX = (spawnSurface.minX + spawnSurface.maxX) / 2;
-  const centerY = spawnSurface.y;
+  let spawnSurface;
+  if (isBig) {
+    spawnSurface = labSurfaces.table;
+  } else {
+    spawnSurface = Math.random() > 0.5 ? labSurfaces.shelfTop : labSurfaces.shelfBottom;
+  }
 
-  // Find collision-free spot near center
-  return findCollisionFreePosition(centerX + random(-50, 50), centerY, type);
+  // Spawn range
+  const minX = spawnSurface.minX + 50;
+  const range = (spawnSurface.maxX - spawnSurface.minX) * 0.8;
+  const targetX = minX + random(0, range);
+
+  return findCollisionFreePosition(targetX, spawnSurface.y, type);
 }
 
 
@@ -545,10 +559,11 @@ function findCollisionFreePosition(targetX, targetY, type) {
   const scaleY = height / 700;
 
   while (attempts < 20) {
-    let testX = targetX + random(-80, 80);
-    let testY = targetY + random(-20, 20);
+    let testX = targetX + random(-100, 100);
+    let testY = targetY; // Keep Y fixed to surface level
 
     // Keep within lab surface bounds
+    /*
     const isBig = BIG_APPARATUS.includes(type);
     const bounds = isBig ? labSurfaces.table : labSurfaces.shelf;
 
@@ -556,6 +571,7 @@ function findCollisionFreePosition(targetX, targetY, type) {
       attempts++;
       continue;
     }
+    */
 
     // Check collision with other vessels
     let collision = false;
@@ -824,14 +840,26 @@ function applyLabPhysics(v) {
   let minDist = Infinity;
 
   if (labSurfaces) {
-    Object.values(labSurfaces).forEach(surf => {
-      const d = abs(v.y - surf.y);
-      if (d < minDist) { minDist = d; closestSurface = surf; }
+    const isBig = BIG_APPARATUS.includes(v.type);
+
+    Object.entries(labSurfaces).forEach(([name, surf]) => {
+      // 1. BIG APPARATUS CONSTRAINT: Big items can ONLY snap to the table (bench)
+      if (isBig && name !== 'table') return;
+
+      // 2. HORIZONTAL CHECK: Must be within surface width
+      if (v.x < surf.minX || v.x > surf.maxX) return;
+
+      const d = abs((v.y + v.h / 2) - surf.y);
+      // Increased snap range for smoother "magnet" feel
+      if (d < minDist && d < 80) {
+        minDist = d;
+        closestSurface = surf;
+      }
     });
   }
 
-  if (closestSurface && v.y >= closestSurface.y - 10) {
-    v.y = closestSurface.y;
+  if (closestSurface && (v.y + v.h / 2) >= closestSurface.y - 10) {
+    v.y = closestSurface.y - v.h / 2;
     v.vy = 0;
     v.surface = closestSurface;
 
