@@ -831,6 +831,26 @@ function applyLabPhysics(v) {
 
   if (snappedToBalance) return;
 
+  // 1.5 Check Titration Snapping (Magnetic snap under burette)
+  const burette = Object.values(vessels).find(b => b.type === 'burette');
+  let snappedToTitration = false;
+
+  if (burette && (v.type === 'conical_flask' || v.type === 'beaker')) {
+    const snapX = burette.x + BURETTE_GLASS_X_OFFSET;
+    // snapY should be the surface the burette is sitting on
+    const snapY = burette.surface ? burette.surface.y : (burette.y + burette.h / 2);
+
+    if (dist(v.x, v.y + v.h / 2, snapX, snapY) < 50) {
+      v.x = lerp(v.x, snapX, 0.3);
+      v.y = lerp(v.y, snapY - v.h / 2, 0.3);
+      v.vy = 0;
+      v.surface = burette.surface; // Share the same surface
+      snappedToTitration = true;
+    }
+  }
+
+  if (snappedToTitration) return;
+
   // 2. Standard Gravity and Surface logic
   const gravity = 1.2;
   v.vy += gravity;
@@ -1044,19 +1064,23 @@ function drawTitrationZone() {
   if (!burette || isDragging) return;
 
   const snapX = burette.x + BURETTE_GLASS_X_OFFSET;
-  const snapY = burette.y + 158;
+  const snapY = burette.surface ? burette.surface.y : (burette.y + burette.h / 2);
 
   const receiver = Object.values(vessels).find(v =>
-    (v.type === 'beaker' || v.type === 'conical_flask') && dist(v.x, v.y, snapX, snapY) < 10
+    (v.type === 'beaker' || v.type === 'conical_flask') && dist(v.x, v.y + v.h / 2, snapX, snapY) < 10
   );
 
   if (!receiver) {
+    push();
     noFill();
     stroke(100, 255, 100, 150);
     strokeWeight(2);
-    circle(snapX, snapY - 20, 60);
+    // Draw the circle exactly on the bench surface
+    ellipse(snapX, snapY - 5, 60, 20);
+
     fill(100, 255, 100); noStroke(); textAlign(CENTER); textSize(10);
     text('PLACE FLASK', snapX, snapY - 20);
+    pop();
   }
 }
 
