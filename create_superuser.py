@@ -33,8 +33,7 @@ def create_superuser():
             
             u = User.objects.create_superuser(
                 email=email,
-                password=password,
-                username=email.split('@')[0] # Fallback username just in case it's required
+                password=password
             )
             print(f"Superuser {email} created successfully.")
         except IntegrityError:
