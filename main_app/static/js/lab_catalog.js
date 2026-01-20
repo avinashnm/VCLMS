@@ -8,7 +8,7 @@ class LabCatalog {
     this.hoverItem = null;
     this.sprites = {};
     this.scale = config.scale || sizeMultiplier;  // Use global scale
-    
+
     this._buildGroups();
   }
 
@@ -22,6 +22,8 @@ class LabCatalog {
       ],
       titration: [       // Precision titration apparatus
         { id: 'burette', name: 'Burette', spriteKey: 'burette' },
+        { id: 'burette_tube', name: 'Burette Tube', spriteKey: 'burette_tube' },
+        { id: 'common_stand', name: 'Common Stand', spriteKey: 'common_stand' },
         { id: 'conical_flask', name: 'Conical Flask', spriteKey: 'conical_flask' }
       ],
       heating: [         // All heating/reflux/distillation
@@ -55,7 +57,7 @@ class LabCatalog {
     const colW = 85 * scale;
     const rowH = 65 * scale;
     const margin = 12 * scale;
-    
+
     // Title
     noStroke();
     fill(0);
@@ -90,14 +92,14 @@ class LabCatalog {
       // 3-column grid for items
       for (let row = 0; row < Math.ceil(items.length / 3); row++) {
         let gridX = x + 15;
-        
+
         for (let col = 0; col < 3; col++) {
           const idx = row * 3 + col;
           if (idx >= items.length) break;
 
           const item = items[idx];
           const over = mouseX > gridX && mouseX < gridX + colW &&
-                      mouseY > gridY - 28 * scale && mouseY < gridY + 28 * scale;
+            mouseY > gridY - 28 * scale && mouseY < gridY + 28 * scale;
 
           // Hover effect
           if (over) {
@@ -122,10 +124,12 @@ class LabCatalog {
             let iw = 22 * scale, ih = 28 * scale;
             if (item.id === 'pipette') { iw *= 0.65; ih *= 2.0; }
             if (item.id === 'burette') { iw *= 0.7; ih *= 2.4; }
+            if (item.id === 'burette_tube') { iw *= 0.7; ih *= 2.4; }
+            if (item.id === 'common_stand') { iw *= 0.8; ih *= 2.4; }
             if (item.id === 'liebig_condensor') { iw *= 0.8; ih *= 2.2; }
             if (item.id === 'separatory_funnel') { iw *= 0.75; ih *= 2.3; }
             if (item.id === 'pH_meter') { iw *= 0.9; ih *= 1.6; }
-            image(sprite, gridX + colW/2, gridY - 8 * scale, iw, ih);
+            image(sprite, gridX + colW / 2, gridY - 8 * scale, iw, ih);
           }
           pop();
 
@@ -133,13 +137,13 @@ class LabCatalog {
           fill(50);
           textAlign(CENTER);
           textSize(9 * scale);
-          text(item.name, gridX + colW/2, gridY + 15 * scale);
+          text(item.name, gridX + colW / 2, gridY + 15 * scale);
 
           gridX += colW + margin;
         }
         gridY += rowH;
       }
-      
+
       gridY += 8 * scale; // Group spacing
     });
   }
@@ -153,26 +157,26 @@ class ChemicalCatalog {
     this.chemicals = chemicals;
     this.hoverItem = null;
   }
-  
+
   drawPanel(x, y, w, h, scale = 0.8) {
     // Title
     noStroke(); fill(0); textAlign(LEFT); textSize(15 * scale); textStyle(BOLD);
     text('🧴 CHEMICALS', x + 12, y + 25);
     textStyle(NORMAL); textSize(11 * scale);
     text('Click to spawn bottle', x + 12, y + 42);
-    
+
     const colW = 140 * scale, rowH = 110 * scale, margin = 15 * scale;
     this.hoverItem = null;
-    
+
     for (let i = 0; i < this.chemicals.length; i++) {
       const item = this.chemicals[i];
       const col = i % 2, row = Math.floor(i / 2);
       const px = x + 15 + col * (colW + margin);
       const py = y + 65 + row * (rowH + 10);
-      
+
       const over = mouseX > px && mouseX < px + colW &&
-                  mouseY > py && mouseY < py + rowH;
-      
+        mouseY > py && mouseY < py + rowH;
+
       // Hover effect
       if (over) {
         fill(255, 200, 200, 220); stroke(255, 100, 100); strokeWeight(2 * scale);
@@ -181,18 +185,18 @@ class ChemicalCatalog {
         fill(255, 240, 240, 200); stroke(200); strokeWeight(1 * scale);
       }
       rect(px, py, colW, rowH, 12);
-      
+
       // Chemical color preview (bottle shape)
       fill(...item.color, 200); noStroke();
       rect(px + 20, py + 30, colW - 40, 55, 25, 5, 25, 5);
       fill(...item.color, 180);
       rect(px + 25, py + 45, colW - 50, 35, 20);
-      
+
       // Label
       fill(50); textAlign(CENTER); textSize(11 * scale);
-      text(item.label, px + colW/2, py + 95);
+      text(item.label, px + colW / 2, py + 95);
     }
   }
-  
+
   handleClick(mx, my) { return this.hoverItem; }
 }

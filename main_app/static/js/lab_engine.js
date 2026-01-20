@@ -23,6 +23,7 @@ let currentCatalogTab = 'apparatus';
 let imgBeaker, imgBottle, imgBurette, imgPipette;
 let imgConical, imgVolumetric, imgFunnel, imgWash, imgBunsen;
 let imgBalance, imgCrucible, imgHotplate, imgLiebig, imgMeltingPoint, imgPHMeter, imgSepFunnel, imgTLC;
+let imgBuretteTube, imgStand;
 
 let catalogVisible = false;
 let catalogToggleButton = null;
@@ -332,12 +333,13 @@ const CHEMICALS = {
 // Big vs Small apparatus classification
 const BIG_APPARATUS = [
   'burette', 'bunsen_burner', 'wash_bottle', 'hotplate', 'balance',
-  'liebig_condensor', 'separatory_funnel', 'pH_meter', 'meltingpoint_apparatus'
+  'liebig_condensor', 'separatory_funnel', 'pH_meter', 'meltingpoint_apparatus',
+  'common_stand'
 ];
 
 const SMALL_APPARATUS = [
   'beaker', 'pipette', 'bottle', 'funnel', 'conical_flask',
-  'volumetric_flask', 'crucible', 'TLC_plate'
+  'volumetric_flask', 'crucible', 'TLC_plate', 'burette_tube'
 ];
 
 // ======================================================
@@ -367,7 +369,9 @@ function getResponsivePositions() {
       volumetric_flask: { w: 120 * scale * sizeMultiplier, h: 160 * scale * sizeMultiplier },
       funnel: { w: 80 * scale * sizeMultiplier, h: 80 * scale * sizeMultiplier },
       wash_bottle: { w: 120 * scale * sizeMultiplier, h: 180 * scale * sizeMultiplier },
-      bunsen_burner: { w: 120 * scale * sizeMultiplier, h: 180 * sizeMultiplier * scale }
+      bunsen_burner: { w: 120 * scale * sizeMultiplier, h: 180 * sizeMultiplier * scale },
+      burette_tube: { w: 100 * scale * sizeMultiplier, h: 360 * scale * sizeMultiplier },
+      common_stand: { w: 180 * scale * sizeMultiplier, h: 360 * scale * sizeMultiplier }
     }
   };
 }
@@ -394,6 +398,8 @@ function preload() {
   imgPHMeter = loadImage('/static/img/catalog/pH_meter.png');
   imgSepFunnel = loadImage('/static/img/catalog/separatory_funnel.png');
   imgTLC = loadImage('/static/img/catalog/TLC_plate.png');
+  imgStand = loadImage('/static/img/catalog/stand.png');
+  imgBuretteTube = loadImage('/static/img/catalog/burette-single.png');
 }
 
 
@@ -429,7 +435,8 @@ function setup() {
     balance: imgBalance, crucible: imgCrucible,
     hotplate: imgHotplate, liebig_condensor: imgLiebig,
     meltingpoint_apparatus: imgMeltingPoint, pH_meter: imgPHMeter,
-    separatory_funnel: imgSepFunnel, TLC_plate: imgTLC
+    separatory_funnel: imgSepFunnel, TLC_plate: imgTLC,
+    burette_tube: imgBuretteTube, common_stand: imgStand
   });
 
   chemicalCatalog = new ChemicalCatalog([
@@ -551,7 +558,12 @@ function smartSpawnPosition(type) {
   const range = (spawnSurface.maxX - spawnSurface.minX) * 0.8;
   const targetX = minX + random(0, range);
 
-  return findCollisionFreePosition(targetX, spawnSurface.y, type);
+  // PREDICT HEIGHT to spawn ABOVE the surface (so logic/physics snaps it down)
+  let size = currentPositions?.sizes[type] || { h: 100, w: 100 };
+  let verticalSize = (type === 'burette_tube') ? size.w : size.h; // Tube lays flat on spawn
+  const targetY = spawnSurface.y - (verticalSize / 2) - 5; // Spawn 5px above snap point
+
+  return findCollisionFreePosition(targetX, targetY, type);
 }
 
 
@@ -805,12 +817,23 @@ function applyLabPhysics(v) {
   if (v.type === 'funnel' && v.isAttachedTo) {
     const parent = vessels[v.isAttachedTo];
     if (parent) {
-      v.x = parent.x;
+      v.x = parent.x + (parent.type === 'burette' ? BURETTE_GLASS_X_OFFSET : 0);
       v.y = parent.y - (parent.h * 0.46);
       v.vy = 0; // Disable gravity for attached items
       return;
     } else {
       v.isAttachedTo = null; // Parent was deleted
+    }
+  }
+  if (v.mountedTo) {
+    const stand = vessels[v.mountedTo];
+    if (stand) {
+      v.x = stand.x - stand.w * 0.18; // Shifted further left (0.18 instead of 0.12)
+      v.y = stand.y + v.clampOffset;   // Apply vertical offset
+      v.vy = 0;
+      return;
+    } else {
+      v.mountedTo = null; // Stand was deleted
     }
   }
   if (v.dragging) return;
@@ -1063,11 +1086,12 @@ function drawSnapGuides() {
 }
 
 function drawTitrationZone() {
-  const burette = Object.values(vessels).find(v => v.type === 'burette');
+  const burette = Object.values(vessels).find(v => (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)));
   if (!burette || isDragging) return;
 
-  const snapX = burette.x + BURETTE_GLASS_X_OFFSET;
-  const snapY = burette.surface ? burette.surface.y : (burette.y + burette.h / 2);
+  const snapX = burette.type === 'burette' ? (burette.x + BURETTE_GLASS_X_OFFSET) : burette.x;
+  const dripTipY = burette.type === 'burette' ? (burette.y + 120) : (burette.y + burette.h * 0.4);
+  const snapY = burette.surface ? burette.surface.y : (dripTipY + 40);
 
   const receiver = Object.values(vessels).find(v =>
     (v.type === 'beaker' || v.type === 'conical_flask') && dist(v.x, v.y + v.h / 2, snapX, snapY) < 10
@@ -1084,6 +1108,15 @@ function drawTitrationZone() {
     fill(100, 255, 100); noStroke(); textAlign(CENTER); textSize(10);
     text('PLACE FLASK', snapX, snapY - 20);
     pop();
+  } else {
+    // Check if the tip is too high
+    const distY = abs(dripTipY - receiver.y);
+    if (distY > 160) {
+      push();
+      fill(255, 50, 50); noStroke(); textAlign(CENTER); textSize(12); textStyle(BOLD);
+      text('⚠️ TIP TOO HIGH - WILL SPILL', snapX, dripTipY - 30);
+      pop();
+    }
   }
 }
 
@@ -1135,9 +1168,25 @@ function draw() {
 
   // Draw shadows first, then vessels
   Object.values(vessels).forEach(v => drawShadow(v));
+
+  // NEW: Handle Keyboard Vertical Sliding for Mounted Burette
+  if (hoverVessel && hoverVessel.type === 'burette_tube' && hoverVessel.mountedTo) {
+    const stand = vessels[hoverVessel.mountedTo];
+    // CONFLICT PREVENTION: Only slide if not currently pouring from a bottle
+    const isPouring = isDragging && isDragging.type === 'bottle';
+    if (stand && !isPouring) {
+      if (keyIsDown(UP_ARROW)) { // Arrow UP
+        hoverVessel.clampOffset = constrain(hoverVessel.clampOffset - 2, -stand.h * 0.5, stand.h * 0.3);
+      }
+      if (keyIsDown(DOWN_ARROW)) { // Arrow DOWN
+        hoverVessel.clampOffset = constrain(hoverVessel.clampOffset + 2, -stand.h * 0.5, stand.h * 0.3);
+      }
+    }
+  }
+
   Object.values(vessels).forEach(v => {
     drawVessel(v);
-    if (v.type === 'burette') drawBuretteZoom(v); // Call the zoom here
+    if (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)) drawBuretteZoom(v); // Call the zoom here
   });
 
   drawTitrationZone();
@@ -1179,11 +1228,15 @@ function drawVessel(v) {
     }
   }
 
+  // REVERT: Entire item is now hoverable again
   const over = mouseX > v.x - v.w / 2 && mouseX < v.x + v.w / 2 &&
     mouseY > v.y - v.h / 2 && mouseY < v.y + v.h / 2;
 
   if (over && !isDragging) {
-    hoverVessel = v;
+    // PRIORITIZE TUBE OVER STAND: If we were already hovering a stand and now find a tube, take the tube.
+    if (!hoverVessel || (v.type === 'burette_tube' && hoverVessel.type === 'common_stand') || v.type !== 'common_stand') {
+      hoverVessel = v;
+    }
   }
 
   push();
@@ -1241,6 +1294,25 @@ function drawVessel(v) {
     }
 
     drawRealisticLiquid(v, v.color || color(255, 160, 100));
+  }
+  else if (v.type === 'burette_tube') {
+    push();
+    if (!v.mountedTo && !v.dragging) {
+      rotate(PI / 2); // Lay flat on shelf
+    }
+    image(imgBuretteTube, 0, 0, v.w, v.h);
+    // Same stopcock check
+    if (keyIsDown(83)) {
+      push(); fill(255, 0, 0); noStroke(); circle(0, v.h * 0.35, 5); pop();
+      v.hint = "Stopcock Open";
+    } else if (v.mountedTo) {
+      v.hint = "Hover & Press ↑ / ↓ to Adjust Height";
+    }
+    drawRealisticLiquid(v, v.color || color(255, 160, 100));
+    pop();
+  }
+  else if (v.type === 'common_stand') {
+    image(imgStand, 0, 0, v.w, v.h);
   }
   else if (v.type === 'pipette') {
     image(imgPipette, 0, 0, v.w, v.h);
@@ -1472,15 +1544,15 @@ function drawRealisticLiquid(v, col) {
     bezierVertex(0, topY + 4, -w / 4, topY + 4, -w / 2, topY + slosh);
     endShape(CLOSE);
   }
-  else if (v.type === 'burette') {
-    const tubeWidth = v.w * 0.10;
-    const bottomLimit = v.h * 0.25;
-    const hMax = v.h * 0.70;
+  else if (v.type === 'burette' || v.type === 'burette_tube') {
+    const tubeWidth = v.type === 'burette' ? v.w * 0.10 : v.w * 0.35;
+    const bottomLimit = v.type === 'burette' ? v.h * 0.25 : v.h * 0.40;
+    const hMax = v.type === 'burette' ? v.h * 0.70 : v.h * 0.85;
     const topRim = bottomLimit - hMax;
     const topY = bottomLimit - (hMax * fillRatio);
 
     push();
-    translate(BURETTE_GLASS_X_OFFSET, 0);
+    if (v.type === 'burette') translate(BURETTE_GLASS_X_OFFSET, 0);
 
     // Main Column (Capped at top rim)
     fill(r, g, b, 160);
@@ -1754,7 +1826,8 @@ function drawControlsPanel() {
   text('SPACE      : Titrate into Flask', x + 15, startY + 44);
   text('D Key      : Add Indicator Drop', x + 15, startY + 66);
   text('R / T      : Remove / Tare', x + 15, startY + 88);
-  text('W (Hold)   : Swirl Flask', x + 15, startY + 110); // NEW
+  text('W (Hold)   : Swirl Flask', x + 15, startY + 110);
+  text('↑ / ↓      : Tilt / Adjust Height', x + 15, startY + 132);
 }
 
 function drawClearShelfButton() {
@@ -1971,8 +2044,15 @@ function mousePressed() {
 
 function mouseDragged() {
   if (isDragging) {
-    isDragging.x = mouseX;
-    isDragging.y = mouseY;
+    if (isDragging.mountedTo) {
+      // Manual sliding removed for keyboard keys: [ and ]
+      // isDragging.clampOffset = constrain(mouseY - stand.y, -stand.h * 0.5, stand.h * 0.3);
+      // isDragging.y = stand.y + isDragging.clampOffset;
+      // isDragging.x = stand.x - stand.w * 0.12; 
+    } else {
+      isDragging.x = mouseX;
+      isDragging.y = mouseY;
+    }
     isDragging.vy = 0;
   }
 }
@@ -1987,7 +2067,7 @@ function mouseReleased() {
         const snapDist = dist(isDragging.x, isDragging.y, burette.x + BURETTE_GLASS_X_OFFSET, burette.y - burette.h * 0.46);
         if (snapDist < 50) {
           isDragging.x = burette.x + BURETTE_GLASS_X_OFFSET; // Snaps to glass
-          isDragging.y = burette.y - burette.h * 0.51;
+          isDragging.y = burette.y - burette.h * 0.58; // Higher (0.58 instead of 0.51)
           isDragging.isAttachedTo = burette.id;
           burette.hasFunnel = true;
           return;
@@ -2012,16 +2092,56 @@ function mouseReleased() {
     }
 
     isDragging.dragging = false;
+
+    // 3. COMMON STAND MOUNTING
+    if (isDragging.type === 'burette_tube') {
+      const stand = Object.values(vessels).find(s => s.type === 'common_stand' && dist(isDragging.x, isDragging.y, s.x - s.w * 0.18, s.y) < 60);
+      if (stand) {
+        isDragging.mountedTo = stand.id;
+        isDragging.clampOffset = constrain(isDragging.y - stand.y, -stand.h * 0.5, stand.h * 0.3);
+        isDragging.x = stand.x - stand.w * 0.18;
+        console.log("Tube mounted to stand");
+      }
+    }
+
+    // 4. BURETTE TUBE SNAPPING (Funnel/Flask)
+    if (isDragging.type === 'funnel' || isDragging.type === 'beaker' || isDragging.type === 'conical_flask') {
+      const tube = Object.values(vessels).find(v => v.type === 'burette_tube' && v.mountedTo);
+      if (tube) {
+        if (isDragging.type === 'funnel') {
+          const snapDist = dist(isDragging.x, isDragging.y, tube.x, tube.y - tube.h * 0.46);
+          if (snapDist < 50) {
+            isDragging.x = tube.x;
+            isDragging.y = tube.y - tube.h * 0.58; // Higher (0.58 instead of 0.51)
+            isDragging.isAttachedTo = tube.id;
+            tube.hasFunnel = true;
+            return;
+          }
+        } else {
+          const snapDist = dist(isDragging.x, isDragging.y, tube.x, tube.y + tube.h * 0.4);
+          if (snapDist < 70) {
+            isDragging.x = tube.x;
+            isDragging.y = tube.y + tube.h * 0.4 + isDragging.h / 2;
+            isDragging.vy = 0;
+            isDragging.surface = null;
+          }
+        }
+      }
+    }
+
     isDragging = null;
   }
 }
 
 function handleBuretteDrainage() {
   if (!keyIsDown(83)) return;
-  const b = Object.values(vessels).find(v => v.type === 'burette');
+  const b = Object.values(vessels).find(v => (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)));
   if (!b || b.targetVolume <= 0) return;
 
-  const waste = Object.values(vessels).find(v => v.type === 'beaker' && dist(v.x, v.y, b.x, b.y + 150) < 80);
+  const snapX = b.type === 'burette' ? (b.x + BURETTE_GLASS_X_OFFSET) : b.x;
+  const dripTipY = b.type === 'burette' ? (b.y + 120) : (b.y + b.h * 0.4);
+
+  const waste = Object.values(vessels).find(v => (v.type === 'beaker' || v.type === 'conical_flask') && dist(v.x, v.y, snapX, dripTipY) < 80);
   let rate = keyIsDown(SHIFT) ? 0.2 : 0.01;
   let amt = rate * (deltaTime / 100);
 
@@ -2093,28 +2213,38 @@ function keyPressed() {
   // For continuous titration, the logic below is better placed in the draw() loop 
   // using keyIsDown(32), but here is the corrected logic for Phase 1:
   if (key === ' ' || keyCode === 32) {
-    const burette = Object.values(vessels).find(v => v.type === 'burette');
+    const burette = Object.values(vessels).find(v => (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)));
+    if (!burette) return;
+    const snapX = burette.type === 'burette' ? (burette.x + BURETTE_GLASS_X_OFFSET) : burette.x;
+    const dripTipY = burette.type === 'burette' ? (burette.y + 120) : (burette.y + burette.h * 0.4);
+
     const receiver = Object.values(vessels).find(v =>
       (v.type === 'conical_flask' || v.type === 'beaker') &&
-      dist(v.x, v.y, burette.x - 45, burette.y + 120) < 80
+      dist(v.x, v.y, snapX, dripTipY) < 80
     );
 
     if (burette && receiver) {
+      const distY = abs(dripTipY - receiver.y);
+      const isTooHigh = distY > 160;
+
       const flow = keyIsDown(SHIFT) ? 0.4 : 0.1; // Slower for precision
       if (burette.targetVolume >= flow && receiver.targetVolume < receiver.capacity) {
         burette.targetVolume -= flow;
-        receiver.targetVolume += flow;
-        studentVolume += flow;
 
-        // --- THE BRAIN FIX ---
-        // Record the HCl entering the flask for the color math
-        receiver.contents.hcl_vol += flow;
-
-        // ADD TURBULENCE (Titration Ripples) - VERY SUBTLE
-        receiver.turbulence = min((receiver.turbulence || 0) + 0.3, 2);
+        if (isTooHigh) {
+          // Spilling logic
+          manager.addPenalty("spilling", 5, "Burette tip is too high above the flask, causing liquid spill.");
+          createParticles(snapX, dripTipY, 2, 'drip');
+          // Liquid is lost, not added to receiver
+        } else {
+          receiver.targetVolume += flow;
+          studentVolume += flow;
+          receiver.contents.hcl_vol += flow;
+          receiver.turbulence = min((receiver.turbulence || 0) + 0.3, 2);
+        }
 
         // USE DROPLETS INSTEAD OF STREAM
-        drawDroplets(burette.x - 45, burette.y + 110, receiver.x, receiver.y - 15, color(255, 160, 100));
+        drawDroplets(snapX, dripTipY - 10, receiver.x, receiver.y - 15, color(255, 160, 100));
       }
     }
   }
@@ -2124,11 +2254,11 @@ function keyPressed() {
 function handleBuretteFilling() {
   if (!isDragging || isDragging.type !== 'bottle') return;
 
-  const burette = Object.values(vessels).find(v => v.type === 'burette');
+  const burette = Object.values(vessels).find(v => (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)));
   if (!burette) return;
 
   // Align target with the glass tube instead of the stand rod
-  const buretteTopX = burette.x + BURETTE_GLASS_X_OFFSET;
+  const buretteTopX = burette.type === 'burette' ? (burette.x + BURETTE_GLASS_X_OFFSET) : burette.x;
   const buretteTopY = burette.y - (burette.h * 0.46);
   const distance = dist(mouseX, mouseY, buretteTopX, buretteTopY);
 
@@ -2192,7 +2322,8 @@ function mouseWheel(event) {
 
 function drawBuretteZoom(v) {
   // Common coordinates relative to burette
-  const zoomX = v.x + 180;
+  const snapX = v.type === 'burette' ? (v.x + BURETTE_GLASS_X_OFFSET) : v.x;
+  const zoomX = snapX + 180;
   const zoomY = v.y - 140;
   const zoomSize = 140;
 
@@ -2200,7 +2331,7 @@ function drawBuretteZoom(v) {
   if (userClosedZoom) {
     push();
     // Positioned right next to the burette tube for easy access
-    const iconX = v.x + 35;
+    const iconX = snapX + 35;
     const iconY = v.y - 120;
     translate(iconX, iconY);
 
@@ -2349,6 +2480,25 @@ function spawnApparatusFromCatalog(item) {
   else if (type === 'conical_flask') {
     v = makeResponsiveVessel(nextId('conical_flask'), 'conical_flask');
     if (v) v.title = 'Conical Flask';
+  }
+  else if (type === 'burette_tube') {
+    const cap = askCapacity('burette') || 50;
+    v = makeResponsiveVessel(nextId('burette_tube'), 'burette_tube');
+    if (v) {
+      v.capacity = cap;
+      v.title = `${cap} mL Burette Tube`;
+      v.targetVolume = 0;
+      v.isBurette = true; // Flag for shared logic
+      v.mountedTo = null;
+      v.clampOffset = 0; // Vertical offset from clamp
+    }
+  }
+  else if (type === 'common_stand') {
+    v = makeResponsiveVessel(nextId('common_stand'), 'common_stand');
+    if (v) {
+      v.title = 'Common Stand';
+      v.y -= 40; // Spawn slightly higher on the table
+    }
   }
   else if (type === 'bottle') {
     const chem = askChemical('base'); // Default to base for titration
