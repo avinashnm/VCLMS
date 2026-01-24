@@ -1002,8 +1002,8 @@ function drawParticles() {
 function easeVolumes() {
   Object.values(vessels).forEach(v => {
     if (v.targetVolume !== undefined) {
-      // Allow burette to overfill by 2mL logically
-      let maxCap = (v.type === 'burette') ? v.capacity + 4 : v.capacity;
+      // Allow burette to overfill by 5mL realistically
+      let maxCap = (v.type === 'burette' || v.type === 'burette_tube') ? v.capacity + 5 : v.capacity;
       v.targetVolume = constrain(v.targetVolume, 0, maxCap);
 
       v.volume = lerp(v.volume, v.targetVolume, 0.15);
@@ -1613,11 +1613,10 @@ function drawRealisticLiquid(v, col) {
     push();
     if (v.type === 'burette') translate(BURETTE_GLASS_X_OFFSET, 0);
 
-    // Main Column (Capped at top rim)
+    // Main Column (Realistically uncapped so it can rise above 0 mark)
     fill(r, g, b, 160);
     noStroke();
-    let renderTopY = max(topY, topRim);
-    rect(-tubeWidth / 2, renderTopY, tubeWidth, bottomLimit - renderTopY);
+    rect(-tubeWidth / 2, topY, tubeWidth, bottomLimit - topY);
 
     // Tapered Bottom Tip
     beginShape();
@@ -1626,8 +1625,8 @@ function drawRealisticLiquid(v, col) {
     vertex(0, bottomLimit + 10);
     endShape(CLOSE);
 
-    // Surface Meniscus
-    if (topY > topRim) {
+    // Surface Meniscus (Always show if above bottom)
+    if (topY < bottomLimit) {
       fill(r, g, b, 255);
       ellipse(0, topY, tubeWidth, 3);
     }
@@ -2227,10 +2226,8 @@ function handleBuretteDrainage() {
     waste.targetVolume += amt;
     waste.turbulence = min((waste.turbulence || 0) + 1, 3); // Ripples in waste beaker
     b.hint = "Draining into Beaker";
-    createParticles(snapX, dripTipY, 2, 'drip');
   } else {
     // If no waste container, still show drainage (spilling to bench)
-    createParticles(snapX, dripTipY, 2, 'drip');
     b.hint = "Draining (Waste)";
   }
 }
@@ -2374,8 +2371,8 @@ function handleBuretteFilling() {
     let actualFlow = flowRate * (deltaTime / 60);
 
     if (flowRate > 0 && isDragging.targetVolume > 0) {
-      // NEW: Allow filling up to 2mL past capacity so student can make mistakes
-      if (burette.targetVolume < burette.capacity + 2) {
+      // NEW: Allow filling up to 5mL past capacity (Realistic mistake zone)
+      if (burette.targetVolume < burette.capacity + 5) {
 
         burette.targetVolume += actualFlow;
         isDragging.targetVolume -= actualFlow;
@@ -2497,8 +2494,11 @@ function drawBuretteZoom(v) {
   fill(255); textAlign(CENTER); textSize(11);
   text(`V: ${nf(reading, 1, 2)} mL`, zoomX, zoomY + zoomSize / 2 + 22);
 
-  if (v.volume > v.capacity) {
-    fill(255, 50, 50); textStyle(BOLD);
+  if (v.volume > v.capacity + 0.1) {
+    // DRAMATIC FLASHING WARNING
+    let flash = sin(frameCount * 0.2) > 0;
+    fill(255, flash ? 50 : 0, flash ? 50 : 0);
+    textStyle(BOLD); textSize(13);
     text("⚠️ OVERFILLED", zoomX, zoomY + zoomSize / 2 + 54);
     textStyle(NORMAL);
   }
