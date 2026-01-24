@@ -73,9 +73,8 @@ class MarkingManager {
   // This MUST be called inside the p5.js draw() loop
   update() {
     const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-    const burette = Object.values(vessels).find(v => v.type === 'burette');
-
     // --- 1. BURETTE TASKS ---
+    const burette = Object.values(vessels).find(v => (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)));
     if (burette) {
       // Check: Fill Burette (Minimum 20mL to start)
       if (burette.targetVolume > 24) {
@@ -83,15 +82,20 @@ class MarkingManager {
       }
 
       // Check: Zero Burette (Meniscus at 0.00)
-      let reading = abs(burette.capacity - burette.volume);
-      if (this.completedIds.has("fill_burette") && reading < 0.2) {
+      let reading = abs(burette.capacity - burette.targetVolume); // Use targetVolume for precision
+      if (this.completedIds.has("fill_burette") && reading < 0.1) {
         this.completeMilestone("zero_burette");
       }
 
       // Penalty: Titrating without Zeroing
-      if (keyIsDown(32) && flask && dist(flask.x, flask.y, burette.x - 45, burette.y + 120) < 80) {
-        if (!this.completedIds.has("zero_burette") && reading > 0.5) {
-          this.addPenalty("no_zeroing", 15, "Titrating without zeroing the burette first.");
+      if (keyIsDown(32) && flask) {
+        const snapX = burette.type === 'burette' ? (burette.x + BURETTE_GLASS_X_OFFSET) : burette.x;
+        const dripTipY = burette.type === 'burette' ? (burette.y + 120) : (burette.y + burette.h * 0.4);
+
+        if (dist(flask.x, flask.y, snapX, dripTipY) < 100) {
+          if (!this.completedIds.has("zero_burette") && reading > 0.3) {
+            this.addPenalty("no_zeroing", 15, "Titrating without zeroing the burette first.");
+          }
         }
       }
 
@@ -864,9 +868,9 @@ function applyLabPhysics(v) {
   if (burette && (v.type === 'conical_flask' || v.type === 'beaker')) {
     const snapX = burette.x + BURETTE_GLASS_X_OFFSET;
     // snapY should be the surface the burette is sitting on
-    const snapY = burette.surface ? burette.surface.y : (burette.y + burette.h / 2);
+    const snapY = burette.surface ? burette.surface.y : (labSurfaces?.table?.y || 335);
 
-    if (dist(v.x, v.y + v.h / 2, snapX, snapY) < 50) {
+    if (!v.dragging && dist(v.x, v.y + v.h / 2, snapX, snapY) < 50) {
       v.x = lerp(v.x, snapX, 0.3);
       v.y = lerp(v.y, snapY - v.h / 2, 0.3);
       v.vy = 0;
@@ -1085,21 +1089,40 @@ function drawSnapGuides() {
 
 }
 
-function drawTitrationZone() {
-  const burette = Object.values(vessels).find(v => (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)));
-  if (!burette || isDragging) return;
+// Helper to determine if burette is correctly positioned
+function getBuretteHeightStatus(burette) {
+  if (!burette) return { isTooLow: false, isTooHigh: false, receiver: null };
 
   const snapX = burette.type === 'burette' ? (burette.x + BURETTE_GLASS_X_OFFSET) : burette.x;
   const dripTipY = burette.type === 'burette' ? (burette.y + 120) : (burette.y + burette.h * 0.4);
 
-  // FIXED: Reference the correct tabletop coordinate (72% height)
-  const snapY = height * 0.72;
+  // Use official tabletop surface
+  const snapY = labSurfaces?.table?.y || (height * 0.48);
 
   const receiver = Object.values(vessels).find(v =>
     (v.type === 'beaker' || v.type === 'conical_flask') && dist(v.x, v.y + v.h / 2, snapX, snapY) < 70
   );
 
-  const isTooLow = dripTipY > snapY - 80; // Clearance check (~80px from bench)
+  if (!receiver) {
+    // Basic clearance against bench
+    return { isTooLow: dripTipY > snapY - 40, isTooHigh: false, receiver: null, snapX, snapY, dripTipY };
+  } else {
+    const receiverTopY = receiver.y - receiver.h / 2;
+    return {
+      isTooLow: dripTipY > receiverTopY - 5,    // Less than 5px above rim
+      isTooHigh: dripTipY < receiverTopY - 120, // More than 120px above rim
+      receiver: receiver,
+      snapX, snapY, dripTipY
+    };
+  }
+}
+
+function drawTitrationZone() {
+  const burette = Object.values(vessels).find(v => (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)));
+  if (!burette || isDragging) return;
+
+  const status = getBuretteHeightStatus(burette);
+  const { isTooLow, isTooHigh, receiver, snapX, snapY, dripTipY } = status;
 
   if (!receiver) {
     if (isTooLow) {
@@ -1109,23 +1132,23 @@ function drawTitrationZone() {
       pop();
     } else {
       push();
-      noFill();
-      stroke(100, 255, 100, 150);
-      strokeWeight(2);
-      // Draw the circle exactly on the bench surface
-      ellipse(snapX, snapY - 5, 60, 20);
-
+      noFill(); stroke(100, 255, 100, 150); strokeWeight(2);
+      // Draw the guide on the actual bench surface
+      ellipse(snapX, snapY - 2, 60, 15);
       fill(100, 255, 100); noStroke(); textAlign(CENTER); textSize(10);
-      text('PLACE FLASK', snapX, snapY - 20);
+      text('PLACE FLASK', snapX, snapY - 15);
       pop();
     }
   } else {
-    // Check if the tip is too high
-    const distY = abs(dripTipY - receiver.y + receiver.h / 2); // Distance from tip to flask top
-    if (distY > 150) { // Very forgiving gap of 150px
+    if (isTooLow) {
+      push();
+      fill(255, 100, 100); noStroke(); textAlign(CENTER); textSize(12); textStyle(BOLD);
+      text('⚠️ TOO LOW - MOVE UP', snapX, dripTipY - 30);
+      pop();
+    } else if (isTooHigh) {
       push();
       fill(255, 50, 50); noStroke(); textAlign(CENTER); textSize(12); textStyle(BOLD);
-      text('⚠️ TIP TOO HIGH - WILL SPILL', snapX, dripTipY - 30);
+      text('⚠️ TOO HIGH - WILL SPILL', snapX, dripTipY - 40);
       pop();
     }
   }
@@ -1336,7 +1359,13 @@ function drawVessel(v) {
       push(); fill(255, 0, 0); noStroke(); circle(0, v.h * 0.35, 5); pop();
       v.hint = "Stopcock Open";
     } else if (v.mountedTo) {
-      v.hint = "Hover & Press ↑ / ↓ to Adjust Height";
+      // CONTEXTUAL HINT: Only show if adjustment is needed
+      const status = getBuretteHeightStatus(v);
+      if (status.isTooLow || status.isTooHigh) {
+        v.hint = "Press ↑ / ↓ to Adjust Height";
+      } else {
+        v.hint = ""; // Hide hint if in good position
+      }
     }
     drawRealisticLiquid(v, v.color || color(255, 160, 100));
     pop();
@@ -2005,13 +2034,16 @@ function mousePressed() {
     }
   }
   // --- CHECK CLOSE ZOOM BUTTON (Synced with new Top-Right position) ---
-  const burette = Object.values(vessels).find(v => v.type === 'burette');
+  const burette = Object.values(vessels).find(v => (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)));
 
   if (burette) {
+    const snapX = burette.type === 'burette' ? (burette.x + BURETTE_GLASS_X_OFFSET) : burette.x;
+    const fixedZoomY = height * 0.25; // FIXED HEIGHT
+
     if (userClosedZoom) {
       // --- LOGIC TO OPEN (Circular Detection) ---
-      const iconX = burette.x + 35;
-      const iconY = burette.y - 120;
+      const iconX = snapX + 60;
+      const iconY = fixedZoomY + 20; // Fixed relative to zoom region
 
       if (dist(mouseX, mouseY, iconX, iconY) < 18) {
         userClosedZoom = false;
@@ -2019,9 +2051,9 @@ function mousePressed() {
         return;
       }
     } else {
-      // --- LOGIC TO CLOSE (Matches Draw Function) ---
-      const zoomX = burette.x + 180;
-      const zoomY = burette.y - 140;
+      // --- LOGIC TO CLOSE (Matches Fixed Draw Function) ---
+      const zoomX = snapX + 180;
+      const zoomY = fixedZoomY;
       const closeBtnX = zoomX + 65;
       const closeBtnY = zoomY - 65;
 
@@ -2109,7 +2141,7 @@ function mouseReleased() {
         // ALIGNMENT FIX: Snaps exactly under the glass tube offset
         const snapX = burette.x + BURETTE_GLASS_X_OFFSET;
         const dripTipY = burette.y + 120;
-        const snapY = height * 0.72;
+        const snapY = labSurfaces?.table?.y || (height * 0.72);
 
         if (dist(isDragging.x, isDragging.y, snapX, dripTipY) < 70 && dripTipY <= snapY - 80) {
           isDragging.x = snapX;
@@ -2117,6 +2149,12 @@ function mouseReleased() {
           isDragging.vy = 0;
           isDragging.surface = { y: snapY };
           console.log("Receiver locked below tube");
+        } else if (dist(isDragging.x, isDragging.y, snapX, dripTipY) < 70) {
+          // FALLBACK: If near but too low, still snap to bench surface
+          isDragging.y = snapY - isDragging.h / 2;
+          isDragging.vy = 0;
+          isDragging.surface = { y: snapY };
+          console.log("Burette too low: Receiver forced to bench");
         }
       }
     }
@@ -2148,7 +2186,7 @@ function mouseReleased() {
             return;
           }
         } else {
-          const snapY = height * 0.72;
+          const snapY = labSurfaces?.table?.y || (height * 0.72);
           const snapDist = dist(isDragging.x, isDragging.y, tube.x, tube.y + tube.h * 0.4);
           const dripTipY = tube.y + tube.h * 0.4;
 
@@ -2157,6 +2195,12 @@ function mouseReleased() {
             isDragging.y = snapY - isDragging.h / 2;
             isDragging.vy = 0;
             isDragging.surface = { y: snapY };
+          } else if (snapDist < 70) {
+            // FALLBACK: If near but too low, still snap to bench surface
+            isDragging.y = snapY - isDragging.h / 2;
+            isDragging.vy = 0;
+            isDragging.surface = { y: snapY };
+            console.log("Burette tube too low: Receiver forced to bench");
           }
         }
       }
@@ -2183,6 +2227,11 @@ function handleBuretteDrainage() {
     waste.targetVolume += amt;
     waste.turbulence = min((waste.turbulence || 0) + 1, 3); // Ripples in waste beaker
     b.hint = "Draining into Beaker";
+    createParticles(snapX, dripTipY, 2, 'drip');
+  } else {
+    // If no waste container, still show drainage (spilling to bench)
+    createParticles(snapX, dripTipY, 2, 'drip');
+    b.hint = "Draining (Waste)";
   }
 }
 
@@ -2248,17 +2297,18 @@ function keyPressed() {
   if (key === ' ' || keyCode === 32) {
     const burette = Object.values(vessels).find(v => (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)));
     if (!burette) return;
-    const snapX = burette.type === 'burette' ? (burette.x + BURETTE_GLASS_X_OFFSET) : burette.x;
-    const dripTipY = burette.type === 'burette' ? (burette.y + 120) : (burette.y + burette.h * 0.4);
 
-    const receiver = Object.values(vessels).find(v =>
-      (v.type === 'conical_flask' || v.type === 'beaker') &&
-      dist(v.x, v.y, snapX, dripTipY) < 80
-    );
+    const status = getBuretteHeightStatus(burette);
+    const { isTooHigh, isTooLow, snapX, dripTipY, receiver } = status;
 
-    if (burette && receiver) {
-      const distY = abs(dripTipY - receiver.y + receiver.h / 2); // Distance from tip to flask top
-      const isTooHigh = distY > 150; // Very forgiving gap of 150px
+    if (receiver) {
+      if (isTooLow) {
+        // BLOCK TITRATION AND EJECT
+        receiver.x += 120; // Forcefully push aside
+        receiver.vy = 0;
+        console.log("BLOCK: Burette too low to titrate. Ejecting flask.");
+        return;
+      }
 
       const flow = keyIsDown(SHIFT) ? 0.4 : 0.1; // Slower for precision
       if (burette.targetVolume >= flow && receiver.targetVolume < receiver.capacity) {
@@ -2303,7 +2353,7 @@ function handleBuretteFilling() {
     }
 
     // 2. Hint Logic (Dynamic based on volume)
-    if (burette.targetVolume > burette.capacity) {
+    if (burette.targetVolume > burette.capacity + 0.05) {
       isDragging.hint = "⚠️ OVERFILLED! Drain to 0.00 using 'S'";
     } else {
       isDragging.hint = "Arrows ↑/↓ to Tilt & Pour";
@@ -2354,18 +2404,18 @@ function mouseWheel(event) {
 }
 
 function drawBuretteZoom(v) {
-  // Common coordinates relative to burette
+  // FIXED COORDINATES: Zoom view stays at top section of the screen
   const snapX = v.type === 'burette' ? (v.x + BURETTE_GLASS_X_OFFSET) : v.x;
   const zoomX = snapX + 180;
-  const zoomY = v.y - 140;
+  const zoomY = height * 0.25; // FIXED VERTICAL POSITION
   const zoomSize = 140;
 
   // --- MINIMIZED STATE: Show "Open Zoom" Button ---
   if (userClosedZoom) {
     push();
-    // Positioned right next to the burette tube for easy access
-    const iconX = snapX + 35;
-    const iconY = v.y - 120;
+    // Positioned to the right of the burette tube
+    const iconX = snapX + 60;
+    const iconY = zoomY + 20; // Fixed relative to zoom region
     translate(iconX, iconY);
 
     // 1. Subtle Shadow
