@@ -21,7 +21,6 @@ class LabCatalog {
         { id: 'volumetric_flask', name: 'Vol. Flask', spriteKey: 'volumetric_flask' }
       ],
       titration: [       // Precision titration apparatus
-        { id: 'burette', name: 'Burette', spriteKey: 'burette' },
         { id: 'burette_tube', name: 'Burette Tube', spriteKey: 'burette_tube' },
         { id: 'common_stand', name: 'Common Stand', spriteKey: 'common_stand' },
         { id: 'conical_flask', name: 'Conical Flask', spriteKey: 'conical_flask' }
