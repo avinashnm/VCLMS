@@ -1110,7 +1110,7 @@ function getBuretteHeightStatus(burette) {
     const receiverTopY = receiver.y - receiver.h / 2;
     return {
       isTooLow: dripTipY > receiverTopY - 5,    // Less than 5px above rim
-      isTooHigh: dripTipY < receiverTopY - 120, // More than 120px above rim
+      isTooHigh: dripTipY < receiverTopY - 80, // More than 80px above rim
       receiver: receiver,
       snapX, snapY, dripTipY
     };
@@ -1216,11 +1216,11 @@ function draw() {
     if (stand && !isPouring) {
       let moved = false;
       if (keyIsDown(UP_ARROW)) {
-        hoverVessel.clampOffset = constrain(hoverVessel.clampOffset - 3, -stand.h * 0.55, stand.h * 0.35);
+        hoverVessel.clampOffset = constrain(hoverVessel.clampOffset - 3, -stand.h * 0.45, stand.h * 0.25);
         moved = true;
       }
       if (keyIsDown(DOWN_ARROW)) {
-        hoverVessel.clampOffset = constrain(hoverVessel.clampOffset + 3, -stand.h * 0.55, stand.h * 0.35);
+        hoverVessel.clampOffset = constrain(hoverVessel.clampOffset + 3, -stand.h * 0.45, stand.h * 0.25);
         moved = true;
       }
 
@@ -2165,7 +2165,7 @@ function mouseReleased() {
       const stand = Object.values(vessels).find(s => s.type === 'common_stand' && dist(isDragging.x, isDragging.y, s.x - s.w * 0.18, s.y) < 60);
       if (stand) {
         isDragging.mountedTo = stand.id;
-        isDragging.clampOffset = constrain(isDragging.y - stand.y, -stand.h * 0.5, stand.h * 0.3);
+        isDragging.clampOffset = constrain(isDragging.y - stand.y, -stand.h * 0.45, stand.h * 0.25);
         isDragging.x = stand.x - stand.w * 0.18;
         console.log("Tube mounted to stand");
       }
