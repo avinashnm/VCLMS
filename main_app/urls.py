@@ -112,6 +112,10 @@ path('watch/<int:course_id>/', hod_views.watch_video, name='watch_video'),
  path('student/video_courses/',student_views.video_course_lists,name='video_courses'),
 path('student/watch/<int:course_id>/', student_views.watch_video, name='watch_video'),
 
+    # Experiment Creation Module
+    path('experiment/add/', hod_views.add_experiment, name='add_experiment'),
+    path('experiment/manage/', hod_views.manage_experiments, name='manage_experiments'),
+
     # Staff
     path("staff/home/", staff_views.staff_home, name='staff_home'),
     path("staff/apply/leave/", staff_views.staff_apply_leave,

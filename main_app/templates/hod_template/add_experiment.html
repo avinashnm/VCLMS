@@ -1,0 +1,183 @@
+{% extends 'main_app/base.html' %}
+{% load static %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card card-primary">
+                    <div class="card-header">
+                        <h3 class="card-title">Add Virtual Lab Experiment</h3>
+                    </div>
+
+                    <form role="form" method="POST" action="{% url 'add_experiment' %}">
+                        {% csrf_token %}
+                        <div class="card-body">
+                            <!-- Basic Info -->
+                            <h4 class="text-primary mt-3 mb-3">Basic Information</h4>
+                            <div class="form-group">
+                                <label>Experiment Title</label>
+                                {{ form.title }}
+                            </div>
+                            <div class="form-group">
+                                <label>URL Slug (e.g., simple-titration)</label>
+                                {{ form.slug }}
+                            </div>
+                            <div class="form-group">
+                                <label>Objective</label>
+                                {{ form.objective }}
+                            </div>
+                            <div class="form-group">
+                                <label>Principle</label>
+                                {{ form.principle }}
+                            </div>
+                            <div class="form-group">
+                                <label>Experiment Type</label>
+                                {{ form.type }}
+                                <small class="text-muted">Currently supported types: 'double_indicator',
+                                    'simple_titration', 'rast'</small>
+                            </div>
+
+                            <hr>
+
+                            <!-- Materials -->
+                            <h4 class="text-primary mt-4 mb-3">Materials Required</h4>
+                            <div id="materials-container">
+                                <div class="material-row form-inline mb-2">
+                                    <input type="text" class="form-control mr-2" style="width: 80%;" name="material-0"
+                                        placeholder="e.g., 250ml Beaker">
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2"
+                                onclick="addMaterial()">+ Add Material</button>
+
+                            <hr>
+
+                            <!-- Procedure Steps -->
+                            <h4 class="text-primary mt-4 mb-3">Procedure Steps</h4>
+                            <div id="steps-container">
+                                <div class="step-row mb-2">
+                                    <div class="input-group">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text">Step 1</span>
+                                        </div>
+                                        <input type="text" class="form-control" name="step-0"
+                                            placeholder="Describe this step...">
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" onclick="addStep()">+
+                                Add Step</button>
+
+                            <hr>
+
+                            <!-- Assessment Milestones -->
+                            <h4 class="text-primary mt-4 mb-3">Assessment Milestones</h4>
+                            <p class="text-muted small mb-3">Define the actions a student must take in the simulation to
+                                score points.</p>
+
+                            <div id="milestones-container">
+                                <div class="milestone-row form-row mb-2">
+                                    <div class="col-md-3">
+                                        <input type="text" class="form-control" name="milestone-id-0"
+                                            placeholder="ID (e.g., fill_burette)">
+                                    </div>
+                                    <div class="col-md-7">
+                                        <input type="text" class="form-control" name="milestone-desc-0"
+                                            placeholder="Description shown to student">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="number" class="form-control" name="milestone-pts-0"
+                                            placeholder="Points (e.g., 10)">
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2"
+                                onclick="addMilestone()">+ Add Milestone</button>
+
+                            <br><br>
+                            <div class="form-group mt-4">
+                                {% if messages %}
+                                {% for message in messages %}
+                                {% if message.tags == 'error' %}
+                                <div class="alert alert-danger">{{ message }}</div>
+                                {% endif %}
+                                {% if message.tags == 'success' %}
+                                <div class="alert alert-success">{{ message }}</div>
+                                {% endif %}
+                                {% endfor %}
+                                {% endif %}
+                            </div>
+
+                        </div>
+
+                        <div class="card-footer">
+                            <button type="submit" class="btn btn-primary btn-block">Create Experiment</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+    let materialCount = 1;
+    function addMaterial() {
+        const container = document.getElementById('materials-container');
+        const count = materialCount++;
+        const html = `
+            <div class="material-row form-inline mb-2">
+                <input type="text" class="form-control mr-2" style="width: 80%;" name="material-${count}" placeholder="Next material...">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.remove()">X</button>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+    }
+
+    let stepCount = 1;
+    function addStep() {
+        const container = document.getElementById('steps-container');
+        const count = stepCount++;
+        const displayNum = count + 1;
+        const html = `
+            <div class="step-row mb-2">
+                <div class="input-group">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text">Step ${displayNum}</span>
+                    </div>
+                    <input type="text" class="form-control" name="step-${count}" placeholder="Describe this step...">
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.parentElement.parentElement.remove()">X</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+    }
+
+    let milestoneCount = 1;
+    function addMilestone() {
+        const container = document.getElementById('milestones-container');
+        const count = milestoneCount++;
+        const html = `
+            <div class="milestone-row form-row mb-2">
+                <div class="col-md-3">
+                    <input type="text" class="form-control" name="milestone-id-${count}" placeholder="ID">
+                </div>
+                <div class="col-md-6">
+                    <input type="text" class="form-control" name="milestone-desc-${count}" placeholder="Description">
+                </div>
+                <div class="col-md-2">
+                    <input type="number" class="form-control" name="milestone-pts-${count}" placeholder="Pts">
+                </div>
+                <div class="col-md-1">
+                    <button type="button" class="btn btn-sm btn-outline-danger btn-block" onclick="this.parentElement.parentElement.remove()">X</button>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+    }
+</script>
+{% endblock content %}

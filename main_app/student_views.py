@@ -772,34 +772,19 @@ def submit_experiment(request):
 
 #virtualLab view
 def student_lab_home(request):
-    experiments = [
-            {
-        "title": "Na₂CO₃–NaHCO₃ Double Indicator",
-        "slug": "double-indicator",
-        "objective": "Estimate sodium carbonate and bicarbonate in a mixture using phenolphthalein and methyl orange.",
-            },
-        {
-            "slug": "rast-method",
-            "title": "Rast Method",
-            "objective": "Determine molecular weight of a solute from freezing-point depression.",
-        },
-        {
-        'slug': 'titration',
-        'title': 'Acid-Base Titration',
-        'objective': 'Determine unknown acid concentration using NaOH titration',
+    # Fetch experiments from DB
+    experiments = LabExperiment.objects.all().order_by('-created_at')
+    
+    # Optional: Keep hardcoded fallbacks if no experiments exist (for testing)
+    if not experiments.exists():
+        experiments = [
+                {
+            "title": "Na₂CO₃–NaHCO₃ Double Indicator (Hardcoded)",
+            "slug": "double-indicator",
+            "objective": "Estimate sodium carbonate and bicarbonate in a mixture using phenolphthalein and methyl orange.",
+                }
+        ]
         
-        },
-        {
-            "slug": "experiment-2",
-            "title": "Experiment 2",
-            "objective": "Placeholder objective for experiment 2.",
-        },
-        {
-            "slug": "experiment-3",
-            "title": "Experiment 3",
-            "objective": "Placeholder objective for experiment 3.",
-        },
-    ]
     return render(request, "student_template/lab_home.html", {"experiments": experiments})
 
 def lab_rast_method(request):
@@ -820,56 +805,55 @@ def lab_rast_method(request):
 
 # shows description/materials/procedure for any experiment
 def lab_experiment_info(request, slug):
-    experiment_map = {
-        "double-indicator": {
-            "name": "Estimation of Na₂CO₃ and NaHCO₃ in a Mixture",
-            "objective": "Estimate sodium carbonate and bicarbonate using double indicator method.",
-            "principle": (
-                "The mixture of Na₂CO₃ and NaHCO₃ is titrated with standard HCl. "
-                "Phenolphthalein gives the volume required to convert CO₃²⁻ to HCO₃⁻ (V₁). "
-                "Methyl orange gives the total neutralisation volume (V₂)."
-            ),
-            "materials": [
-                "Standard N/10 HCl in burette",
-                "Mixture solution (Na₂CO₃ + NaHCO₃)",
-                "20 mL pipette",
-                "Conical flask",
-                "Phenolphthalein indicator",
-                "Methyl orange indicator",
-            ],
-            "procedure": [
-                "Rinse burette with N/10 HCl and fill it. Remove air bubbles.",
-                "Pipette 20 mL of the given mixture into a clean conical flask.",
-                "Add 2–3 drops of phenolphthalein; solution appears pink.",
-                "Titrate with HCl until the pink colour just disappears (phenolphthalein end point, V₁).",
-                "To the same solution add 2–3 drops of methyl orange; solution becomes yellow.",
-                "Continue titration until the colour changes from yellow to orange/red (methyl orange end point, V₂).",
-                "Repeat titration to obtain concordant readings.",
-            ],
-        },
-        "titration": {
-            "name": "Acid-Base Titration",
-            "objective": "Determine unknown acid concentration using NaOH titration.",
-            "principle": "Standard NaOH is titrated against HCl using phenolphthalein as indicator.",
-            "materials": [
-                "0.1 M NaOH in burette",
-                "0.1 M HCl in beaker",
-                "Pipette",
-                "Phenolphthalein indicator",
-            ],
-            "procedure": [
-                "Pipette 25 mL of HCl into a beaker.",
-                "Add 2–3 drops phenolphthalein.",
-                "Fill burette with 0.1 M NaOH.",
-                "Titrate until the first permanent pink colour appears.",
-            ],
-        },
-        # add entries for other experiments as needed
-    }
-
-    experiment = experiment_map.get(slug)
-    if not experiment:
-        raise Http404()
+    # Fetch from database
+    try:
+        experiment_obj = LabExperiment.objects.get(slug=slug)
+        
+        # Format materials and procedure into lists as the template expects
+        materials_list = [mat.name for mat in experiment_obj.materials.all()]
+        procedure_list = [step.description for step in experiment_obj.steps.all().order_by('step_number')]
+        
+        experiment = {
+            "name": experiment_obj.title,
+            "objective": experiment_obj.objective,
+            "principle": experiment_obj.principle,
+            "materials": materials_list,
+            "procedure": procedure_list,
+        }
+        
+    except LabExperiment.DoesNotExist:
+        # Fallback for old hardcoded URLs if they somehow persist
+        experiment_map = {
+            "double-indicator": {
+                "name": "Estimation of Na₂CO₃ and NaHCO₃ in a Mixture",
+                "objective": "Estimate sodium carbonate and bicarbonate using double indicator method.",
+                "principle": (
+                    "The mixture of Na₂CO₃ and NaHCO₃ is titrated with standard HCl. "
+                    "Phenolphthalein gives the volume required to convert CO₃²⁻ to HCO₃⁻ (V₁). "
+                    "Methyl orange gives the total neutralisation volume (V₂)."
+                ),
+                "materials": [
+                    "Standard N/10 HCl in burette",
+                    "Mixture solution (Na₂CO₃ + NaHCO₃)",
+                    "20 mL pipette",
+                    "Conical flask",
+                    "Phenolphthalein indicator",
+                    "Methyl orange indicator",
+                ],
+                "procedure": [
+                    "Rinse burette with N/10 HCl and fill it. Remove air bubbles.",
+                    "Pipette 20 mL of the given mixture into a clean conical flask.",
+                    "Add 2–3 drops of phenolphthalein; solution appears pink.",
+                    "Titrate with HCl until the pink colour just disappears (phenolphthalein end point, V₁).",
+                    "To the same solution add 2–3 drops of methyl orange; solution becomes yellow.",
+                    "Continue titration until the colour changes from yellow to orange/red (methyl orange end point, V₂).",
+                    "Repeat titration to obtain concordant readings.",
+                ],
+            },
+        }
+        experiment = experiment_map.get(slug)
+        if not experiment:
+            raise Http404()
 
     return render(
         request,
@@ -879,59 +863,66 @@ def lab_experiment_info(request, slug):
 
 
 def lab_experiment_simulation(request, slug):
-    # Per‑experiment configuration (can move to DB later)
-    experiment_map = {
-        "double-indicator": {
-            "name": "Estimation of Na₂CO₃ and NaHCO₃ in a Mixture",
-            "objective": "Estimate sodium carbonate and bicarbonate using double indicator method.",
-            "type": "double_indicator",
-            # THE BRAIN: Define marks and success steps here
-           "milestones": [
-    {"id": "fill_burette", "desc": "Fill burette with HCl", "points": 10},
-    {"id": "zero_burette", "desc": "Adjust to 0.00 mL mark", "points": 10},
-    {"id": "pipette_mixture", "desc": "Pipette 20mL of analyte", "points": 10},
-    {"id": "add_pp", "desc": "Add Phenolphthalein", "points": 5},
-    {"id": "reach_v1", "desc": "Enter V1 Observation", "points": 15},
-    {"id": "add_mo", "desc": "Add Methyl Orange", "points": 5},
-    {"id": "reach_v2", "desc": "Enter V2 Observation", "points": 20},
-    {"id": "submit_calc", "desc": "Submit Final Calculations", "points": 25}, # Significant points for math
-],
-            # THE SECRET TARGETS: Unique for every student session
-            "targets": {
-                "v1": round(random.uniform(9.5, 11.5), 2),  # Random V1 target
-                "v2": round(random.uniform(23.0, 27.0), 2), # Random V2 target
+    try:
+        experiment_obj = LabExperiment.objects.get(slug=slug)
+        
+        milestones_list = [
+            {"id": ms.milestone_id, "desc": ms.description, "points": ms.points}
+            for ms in experiment_obj.milestones.all()
+        ]
+        
+        targets = {}
+        if hasattr(experiment_obj, 'target_config') and experiment_obj.target_config:
+            cfg = experiment_obj.target_config
+            targets = {
+                "v1": round(random.uniform(cfg.v1_min, cfg.v1_max), 2),
+                "v2": round(random.uniform(cfg.v2_min, cfg.v2_max), 2)
             }
-        },
-        "titration": {
-            "name": "Acid-Base Titration",
-            "objective": "Determine unknown acid concentration using NaOH titration.",
-            "type": "simple_titration",
-        },
-        "experiment-2": {
-            "name": "Experiment 2",
-            "objective": "Placeholder objective for experiment 2.",
-            "type": "placeholder",
-        },
-        "experiment-3": {
-            "name": "Experiment 3",
-            "objective": "Placeholder objective for experiment 3.",
-            "type": "placeholder",
-        },
-        "rast-method": {
-            "name": "Rast Method",
-            "objective": "Determine molecular weight of a solute from freezing-point depression.",
-            "type": "rast",
-        },
-    }
-
-    experiment_data = experiment_map.get(slug)
-    if not experiment_data:
-        raise Http404()
+        else:
+            # Fallback targets if no config is set
+            targets = {
+                "v1": round(random.uniform(9.5, 11.5), 2),
+                "v2": round(random.uniform(23.0, 27.0), 2)
+            }
+            
+        experiment_data = {
+            "name": experiment_obj.title,
+            "objective": experiment_obj.objective,
+            "type": experiment_obj.type,
+            "milestones": milestones_list,
+            "targets": targets
+        }
+        
+    except LabExperiment.DoesNotExist:
+        # Per‑experiment configuration fallback for old paths
+        experiment_map = {
+            "double-indicator": {
+                "name": "Estimation of Na₂CO₃ and NaHCO₃ in a Mixture",
+                "objective": "Estimate sodium carbonate and bicarbonate using double indicator method.",
+                "type": "double_indicator",
+               "milestones": [
+        {"id": "fill_burette", "desc": "Fill burette with HCl", "points": 10},
+        {"id": "zero_burette", "desc": "Adjust to 0.00 mL mark", "points": 10},
+        {"id": "pipette_mixture", "desc": "Pipette 20mL of analyte", "points": 10},
+        {"id": "add_pp", "desc": "Add Phenolphthalein", "points": 5},
+        {"id": "reach_v1", "desc": "Enter V1 Observation", "points": 15},
+        {"id": "add_mo", "desc": "Add Methyl Orange", "points": 5},
+        {"id": "reach_v2", "desc": "Enter V2 Observation", "points": 20},
+        {"id": "submit_calc", "desc": "Submit Final Calculations", "points": 25}, 
+    ],
+                "targets": {
+                    "v1": round(random.uniform(9.5, 11.5), 2),  
+                    "v2": round(random.uniform(23.0, 27.0), 2), 
+                }
+            },
+        }
+        experiment_data = experiment_map.get(slug)
+        if not experiment_data:
+            raise Http404()
 
     context = {
         "slug": slug,
         "experiment": experiment_data,
-        # We pass a JSON string so the JavaScript engine can read the rules
         "config_json": json.dumps(experiment_data),
         "page_title": "Simulation: " + experiment_data['name']
     }

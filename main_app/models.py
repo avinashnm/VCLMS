@@ -415,3 +415,54 @@ class VirtualLabSubmission(models.Model):
 
     def __str__(self):
         return f"{self.student.admin.first_name} - {self.experiment_name}"
+
+# Dynamic Virtual Lab Models
+
+class LabExperiment(models.Model):
+    title = models.CharField(max_length=200)
+    slug = models.SlugField(unique=True)
+    objective = models.TextField()
+    principle = models.TextField(blank=True, null=True)
+    type = models.CharField(max_length=50, default='double_indicator')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.title
+
+class ExperimentMaterial(models.Model):
+    experiment = models.ForeignKey(LabExperiment, on_delete=models.CASCADE, related_name='materials')
+    name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return f"{self.name} ({self.experiment.title})"
+
+class ExperimentStep(models.Model):
+    experiment = models.ForeignKey(LabExperiment, on_delete=models.CASCADE, related_name='steps')
+    step_number = models.PositiveIntegerField()
+    description = models.TextField()
+
+    class Meta:
+        ordering = ['step_number']
+
+    def __str__(self):
+        return f"Step {self.step_number} - {self.experiment.title}"
+
+class ExperimentMilestone(models.Model):
+    experiment = models.ForeignKey(LabExperiment, on_delete=models.CASCADE, related_name='milestones')
+    milestone_id = models.CharField(max_length=100) # e.g., 'fill_burette'
+    description = models.CharField(max_length=200)
+    points = models.IntegerField(default=10)
+
+    def __str__(self):
+        return f"{self.milestone_id} ({self.experiment.title})"
+
+class ExperimentTargetConfig(models.Model):
+    experiment = models.OneToOneField(LabExperiment, on_delete=models.CASCADE, related_name='target_config')
+    v1_min = models.FloatField(default=9.5)
+    v1_max = models.FloatField(default=11.5)
+    v2_min = models.FloatField(default=23.0)
+    v2_max = models.FloatField(default=27.0)
+
+    def __str__(self):
+        return f"Targets for {self.experiment.title}"

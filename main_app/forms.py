@@ -415,4 +415,19 @@ class RatingQuestionForm(forms.ModelForm):
     class Meta:
         model = RatingQuestion
         fields = ['question_text']
+        
+# Experiment Creation Forms
+
+class LabExperimentForm(FormSettings):
+    def __init__(self, *args, **kwargs):
+        super(LabExperimentForm, self).__init__(*args, **kwargs)
+
+    class Meta:
+        model = LabExperiment
+        fields = ['title', 'slug', 'objective', 'principle', 'type']
+        widgets = {
+            'objective': forms.Textarea(attrs={'rows': 3}),
+            'principle': forms.Textarea(attrs={'rows': 3}),
+        }
+
     

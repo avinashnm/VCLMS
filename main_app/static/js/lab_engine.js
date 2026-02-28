@@ -73,19 +73,11 @@ class MarkingManager {
   // This MUST be called inside the p5.js draw() loop
   update() {
     const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-    // --- 1. BURETTE TASKS ---
     const burette = Object.values(vessels).find(v => (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)));
-    if (burette) {
-      // Check: Fill Burette (Minimum 20mL to start)
-      if (burette.targetVolume > 24) {
-        this.completeMilestone("fill_burette");
-      }
 
-      // Check: Zero Burette (Meniscus at 0.00)
-      let reading = abs(burette.capacity - burette.targetVolume); // Use targetVolume for precision
-      if (this.completedIds.has("fill_burette") && reading < 0.1) {
-        this.completeMilestone("zero_burette");
-      }
+    // GENERIC BURETTE PENALTIES (Apply to all titration experiments)
+    if (burette && (this.config?.type === 'double_indicator' || this.config?.type === 'simple_titration')) {
+      let reading = abs(burette.capacity - burette.targetVolume);
 
       // Penalty: Titrating without Zeroing
       if (keyIsDown(32) && flask) {
@@ -105,39 +97,51 @@ class MarkingManager {
       }
 
       // Penalty: Titrating without Swirling (Lack of Agitation)
-      // If Space is held (titrating) but W is NOT held (no swirl)
       if (keyIsDown(32) && !keyIsDown(87)) {
         this.swirlNeglectTimer++;
         if (this.swirlNeglectTimer > 180) { // ~3 seconds of neglect
           this.addPenalty("no_swirl", 10, "Titrating without swirling the flask regularly.");
         }
       } else {
-        // Reset timer if they swirl
         if (keyIsDown(87)) this.swirlNeglectTimer = 0;
       }
     }
 
-    // --- 2. FLASK TASKS ---
+    // DISPATCH BASED ON EXPERIMENT TYPE
+    if (this.config?.type === 'double_indicator') {
+      this.updateDoubleIndicator(flask, burette);
+    } else if (this.config?.type === 'simple_titration') {
+      this.updateSimpleTitration(flask, burette);
+    }
+  }
+
+  updateDoubleIndicator(flask, burette) {
+    if (burette) {
+      if (burette.targetVolume > 24) this.completeMilestone("fill_burette");
+      let reading = abs(burette.capacity - burette.targetVolume);
+      if (this.completedIds.has("fill_burette") && reading < 0.1) this.completeMilestone("zero_burette");
+    }
+
     if (flask) {
-      // Check: Pipette 20mL Analyte into Flask
-      if (flask.contents.mixture_vol >= 19.5) {
-        this.completeMilestone("pipette_mixture");
-      }
-
-      // Check: Add Phenolphthalein
-      if (this.completedIds.has("pipette_mixture") && flask.contents.pp_drops >= 1) {
-        this.completeMilestone("add_pp");
-      }
-
-      // Penalty: Adding Methyl Orange too early
+      if (flask.contents.mixture_vol >= 19.5) this.completeMilestone("pipette_mixture");
+      if (this.completedIds.has("pipette_mixture") && flask.contents.pp_drops >= 1) this.completeMilestone("add_pp");
       if (flask.contents.mo_drops > 0 && !this.completedIds.has("reach_v1")) {
         this.addPenalty("wrong_sequence", 15, "Added Methyl Orange before V1 endpoint.");
       }
+      if (this.completedIds.has("reach_v1") && flask.contents.mo_drops >= 1) this.completeMilestone("add_mo");
+    }
+  }
 
-      // Check: Add Methyl Orange (Only after V1 is finished)
-      if (this.completedIds.has("reach_v1") && flask.contents.mo_drops >= 1) {
-        this.completeMilestone("add_mo");
-      }
+  updateSimpleTitration(flask, burette) {
+    if (burette) {
+      if (burette.targetVolume > 24) this.completeMilestone("fill_burette");
+      let reading = abs(burette.capacity - burette.targetVolume);
+      if (this.completedIds.has("fill_burette") && reading < 0.1) this.completeMilestone("zero_burette");
+    }
+
+    if (flask) {
+      if (flask.contents.hcl_vol >= 19.5 || flask.contents.mixture_vol >= 19.5) this.completeMilestone("pipette_acid");
+      if (this.completedIds.has("pipette_acid") && flask.contents.pp_drops >= 1) this.completeMilestone("add_indicator");
     }
   }
 
@@ -161,7 +165,12 @@ class MarkingManager {
 
   // --- MANUAL ENTRY: V1 ---
   openV1Input() {
-    let val = window.prompt("LAB OBSERVATION:\nEnter the Phenolphthalein endpoint (V1) reading in mL:");
+    let promptText = "LAB OBSERVATION:\nEnter the Phenolphthalein endpoint (V1) reading in mL:";
+    if (this.config?.type === 'simple_titration') {
+      promptText = "LAB OBSERVATION:\nEnter the titration endpoint (V1) reading in mL:";
+    }
+
+    let val = window.prompt(promptText);
     if (val !== null && val !== "") {
       let userV1 = parseFloat(val);
       const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
@@ -195,45 +204,50 @@ class MarkingManager {
 
   // --- FINAL CHECKPOINT: CALCULATIONS ---
   openCalculationModal() {
-    // Brief delay ensures the click event is finished before browser prompts open
     setTimeout(() => {
-      const confirmed = confirm("TITRATION COMPLETE\n\nAre you ready to submit your final mass calculations based on your V1 and V2 observations?");
-      if (!confirmed) return;
+      if (this.config?.type === 'double_indicator') {
+        const confirmed = confirm("TITRATION COMPLETE\n\nAre you ready to submit your final mass calculations based on your V1 and V2 observations?");
+        if (!confirmed) return;
 
-      let m1 = window.prompt(`Step 1: Use your V1 (${this.recordedV1} mL) to calculate:\nMass of Na2CO3 in grams:`);
-      let m2 = window.prompt(`Step 2: Use your V2 (${this.recordedV2} mL) to calculate:\nMass of NaHCO3 in grams:`);
+        let m1 = window.prompt(`Step 1: Use your V1 (${this.recordedV1} mL) to calculate:\nMass of Na2CO3 in grams:`);
+        let m2 = window.prompt(`Step 2: Use your V2 (${this.recordedV2} mL) to calculate:\nMass of NaHCO3 in grams:`);
 
-      if (m1 !== null && m2 !== null && m1 !== "" && m2 !== "") {
-        this.verifyCalculations(parseFloat(m1), parseFloat(m2));
+        if (m1 !== null && m2 !== null && m1 !== "" && m2 !== "") {
+          this.verifyCalculationsDoubleIndicator(parseFloat(m1), parseFloat(m2));
+        } else {
+          alert("Submission cancelled. Please calculate and enter both values.");
+        }
+      } else if (this.config?.type === 'simple_titration') {
+        const confirmed = confirm("TITRATION COMPLETE\n\nAre you ready to submit your final concentration calculation based on your V1 observation?");
+        if (!confirmed) return;
+
+        let c1 = window.prompt(`Calculate:\nMolarity of unknown solution using V1 (${this.recordedV1} mL):`);
+        if (c1 !== null && c1 !== "") {
+          this.verifyCalculationsSimpleTitration(parseFloat(c1));
+        } else {
+          alert("Submission cancelled. Please calculate and enter the value.");
+        }
       } else {
-        alert("Submission cancelled. Please calculate and enter both values.");
+        alert("Calculations complete for this experiment.");
+        this.saveResults({}, {});
       }
     }, 100);
   }
 
-  verifyCalculations(massNa2CO3, massNaHCO3) {
-    // --- Chemistry Formulae ---
-    // Vol for Na2CO3 = 2 * V1
-    // Vol for NaHCO3 = V2 - 2*V1
-    // Mass = (Volume * Molarity * Eq.Wt) / 1000
-
+  verifyCalculationsDoubleIndicator(massNa2CO3, massNaHCO3) {
     const M = 0.1;
-    const trueV1 = TARGET_V1; // Using simulated targets for absolute marking
+    const trueV1 = TARGET_V1;
     const trueV2 = TARGET_V2;
 
     let expectedNa2CO3 = (2 * trueV1 * M * 53) / 1000;
     let expectedNaHCO3 = ((trueV2 - (2 * trueV1)) * M * 84) / 1000;
 
-    let mathErrors = [];
-
-    // Mark Na2CO3 Math (within 0.05g tolerance)
     if (abs(massNa2CO3 - expectedNa2CO3) < 0.05) {
       console.log("Carbonate math correct");
     } else {
       this.addPenalty("calc_na2co3", 12, "Incorrect Mass calculation for Sodium Carbonate.");
     }
 
-    // Mark NaHCO3 Math (within 0.05g tolerance)
     if (abs(massNaHCO3 - expectedNaHCO3) < 0.05) {
       console.log("Bicarbonate math correct");
     } else {
@@ -242,6 +256,23 @@ class MarkingManager {
 
     this.completeMilestone("submit_calc");
     this.saveResults(massNa2CO3, massNaHCO3);
+  }
+
+  verifyCalculationsSimpleTitration(concentration) {
+    const M_titrant = 0.1;
+    const V_titrand = 20.0;
+    const trueV1 = TARGET_V1;
+
+    let expectedConcentration = (M_titrant * trueV1) / V_titrand;
+
+    if (abs(concentration - expectedConcentration) < 0.01) {
+      console.log("Concentration math correct");
+    } else {
+      this.addPenalty("calc_conc", 15, "Incorrect calculation for unknown concentration.");
+    }
+
+    this.completeMilestone("submit_calc");
+    this.saveResults(concentration, 0); // Reuse saveResults
   }
 
   saveResults(m1, m2) {
@@ -270,17 +301,22 @@ class MarkingManager {
 
 function drawEndpointButtons(x, y, w) {
   const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-  if (!flask || flask.contents.mixture_vol < 1) return;
+  if (!flask || flask.contents.mixture_vol < 1 && flask.contents.hcl_vol < 1) return;
 
-
-  if (idIsDone("add_pp") && !idIsDone("reach_v1")) {
-    drawButton(x, y, w, 40, "ENTER V1 READING", [255, 105, 180]);
-  }
-  if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
-    drawButton(x, y, w, 40, "ENTER V2 READING", [255, 160, 0]);
-  }
-  if (idIsDone("reach_v2") && !idIsDone("submit_calc")) {
-    drawButton(x, y, w, 40, "SUBMIT CALCULATIONS", [0, 200, 100]);
+  if (manager.config?.type === 'double_indicator') {
+    if (idIsDone("add_pp") && !idIsDone("reach_v1")) {
+      drawButton(x, y, w, 40, "ENTER V1 READING", [255, 105, 180]);
+    } else if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
+      drawButton(x, y, w, 40, "ENTER V2 READING", [255, 160, 0]);
+    } else if (idIsDone("reach_v2") && !idIsDone("submit_calc")) {
+      drawButton(x, y, w, 40, "SUBMIT CALCULATIONS", [0, 200, 100]);
+    }
+  } else if (manager.config?.type === 'simple_titration') {
+    if (idIsDone("add_indicator") && !idIsDone("reach_v1")) {
+      drawButton(x, y, w, 40, "ENTER V1 READING", [255, 105, 180]);
+    } else if (idIsDone("reach_v1") && !idIsDone("submit_calc")) {
+      drawButton(x, y, w, 40, "SUBMIT CALCULATIONS", [0, 200, 100]);
+    }
   }
 }
 
@@ -2065,13 +2101,20 @@ function mousePressed() {
   const panelW = 280, margin = 20, btnX = width - panelW - margin + 20;
   // We check Y=510 to 560 now to match the new DataPanel layout
   if (mouseX > btnX && mouseX < btnX + (panelW - 40) && mouseY > 510 && mouseY < 560) {
-    if (idIsDone("add_pp") && !idIsDone("reach_v1")) {
-      manager.openV1Input();
-    } else if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
-      manager.openV2Input();
-    } else if (idIsDone("reach_v2") && !idIsDone("submit_calc")) {
-      console.log("Opening Calculation Modal...");
-      manager.openCalculationModal();
+    if (manager.config?.type === 'double_indicator') {
+      if (idIsDone("add_pp") && !idIsDone("reach_v1")) {
+        manager.openV1Input();
+      } else if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
+        manager.openV2Input();
+      } else if (idIsDone("reach_v2") && !idIsDone("submit_calc")) {
+        manager.openCalculationModal();
+      }
+    } else if (manager.config?.type === 'simple_titration') {
+      if (idIsDone("add_indicator") && !idIsDone("reach_v1")) {
+        manager.openV1Input();
+      } else if (idIsDone("reach_v1") && !idIsDone("submit_calc")) {
+        manager.openCalculationModal();
+      }
     }
     return;
   }

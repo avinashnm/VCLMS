@@ -1293,3 +1293,82 @@ def student_reports(request):
 
     # Render the quiz_success.html template with the quiz object
     return render(request, 'hod_template/student_reports.html',context)
+
+
+# ==========================================
+# EXPERIMENT CREATION MODULE (DYNAMIC LAB)
+# ==========================================
+
+from .models import LabExperiment, ExperimentMaterial, ExperimentStep, ExperimentMilestone, ExperimentTargetConfig
+from .forms import LabExperimentForm
+
+def add_experiment(request):
+    if request.method == "POST":
+        form = LabExperimentForm(request.POST)
+        if form.is_valid():
+            experiment = form.save()
+            
+            # 1. Process Materials
+            # Expecting fields like material-0, material-1...
+            i = 0
+            while True:
+                mat_name = request.POST.get(f"material-{i}")
+                if mat_name is None:
+                    break
+                if mat_name.strip():
+                    ExperimentMaterial.objects.create(experiment=experiment, name=mat_name.strip())
+                i += 1
+                
+            # 2. Process Procedure Steps
+            # Expecting fields like step-0, step-1...
+            j = 0
+            step_num = 1
+            while True:
+                step_desc = request.POST.get(f"step-{j}")
+                if step_desc is None:
+                    break
+                if step_desc.strip():
+                    ExperimentStep.objects.create(experiment=experiment, step_number=step_num, description=step_desc.strip())
+                    step_num += 1
+                j += 1
+                
+            # 3. Process Milestones
+            # Expecting milestone-id-X, milestone-desc-X, milestone-pts-X
+            k = 0
+            while True:
+                m_id = request.POST.get(f"milestone-id-{k}")
+                m_desc = request.POST.get(f"milestone-desc-{k}")
+                m_pts = request.POST.get(f"milestone-pts-{k}")
+                
+                if m_id is None:
+                    break
+                if m_id.strip() and m_desc.strip():
+                    pts = int(m_pts) if m_pts and m_pts.isdigit() else 10
+                    ExperimentMilestone.objects.create(
+                        experiment=experiment, 
+                        milestone_id=m_id.strip(), 
+                        description=m_desc.strip(), 
+                        points=pts
+                    )
+                k += 1
+                
+            # 4. Save Target Config (Default values for now, can be expanded in UI later)
+            ExperimentTargetConfig.objects.create(experiment=experiment)
+            
+            messages.success(request, "Experiment created successfully!")
+            return redirect(reverse("manage_experiments"))
+        else:
+            messages.error(request, "Failed to create experiment. Please check the form data.")
+            return render(request, "hod_template/add_experiment.html", {"form": form})
+            
+    else:
+        form = LabExperimentForm()
+        return render(request, "hod_template/add_experiment.html", {"form": form})
+
+def manage_experiments(request):
+    experiments = LabExperiment.objects.all().order_by('-created_at')
+    context = {
+        'experiments': experiments,
+        'page_title': 'Manage Virtual Lab Experiments'
+    }
+    return render(request, 'hod_template/manage_experiments.html', context)
