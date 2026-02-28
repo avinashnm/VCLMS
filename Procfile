@@ -1,1 +1,1 @@
-web: gunicorn vclms.wsgi
+web: python manage.py migrate && python create_superuser.py && gunicorn vclms.wsgi
