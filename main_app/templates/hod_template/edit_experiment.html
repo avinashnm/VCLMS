@@ -1,0 +1,263 @@
+{% extends 'main_app/base.html' %}
+{% load static %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card card-info">
+                    <div class="card-header">
+                        <h3 class="card-title">Edit Virtual Lab Experiment: {{ experiment.title }}</h3>
+                        <a href="{% url 'manage_experiments' %}" class="btn btn-sm btn-light float-right">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+                    </div>
+
+                    <form role="form" method="POST" action="{% url 'edit_experiment' experiment.id %}">
+                        {% csrf_token %}
+                        <div class="card-body">
+                            <!-- Basic Info -->
+                            <h4 class="text-info mt-3 mb-3"><i class="fas fa-info-circle"></i> Basic Information</h4>
+                            <div class="form-group">
+                                <label>Experiment Title</label>
+                                <input type="text" class="form-control" name="title" value="{{ experiment.title }}"
+                                    required>
+                            </div>
+                            <div class="form-group">
+                                <label>URL Slug (e.g., simple-titration)</label>
+                                <input type="text" class="form-control" name="slug" value="{{ experiment.slug }}"
+                                    required>
+                            </div>
+                            <div class="form-group">
+                                <label>Objective</label>
+                                <textarea class="form-control" name="objective" rows="3"
+                                    required>{{ experiment.objective }}</textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Principle</label>
+                                <textarea class="form-control" name="principle" rows="4"
+                                    required>{{ experiment.principle }}</textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Experiment Type</label>
+                                <select class="form-control" name="type" required>
+                                    <option value="simple_titration" {% if experiment.type=='simple_titration'
+                                        %}selected{% endif %}>Simple Titration</option>
+                                    <option value="double_indicator" {% if experiment.type=='double_indicator'
+                                        %}selected{% endif %}>Double Indicator Titration</option>
+                                    <option value="rast" {% if experiment.type=='rast' %}selected{% endif %}>Rast Method
+                                    </option>
+                                    <option value="placeholder" {% if experiment.type=='placeholder' %}selected{% endif
+                                        %}>Placeholder</option>
+                                </select>
+                                <small class="text-muted">Choose the simulation template to be used.</small>
+                            </div>
+
+                            <hr>
+
+                            <!-- Materials -->
+                            <h4 class="text-info mt-4 mb-3"><i class="fas fa-flask"></i> Materials Required</h4>
+                            <div id="materials-container">
+                                {% for material in materials %}
+                                <div class="material-row form-inline mb-2">
+                                    <input type="text" class="form-control mr-2" style="width: 80%;"
+                                        name="material-{{ forloop.counter0 }}" value="{{ material.name }}">
+                                    {% if not forloop.first %}
+                                    <button type="button" class="btn btn-sm btn-outline-danger"
+                                        onclick="this.parentElement.remove()">X</button>
+                                    {% endif %}
+                                </div>
+                                {% empty %}
+                                <div class="material-row form-inline mb-2">
+                                    <input type="text" class="form-control mr-2" style="width: 80%;" name="material-0"
+                                        placeholder="e.g., 250ml Beaker">
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-info mt-2" onclick="addMaterial()">+ Add
+                                Material</button>
+
+                            <hr>
+
+                            <!-- Procedure Steps -->
+                            <h4 class="text-info mt-4 mb-3"><i class="fas fa-list-ol"></i> Procedure Steps</h4>
+                            <div id="steps-container">
+                                {% for step in steps %}
+                                <div class="step-row mb-2">
+                                    <div class="input-group">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text step-label">Step {{ forloop.counter }}</span>
+                                        </div>
+                                        <input type="text" class="form-control step-input"
+                                            name="step-{{ forloop.counter0 }}" value="{{ step.description }}">
+                                        {% if not forloop.first %}
+                                        <div class="input-group-append">
+                                            <button class="btn btn-outline-danger" type="button"
+                                                onclick="this.parentElement.parentElement.parentElement.remove(); updateStepLabels();">X</button>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% empty %}
+                                <div class="step-row mb-2">
+                                    <div class="input-group">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text step-label">Step 1</span>
+                                        </div>
+                                        <input type="text" class="form-control step-input" name="step-0"
+                                            placeholder="Describe this step...">
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-info mt-2" onclick="addStep()">+
+                                Add Step</button>
+
+                            <hr>
+
+                            <!-- Assessment Milestones -->
+                            <h4 class="text-info mt-4 mb-3"><i class="fas fa-tasks"></i> Assessment Milestones</h4>
+                            <p class="text-muted small mb-3">Define the actions a student must take in the simulation to
+                                score points.</p>
+
+                            <div id="milestones-container">
+                                {% for ms in milestones %}
+                                <div class="milestone-row form-row mb-2">
+                                    <div class="col-md-3">
+                                        <input type="text" class="form-control"
+                                            name="milestone-id-{{ forloop.counter0 }}" value="{{ ms.milestone_id }}"
+                                            placeholder="ID (e.g., fill_burette)">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <input type="text" class="form-control"
+                                            name="milestone-desc-{{ forloop.counter0 }}" value="{{ ms.description }}"
+                                            placeholder="Description shown to student">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="number" class="form-control"
+                                            name="milestone-pts-{{ forloop.counter0 }}" value="{{ ms.points }}"
+                                            placeholder="Pts">
+                                    </div>
+                                    {% if not forloop.first %}
+                                    <div class="col-md-1">
+                                        <button type="button" class="btn btn-sm btn-outline-danger btn-block"
+                                            onclick="this.parentElement.parentElement.remove()">X</button>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% empty %}
+                                <div class="milestone-row form-row mb-2">
+                                    <div class="col-md-3">
+                                        <input type="text" class="form-control" name="milestone-id-0"
+                                            placeholder="ID (e.g., fill_burette)">
+                                    </div>
+                                    <div class="col-md-7">
+                                        <input type="text" class="form-control" name="milestone-desc-0"
+                                            placeholder="Description shown to student">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="number" class="form-control" name="milestone-pts-0"
+                                            placeholder="Points (e.g., 10)">
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-info mt-2" onclick="addMilestone()">+
+                                Add Milestone</button>
+
+                            <br><br>
+                            <div class="form-group mt-4">
+                                {% if messages %}
+                                {% for message in messages %}
+                                {% if message.tags == 'error' %}
+                                <div class="alert alert-danger">{{ message }}</div>
+                                {% endif %}
+                                {% if message.tags == 'success' %}
+                                <div class="alert alert-success">{{ message }}</div>
+                                {% endif %}
+                                {% endfor %}
+                                {% endif %}
+                            </div>
+
+                        </div>
+
+                        <div class="card-footer">
+                            <button type="submit" class="btn btn-info btn-block"><i class="fas fa-save"></i> Save
+                                Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+    // Initialize starting counters correctly based on existing rendered items
+    let materialCount = document.querySelectorAll('.material-row').length;
+    let stepCount = document.querySelectorAll('.step-row').length;
+    let milestoneCount = document.querySelectorAll('.milestone-row').length;
+
+    function addMaterial() {
+        const container = document.getElementById('materials-container');
+        const count = materialCount++;
+        const html = `
+            <div class="material-row form-inline mb-2">
+                <input type="text" class="form-control mr-2" style="width: 80%;" name="material-${count}" placeholder="Next material...">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.remove()">X</button>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+    }
+
+    function addStep() {
+        const container = document.getElementById('steps-container');
+        const count = stepCount++;
+        const displayNum = document.querySelectorAll('.step-row').length + 1;
+        const html = `
+            <div class="step-row mb-2">
+                <div class="input-group">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text step-label">Step ${displayNum}</span>
+                    </div>
+                    <input type="text" class="form-control step-input" name="step-${count}" placeholder="Describe this step...">
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.parentElement.parentElement.remove(); updateStepLabels();">X</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+    }
+
+    function updateStepLabels() {
+        const labels = document.querySelectorAll('.step-label');
+        labels.forEach((lbl, index) => {
+            lbl.innerText = `Step ${index + 1}`;
+        });
+    }
+
+    function addMilestone() {
+        const container = document.getElementById('milestones-container');
+        const count = milestoneCount++;
+        const html = `
+            <div class="milestone-row form-row mb-2">
+                <div class="col-md-3">
+                    <input type="text" class="form-control" name="milestone-id-${count}" placeholder="ID">
+                </div>
+                <div class="col-md-6">
+                    <input type="text" class="form-control" name="milestone-desc-${count}" placeholder="Description">
+                </div>
+                <div class="col-md-2">
+                    <input type="number" class="form-control" name="milestone-pts-${count}" placeholder="Pts">
+                </div>
+                <div class="col-md-1">
+                    <button type="button" class="btn btn-sm btn-outline-danger btn-block" onclick="this.parentElement.parentElement.remove()">X</button>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+    }
+</script>
+{% endblock content %}

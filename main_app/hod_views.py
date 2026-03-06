@@ -1372,3 +1372,84 @@ def manage_experiments(request):
         'page_title': 'Manage Virtual Lab Experiments'
     }
     return render(request, 'hod_template/manage_experiments.html', context)
+
+
+def edit_experiment(request, experiment_id):
+    experiment = get_object_or_404(LabExperiment, id=experiment_id)
+    
+    if request.method == "POST":
+        experiment.title = request.POST.get('title')
+        experiment.slug = request.POST.get('slug')
+        experiment.objective = request.POST.get('objective')
+        experiment.principle = request.POST.get('principle')
+        experiment.type = request.POST.get('type')
+        experiment.save()
+        
+        # Clear existing related data
+        experiment.materials.all().delete()
+        experiment.steps.all().delete()
+        experiment.milestones.all().delete()
+        
+        # 1. Process Materials
+        i = 0
+        while True:
+            mat_name = request.POST.get(f"material-{i}")
+            if mat_name is None:
+                # check a few more in case of gaps (deleted rows in UI)
+                if not any(request.POST.get(f"material-{k}") for k in range(i, i+10)):
+                    break
+            if mat_name and mat_name.strip():
+                ExperimentMaterial.objects.create(experiment=experiment, name=mat_name.strip())
+            i += 1
+            
+        # 2. Process Procedure Steps
+        j = 0
+        step_num = 1
+        while True:
+            step_desc = request.POST.get(f"step-{j}")
+            if step_desc is None:
+                if not any(request.POST.get(f"step-{k}") for k in range(j, j+10)):
+                    break
+            if step_desc and step_desc.strip():
+                ExperimentStep.objects.create(experiment=experiment, step_number=step_num, description=step_desc.strip())
+                step_num += 1
+            j += 1
+            
+        # 3. Process Milestones
+        k = 0
+        while True:
+            m_id = request.POST.get(f"milestone-id-{k}")
+            m_desc = request.POST.get(f"milestone-desc-{k}")
+            m_pts = request.POST.get(f"milestone-pts-{k}")
+            
+            if m_id is None:
+                if not any(request.POST.get(f"milestone-id-{l}") for l in range(k, k+10)):
+                    break
+            if m_id and m_desc and m_id.strip() and m_desc.strip():
+                pts = int(m_pts) if m_pts and str(m_pts).strip().isdigit() else 10
+                ExperimentMilestone.objects.create(
+                    experiment=experiment, 
+                    milestone_id=m_id.strip(), 
+                    description=m_desc.strip(), 
+                    points=pts
+                )
+            k += 1
+            
+        messages.success(request, "Experiment updated successfully!")
+        return redirect(reverse("manage_experiments"))
+        
+    else:
+        context = {
+            'experiment': experiment,
+            'materials': experiment.materials.all(),
+            'steps': experiment.steps.all().order_by('step_number'),
+            'milestones': experiment.milestones.all()
+        }
+        return render(request, "hod_template/edit_experiment.html", context)
+
+
+def delete_experiment(request, experiment_id):
+    experiment = get_object_or_404(LabExperiment, id=experiment_id)
+    experiment.delete()
+    messages.success(request, "Experiment deleted successfully!")
+    return redirect(reverse("manage_experiments"))

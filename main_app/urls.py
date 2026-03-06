@@ -115,6 +115,8 @@ path('student/watch/<int:course_id>/', student_views.watch_video, name='watch_vi
     # Experiment Creation Module
     path('experiment/add/', hod_views.add_experiment, name='add_experiment'),
     path('experiment/manage/', hod_views.manage_experiments, name='manage_experiments'),
+    path('experiment/edit/<int:experiment_id>/', hod_views.edit_experiment, name='edit_experiment'),
+    path('experiment/delete/<int:experiment_id>/', hod_views.delete_experiment, name='delete_experiment'),
 
     # Staff
     path("staff/home/", staff_views.staff_home, name='staff_home'),

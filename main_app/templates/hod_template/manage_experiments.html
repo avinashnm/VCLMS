@@ -39,9 +39,15 @@
                                     <td>{{ experiment.objective|truncatechars:50 }}</td>
                                     <td>{{ experiment.created_at|date:"M d, Y" }}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-info" disabled title="Coming soon">Edit</button>
-                                        <button class="btn btn-sm btn-danger" disabled
-                                            title="Coming soon">Delete</button>
+                                        <a href="{% url 'edit_experiment' experiment.id %}" class="btn btn-sm btn-info"
+                                            title="Edit Experiment">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </a>
+                                        <a href="{% url 'delete_experiment' experiment.id %}"
+                                            class="btn btn-sm btn-danger" title="Delete Experiment"
+                                            onclick="return confirm('Are you sure you want to delete {{ experiment.title }}? This action cannot be undone.');">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </a>
                                     </td>
                                 </tr>
                                 {% empty %}
