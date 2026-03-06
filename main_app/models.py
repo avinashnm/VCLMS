@@ -466,3 +466,61 @@ class ExperimentTargetConfig(models.Model):
 
     def __str__(self):
         return f"Targets for {self.experiment.title}"
+
+
+# ==========================================
+# PHASE 3: TRUE NO-CODE PLATFORM MODELS
+# ==========================================
+
+class ChemicalCatalog(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    formula = models.CharField(max_length=100)
+    molarity = models.FloatField(null=True, blank=True, help_text="Default molarity if applicable")
+    density = models.FloatField(default=1.0, help_text="g/mL")
+    default_color_hex = models.CharField(max_length=9, default="#FFFFFF80", help_text="Format: #RRGGBBAA")
+    is_indicator = models.BooleanField(default=False)
+    
+    def __str__(self):
+        return f"{self.name} ({self.formula})"
+
+class ApparatusCatalog(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    type = models.CharField(max_length=50, help_text="e.g., volumetric_flask, beaker, burette")
+    max_capacity = models.FloatField(help_text="In mL")
+    svg_sprite_url = models.CharField(max_length=255, blank=True, null=True)
+    is_heatable = models.BooleanField(default=False)
+    can_measure_vol = models.BooleanField(default=False)
+    can_pour = models.BooleanField(default=True)
+    
+    def __str__(self):
+        return f"{self.name} ({self.max_capacity}mL)"
+
+class ChemicalReaction(models.Model):
+    chemical_a = models.ForeignKey(ChemicalCatalog, related_name='reactions_as_a', on_delete=models.CASCADE)
+    chemical_b = models.ForeignKey(ChemicalCatalog, related_name='reactions_as_b', on_delete=models.CASCADE)
+    product = models.ForeignKey(ChemicalCatalog, related_name='reactions_as_product', on_delete=models.CASCADE, null=True, blank=True)
+    reaction_color_hex = models.CharField(max_length=9, default="#FFFFFF80")
+    ph_change = models.FloatField(default=0.0)
+    
+    def __str__(self):
+        return f"{self.chemical_a.name} + {self.chemical_b.name} Reaction"
+
+class MilestoneRule(models.Model):
+    OPERATOR_CHOICES = [
+        ('>', 'Greater Than'),
+        ('>=', 'Greater Than or Equal'),
+        ('<', 'Less Than'),
+        ('<=', 'Less Than or Equal'),
+        ('==', 'Equal To'),
+        ('!=', 'Not Equal To'),
+        ('CONTAINS', 'Contains Object'),
+    ]
+    
+    milestone = models.ForeignKey(ExperimentMilestone, on_delete=models.CASCADE, related_name='rules')
+    target_vessel = models.CharField(max_length=100, help_text="e.g., 'conical_flask' or apparatus ID")
+    target_property = models.CharField(max_length=100, help_text="e.g., 'hcl_vol', 'temperature', 'ph'")
+    operator = models.CharField(max_length=10, choices=OPERATOR_CHOICES, default='>=')
+    value = models.FloatField(help_text="Target threshold value")
+    
+    def __str__(self):
+        return f"Rule: IF {self.target_vessel}.{self.target_property} {self.operator} {self.value}"

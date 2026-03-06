@@ -866,10 +866,22 @@ def lab_experiment_simulation(request, slug):
     try:
         experiment_obj = LabExperiment.objects.get(slug=slug)
         
-        milestones_list = [
-            {"id": ms.milestone_id, "desc": ms.description, "points": ms.points}
-            for ms in experiment_obj.milestones.all()
-        ]
+        milestones_list = []
+        for ms in experiment_obj.milestones.all():
+            rules_list = [
+                {
+                    "target_vessel": r.target_vessel,
+                    "target_property": r.target_property,
+                    "operator": r.operator,
+                    "value": r.value
+                } for r in ms.rules.all()
+            ]
+            milestones_list.append({
+                "id": ms.milestone_id, 
+                "desc": ms.description, 
+                "points": ms.points,
+                "rules": rules_list
+            })
         
         targets = {}
         if hasattr(experiment_obj, 'target_config') and experiment_obj.target_config:
@@ -885,12 +897,42 @@ def lab_experiment_simulation(request, slug):
                 "v2": round(random.uniform(23.0, 27.0), 2)
             }
             
+        # Fetch Catalogs
+        chemicals_list = [
+            {
+                "id": c.id, "name": c.name, "formula": c.formula,
+                "state": c.state, "molarity": c.molarity, "density": c.density,
+                "color": c.default_color_hex
+            } for c in ChemicalCatalog.objects.all()
+        ]
+        
+        apparatus_list = [
+            {
+                "id": a.id, "name": a.name, "type": a.type,
+                "max_capacity": a.max_capacity, "sprite": a.svg_sprite_url,
+                "is_container": a.is_container, "is_heatable": a.is_heatable, "can_pour": a.can_pour
+            } for a in ApparatusCatalog.objects.all()
+        ]
+        
+        reactions_list = [
+            {
+                "id": r.id, "reactant_a": r.reactant_a.id, "reactant_b": r.reactant_b.id,
+                "product_name": r.product_name, "product_color": r.product_color_hex,
+                "is_exothermic": r.is_exothermic
+            } for r in ChemicalReaction.objects.all()
+        ]
+            
         experiment_data = {
             "name": experiment_obj.title,
             "objective": experiment_obj.objective,
             "type": experiment_obj.type,
             "milestones": milestones_list,
-            "targets": targets
+            "targets": targets,
+            "catalogs": {
+                "chemicals": chemicals_list,
+                "apparatus": apparatus_list,
+                "reactions": reactions_list
+            }
         }
         
     except LabExperiment.DoesNotExist:

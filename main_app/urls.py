@@ -117,6 +117,15 @@ path('student/watch/<int:course_id>/', student_views.watch_video, name='watch_vi
     path('experiment/manage/', hod_views.manage_experiments, name='manage_experiments'),
     path('experiment/edit/<int:experiment_id>/', hod_views.edit_experiment, name='edit_experiment'),
     path('experiment/delete/<int:experiment_id>/', hod_views.delete_experiment, name='delete_experiment'),
+    
+    # Catalogs UI
+    path('catalogs/manage/', hod_views.manage_catalogs, name='manage_catalogs'),
+    path('catalogs/chemical/add/', hod_views.add_chemical, name='add_chemical'),
+    path('catalogs/apparatus/add/', hod_views.add_apparatus, name='add_apparatus'),
+    path('catalogs/reaction/add/', hod_views.add_reaction, name='add_reaction'),
+    path('catalogs/chemical/delete/<int:cid>/', hod_views.delete_chemical, name='delete_chemical'),
+    path('catalogs/apparatus/delete/<int:aid>/', hod_views.delete_apparatus, name='delete_apparatus'),
+    path('catalogs/reaction/delete/<int:rid>/', hod_views.delete_reaction, name='delete_reaction'),
 
     # Staff
     path("staff/home/", staff_views.staff_home, name='staff_home'),

@@ -1332,8 +1332,7 @@ def add_experiment(request):
                     step_num += 1
                 j += 1
                 
-            # 3. Process Milestones
-            # Expecting milestone-id-X, milestone-desc-X, milestone-pts-X
+            # 3. Process Milestones and Rules
             k = 0
             while True:
                 m_id = request.POST.get(f"milestone-id-{k}")
@@ -1344,12 +1343,35 @@ def add_experiment(request):
                     break
                 if m_id.strip() and m_desc.strip():
                     pts = int(m_pts) if m_pts and m_pts.isdigit() else 10
-                    ExperimentMilestone.objects.create(
+                    milestone = ExperimentMilestone.objects.create(
                         experiment=experiment, 
                         milestone_id=m_id.strip(), 
                         description=m_desc.strip(), 
                         points=pts
                     )
+                    
+                    # Process Rules for this specific milestone
+                    rule_count_str = request.POST.get(f"rule-count-{k}", "0")
+                    rule_count = int(rule_count_str) if rule_count_str.isdigit() else 0
+                    
+                    for r in range(rule_count):
+                        target_vessel = request.POST.get(f"rule-vessel-{k}-{r}")
+                        target_prop = request.POST.get(f"rule-prop-{k}-{r}")
+                        operator = request.POST.get(f"rule-op-{k}-{r}")
+                        val_str = request.POST.get(f"rule-val-{k}-{r}")
+                        
+                        if target_vessel and target_prop and operator and val_str:
+                            try:
+                                val = float(val_str)
+                                MilestoneRule.objects.create(
+                                    milestone=milestone,
+                                    target_vessel=target_vessel.strip(),
+                                    target_property=target_prop.strip(),
+                                    operator=operator.strip(),
+                                    value=val
+                                )
+                            except ValueError:
+                                pass # ignore rules with invalid float values
                 k += 1
                 
             # 4. Save Target Config (Default values for now, can be expanded in UI later)
@@ -1415,7 +1437,7 @@ def edit_experiment(request, experiment_id):
                 step_num += 1
             j += 1
             
-        # 3. Process Milestones
+        # 3. Process Milestones and Rules
         k = 0
         while True:
             m_id = request.POST.get(f"milestone-id-{k}")
@@ -1427,12 +1449,35 @@ def edit_experiment(request, experiment_id):
                     break
             if m_id and m_desc and m_id.strip() and m_desc.strip():
                 pts = int(m_pts) if m_pts and str(m_pts).strip().isdigit() else 10
-                ExperimentMilestone.objects.create(
+                milestone = ExperimentMilestone.objects.create(
                     experiment=experiment, 
                     milestone_id=m_id.strip(), 
                     description=m_desc.strip(), 
                     points=pts
                 )
+                
+                # Process Rules for this specific milestone
+                rule_count_str = request.POST.get(f"rule-count-{k}", "0")
+                rule_count = int(rule_count_str) if rule_count_str.isdigit() else 0
+                
+                for r in range(rule_count):
+                    target_vessel = request.POST.get(f"rule-vessel-{k}-{r}")
+                    target_prop = request.POST.get(f"rule-prop-{k}-{r}")
+                    operator = request.POST.get(f"rule-op-{k}-{r}")
+                    val_str = request.POST.get(f"rule-val-{k}-{r}")
+                    
+                    if target_vessel and target_prop and operator and val_str:
+                        try:
+                            val = float(val_str)
+                            MilestoneRule.objects.create(
+                                milestone=milestone,
+                                target_vessel=target_vessel.strip(),
+                                target_property=target_prop.strip(),
+                                operator=operator.strip(),
+                                value=val
+                            )
+                        except ValueError:
+                            pass # ignore rules with invalid float values
             k += 1
             
         messages.success(request, "Experiment updated successfully!")
@@ -1453,3 +1498,107 @@ def delete_experiment(request, experiment_id):
     experiment.delete()
     messages.success(request, "Experiment deleted successfully!")
     return redirect(reverse("manage_experiments"))
+
+
+def manage_catalogs(request):
+    chemicals = ChemicalCatalog.objects.all().order_by('name')
+    apparatus = ApparatusCatalog.objects.all().order_by('name')
+    reactions = ChemicalReaction.objects.all()
+    
+    context = {
+        'chemicals': chemicals,
+        'apparatus': apparatus,
+        'reactions': reactions,
+        'page_title': 'Manage Virtual Lab Catalogs'
+    }
+    return render(request, 'hod_template/manage_catalogs.html', context)
+
+def add_chemical(request):
+    if request.method == "POST":
+        name = request.POST.get('name')
+        formula = request.POST.get('formula')
+        state = request.POST.get('state')
+        molarity = request.POST.get('molarity')
+        density = request.POST.get('density')
+        default_color_hex = request.POST.get('default_color_hex')
+        
+        try:
+            molarity_val = float(molarity) if molarity else 1.0
+            density_val = float(density) if density else 1.0
+            
+            ChemicalCatalog.objects.create(
+                name=name, formula=formula, state=state,
+                molarity=molarity_val, density=density_val,
+                default_color_hex=default_color_hex
+            )
+            messages.success(request, "Chemical added successfully!")
+        except Exception as e:
+            messages.error(request, f"Error adding chemical: {str(e)}")
+            
+    return redirect(reverse("manage_catalogs"))
+
+def add_apparatus(request):
+    if request.method == "POST":
+        name = request.POST.get('name')
+        type_val = request.POST.get('type')
+        max_capacity = request.POST.get('max_capacity')
+        svg_sprite_url = request.POST.get('svg_sprite_url')
+        
+        # Checkboxes
+        is_container = request.POST.get('is_container') == 'on'
+        is_heatable = request.POST.get('is_heatable') == 'on'
+        can_pour = request.POST.get('can_pour') == 'on'
+        
+        try:
+            cap_val = float(max_capacity) if max_capacity else 0.0
+            
+            ApparatusCatalog.objects.create(
+                name=name, type=type_val, max_capacity=cap_val,
+                svg_sprite_url=svg_sprite_url,
+                is_container=is_container, is_heatable=is_heatable, can_pour=can_pour
+            )
+            messages.success(request, "Apparatus added successfully!")
+        except Exception as e:
+            messages.error(request, f"Error adding apparatus: {str(e)}")
+            
+    return redirect(reverse("manage_catalogs"))
+
+def add_reaction(request):
+    if request.method == "POST":
+        reactant_a_id = request.POST.get('reactant_a')
+        reactant_b_id = request.POST.get('reactant_b')
+        product_name = request.POST.get('product_name')
+        product_color_hex = request.POST.get('product_color_hex')
+        is_exothermic = request.POST.get('is_exothermic') == 'on'
+        
+        try:
+            r_a = ChemicalCatalog.objects.get(id=reactant_a_id)
+            r_b = ChemicalCatalog.objects.get(id=reactant_b_id)
+            ChemicalReaction.objects.create(
+                reactant_a=r_a, reactant_b=r_b,
+                product_name=product_name, product_color_hex=product_color_hex,
+                is_exothermic=is_exothermic
+            )
+            messages.success(request, "Reaction added successfully!")
+        except Exception as e:
+            messages.error(request, f"Error adding reaction: {str(e)}")
+            
+    return redirect(reverse("manage_catalogs"))
+
+def delete_chemical(request, cid):
+    c = get_object_or_404(ChemicalCatalog, id=cid)
+    c.delete()
+    messages.success(request, "Chemical removed successfully!")
+    return redirect(reverse("manage_catalogs"))
+
+def delete_apparatus(request, aid):
+    a = get_object_or_404(ApparatusCatalog, id=aid)
+    a.delete()
+    messages.success(request, "Apparatus removed successfully!")
+    return redirect(reverse("manage_catalogs"))
+
+def delete_reaction(request, rid):
+    r = get_object_or_404(ChemicalReaction, id=rid)
+    r.delete()
+    messages.success(request, "Reaction removed successfully!")
+    return redirect(reverse("manage_catalogs"))

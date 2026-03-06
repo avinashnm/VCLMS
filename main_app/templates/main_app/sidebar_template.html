@@ -350,6 +350,14 @@
                             <p>Manage Experiments</p>
                         </a>
                     </li>
+                    <li class="nav-item">
+                        {% url 'manage_catalogs' as manage_catalogs %}
+                        <a href="{{manage_catalogs}}"
+                            class="nav-link {% if manage_catalogs == request.path %} active {% endif %}">
+                            <i class="nav-icon fas fa-database"></i>
+                            <p>Manage Catalogs</p>
+                        </a>
+                    </li>
                 </ul>
             </li>
 

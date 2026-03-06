@@ -162,22 +162,71 @@
         const container = document.getElementById('milestones-container');
         const count = milestoneCount++;
         const html = `
-            <div class="milestone-row form-row mb-2">
-                <div class="col-md-3">
-                    <input type="text" class="form-control" name="milestone-id-${count}" placeholder="ID">
-                </div>
-                <div class="col-md-6">
-                    <input type="text" class="form-control" name="milestone-desc-${count}" placeholder="Description">
-                </div>
-                <div class="col-md-2">
-                    <input type="number" class="form-control" name="milestone-pts-${count}" placeholder="Pts">
-                </div>
-                <div class="col-md-1">
-                    <button type="button" class="btn btn-sm btn-outline-danger btn-block" onclick="this.parentElement.parentElement.remove()">X</button>
+            <div class="milestone-row card mb-3">
+                <div class="card-body pb-2">
+                    <div class="form-row mb-2">
+                        <div class="col-md-3">
+                            <input type="text" class="form-control" name="milestone-id-${count}" placeholder="Milestone ID (e.g., fill_burette)">
+                        </div>
+                        <div class="col-md-6">
+                            <input type="text" class="form-control" name="milestone-desc-${count}" placeholder="Description shown to student">
+                        </div>
+                        <div class="col-md-2">
+                            <input type="number" class="form-control" name="milestone-pts-${count}" placeholder="Points">
+                        </div>
+                        <div class="col-md-1">
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-block" onclick="this.parentElement.parentElement.parentElement.parentElement.remove()">X</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Rules Section -->
+                    <div class="rules-container bg-light p-2 rounded" id="rules-container-${count}">
+                        <h6 class="text-secondary mb-2"><i class="fas fa-code-branch"></i> Validation Rules (Optional)</h6>
+                        <!-- No default rules -->
+                    </div>
+                    <button type="button" class="btn btn-xs btn-outline-secondary mt-1" onclick="addRule(${count})">+ Add Rule</button>
+                    <!-- Hidden input to track rule count for this milestone -->
+                    <input type="hidden" name="rule-count-${count}" id="rule-count-${count}" value="0">
                 </div>
             </div>
         `;
         container.insertAdjacentHTML('beforeend', html);
+    }
+
+    function addRule(milestoneIndex) {
+        const container = document.getElementById(`rules-container-${milestoneIndex}`);
+        const countInput = document.getElementById(`rule-count-${milestoneIndex}`);
+        const ruleIndex = parseInt(countInput.value);
+
+        const html = `
+            <div class="rule-row form-row mb-1">
+                <div class="col-md-3">
+                    <input type="text" class="form-control form-control-sm" name="rule-vessel-${milestoneIndex}-${ruleIndex}" placeholder="Target Vessel (e.g. beaker)">
+                </div>
+                <div class="col-md-3">
+                    <input type="text" class="form-control form-control-sm" name="rule-prop-${milestoneIndex}-${ruleIndex}" placeholder="Property (e.g. hcl_vol)">
+                </div>
+                <div class="col-md-2">
+                    <select class="form-control form-control-sm" name="rule-op-${milestoneIndex}-${ruleIndex}">
+                        <option value=">=">>=</option>
+                        <option value=">">&gt;</option>
+                        <option value="<=">&lt;=</option>
+                        <option value="<">&lt;</option>
+                        <option value="==">==</option>
+                        <option value="!=">!=</option>
+                        <option value="CONTAINS">Contains</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <input type="text" class="form-control form-control-sm" name="rule-val-${milestoneIndex}-${ruleIndex}" placeholder="Value (e.g. 10)">
+                </div>
+                <div class="col-md-1">
+                    <button type="button" class="btn btn-sm btn-outline-danger btn-block py-0" onclick="this.parentElement.parentElement.remove()">x</button>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+        countInput.value = ruleIndex + 1;
     }
 </script>
 {% endblock content %}

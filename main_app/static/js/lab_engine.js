@@ -107,41 +107,59 @@ class MarkingManager {
       }
     }
 
-    // DISPATCH BASED ON EXPERIMENT TYPE
-    if (this.config?.type === 'double_indicator') {
-      this.updateDoubleIndicator(flask, burette);
-    } else if (this.config?.type === 'simple_titration') {
-      this.updateSimpleTitration(flask, burette);
-    }
-  }
+    // EVALUATE DYNAMIC RULES PER MILESTONE
+    for (let m of this.milestones) {
+      if (this.completedIds.has(m.id)) continue; // Already achieved
 
-  updateDoubleIndicator(flask, burette) {
-    if (burette) {
-      if (burette.targetVolume > 24) this.completeMilestone("fill_burette");
-      let reading = abs(burette.capacity - burette.targetVolume);
-      if (this.completedIds.has("fill_burette") && reading < 0.1) this.completeMilestone("zero_burette");
-    }
+      let allRulesPassed = true;
+      if (m.rules && m.rules.length > 0) {
+        for (let rule of m.rules) {
+          let targetVessel = Object.values(vessels).find(v => v.type === rule.target_vessel || (rule.target_vessel === "burette" && (v.type === "burette" || (v.type === "burette_tube" && v.mountedTo))));
+          if (!targetVessel) {
+            allRulesPassed = false;
+            break;
+          }
 
-    if (flask) {
-      if (flask.contents.mixture_vol >= 19.5) this.completeMilestone("pipette_mixture");
-      if (this.completedIds.has("pipette_mixture") && flask.contents.pp_drops >= 1) this.completeMilestone("add_pp");
-      if (flask.contents.mo_drops > 0 && !this.completedIds.has("reach_v1")) {
-        this.addPenalty("wrong_sequence", 15, "Added Methyl Orange before V1 endpoint.");
+          // Extract the property value to check
+          let propValue = null;
+          if (rule.target_property === "reading") { // Special case for burette reading
+            propValue = abs(targetVessel.capacity - targetVessel.targetVolume);
+          } else if (rule.target_property === "capacity") {
+            propValue = targetVessel.targetVolume; // How much liquid is inside
+          } else if (targetVessel.contents && targetVessel.contents[rule.target_property] !== undefined) {
+            propValue = targetVessel.contents[rule.target_property];
+          } else if (targetVessel.contents && targetVessel.contents.indicators) {
+            // Treat unknown properties as indicators (default 0 if not yet added)
+            propValue = targetVessel.contents.indicators[rule.target_property] || 0;
+          } else {
+            propValue = 0;
+          }
+
+          // Evaluate generic operator string
+          let rulePassed = false;
+          switch (rule.operator) {
+            case ">=": rulePassed = (propValue >= rule.value); break;
+            case ">": rulePassed = (propValue > rule.value); break;
+            case "<=": rulePassed = (propValue <= rule.value); break;
+            case "<": rulePassed = (propValue < rule.value); break;
+            case "==": rulePassed = (propValue === rule.value); break;
+            case "!=": rulePassed = (propValue !== rule.value); break;
+            case "CONTAINS": rulePassed = (propValue > 0); break; // Contains any amount
+          }
+
+          if (!rulePassed) {
+            allRulesPassed = false;
+            break;
+          }
+        }
+      } else {
+        // Milestone has no rules, meaning it relies on a specific manual interaction hook
+        allRulesPassed = false;
       }
-      if (this.completedIds.has("reach_v1") && flask.contents.mo_drops >= 1) this.completeMilestone("add_mo");
-    }
-  }
 
-  updateSimpleTitration(flask, burette) {
-    if (burette) {
-      if (burette.targetVolume > 24) this.completeMilestone("fill_burette");
-      let reading = abs(burette.capacity - burette.targetVolume);
-      if (this.completedIds.has("fill_burette") && reading < 0.1) this.completeMilestone("zero_burette");
-    }
-
-    if (flask) {
-      if (flask.contents.hcl_vol >= 19.5 || flask.contents.mixture_vol >= 19.5) this.completeMilestone("pipette_acid");
-      if (this.completedIds.has("pipette_acid") && flask.contents.pp_drops >= 1) this.completeMilestone("add_indicator");
+      if (allRulesPassed) {
+        this.completeMilestone(m.id);
+      }
     }
   }
 
@@ -174,7 +192,7 @@ class MarkingManager {
     if (val !== null && val !== "") {
       let userV1 = parseFloat(val);
       const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-      let trueV1 = flask.contents.hcl_vol; // The real volume added in simulation
+      let trueV1 = flask.contents.titrant_vol; // The real volume added in simulation
 
       // Mark accuracy of observation (within 0.2 mL tolerance)
       if (abs(userV1 - trueV1) > 0.2) {
@@ -191,7 +209,7 @@ class MarkingManager {
     if (val !== null && val !== "") {
       let userV2 = parseFloat(val);
       const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-      let trueV2 = flask.contents.hcl_vol;
+      let trueV2 = flask.contents.titrant_vol;
 
       // Mark accuracy of observation (within 0.2 mL tolerance)
       if (abs(userV2 - trueV2) > 0.2) {
@@ -301,7 +319,7 @@ class MarkingManager {
 
 function drawEndpointButtons(x, y, w) {
   const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-  if (!flask || flask.contents.mixture_vol < 1 && flask.contents.hcl_vol < 1) return;
+  if (!flask || flask.contents.mixture_vol < 1 && flask.contents.titrant_vol < 1) return;
 
   if (manager.config?.type === 'double_indicator') {
     if (idIsDone("add_pp") && !idIsDone("reach_v1")) {
@@ -353,22 +371,6 @@ function updateLabSurfaces() {
   labSurfaces = getLabSurfaces();
 }
 
-// ======================================================
-// CHEMICALS
-// ======================================================
-const CHEMICALS = {
-  acid: [
-    { id: 'hcl_0_1M', label: '0.1 M HCl' },
-    { id: 'h2so4_0_1M', label: '0.1 M H2SO4' }
-  ],
-  base: [
-    { id: 'naoh_0_1M', label: '0.1 M NaOH' },
-    { id: 'koh_0_1M', label: '0.1 M KOH' }
-  ],
-  indicator: [
-    { id: 'phenolphthalein', label: 'Phenolphthalein' }
-  ]
-};
 
 // Big vs Small apparatus classification
 const BIG_APPARATUS = [
@@ -479,48 +481,44 @@ function setup() {
     burette_tube: imgBuretteTube, common_stand: imgStand
   });
 
-  chemicalCatalog = new ChemicalCatalog([
-    {
-      id: 'na2co3_nahco3',
-      label: '25% Na₂CO₃+NaHCO₃',
-      name: 'Sodium Carbonate + Bicarbonate',
-      formula: 'Na₂CO₃ + NaHCO₃',
-      conc: '25%',
-      color: [220, 180, 100]
-    },
-    {
-      id: 'hcl_0_1M',
-      label: '0.1M HCl (Burette)',
-      name: 'Hydrochloric Acid',
-      formula: 'HCl',
-      conc: '0.1M',
-      color: [255, 120, 80]
-    },
-    {
-      id: 'phenolphthalein',
-      label: 'Phenolphthalein',
-      name: 'Phenolphthalein',
-      formula: 'C₂₀H₁₄O₄',
-      conc: '',
-      color: [255, 180, 220]
-    },
-    {
-      id: 'methyl_orange',
-      label: 'Methyl Orange',
-      name: 'Methyl Orange',
-      formula: 'C₁₄H₁₄N₃NaO₃S',
-      conc: '',
-      color: [255, 160, 60]
-    },
-    {
-      id: 'distilled_water',
-      label: 'Distilled Water',
-      name: 'Distilled Water',
-      formula: 'H₂O',
-      conc: '',
-      color: [200, 220, 255]
-    }
-  ]);
+  // Dynamic Chemical Loading
+  let dynamicChemicals = [];
+  if (experimentData && experimentData.catalogs && experimentData.catalogs.chemicals) {
+    dynamicChemicals = experimentData.catalogs.chemicals.map(c => {
+      // Parse hex color "#RRGGBB" to [R, G, B]
+      let r = 200, g = 200, b = 200;
+      if (c.color && c.color.startsWith('#')) {
+        let hex = c.color.replace('#', '');
+        if (hex.length === 6) {
+          r = parseInt(hex.substring(0, 2), 16);
+          g = parseInt(hex.substring(2, 4), 16);
+          b = parseInt(hex.substring(4, 6), 16);
+        }
+      }
+      return {
+        id: c.name, // Use name as ID for matching rules
+        label: c.name,
+        name: c.name,
+        formula: c.formula,
+        conc: c.molarity ? c.molarity + 'M' : '',
+        color: [r, g, b]
+      };
+    });
+  } else {
+    // Fallback if no DB catalogs present
+    dynamicChemicals = [
+      { id: 'Sodium Carbonate + Bicarbonate', label: '25% Na₂CO₃+NaHCO₃', name: 'Sodium Carbonate + Bicarbonate', formula: 'Na₂CO₃ + NaHCO₃', conc: '25%', color: [220, 180, 100] },
+      { id: 'Hydrochloric Acid', label: '0.1M HCl (Burette)', name: 'Hydrochloric Acid', formula: 'HCl', conc: '0.1M', color: [255, 120, 80] },
+      { id: 'Phenolphthalein', label: 'Phenolphthalein', name: 'Phenolphthalein', formula: 'C₂₀H₁₄O₄', conc: '', color: [255, 180, 220] },
+      { id: 'Methyl Orange', label: 'Methyl Orange', name: 'Methyl Orange', formula: 'C₁₄H₁₄N₃NaO₃S', conc: '', color: [255, 160, 60] },
+      { id: 'Distilled Water', label: 'Distilled Water', name: 'Distilled Water', formula: 'H₂O', conc: '', color: [200, 220, 255] }
+    ];
+  }
+
+  chemicalCatalog = new ChemicalCatalog(dynamicChemicals);
+
+  // Expose global physics reactions from dynamic payload
+  window.CHEMICAL_REACTIONS = (experimentData && experimentData.catalogs) ? experimentData.catalogs.reactions : [];
 
 }
 
@@ -565,16 +563,6 @@ function askCapacity(type) {
   return options.includes(value) ? value : null;
 }
 
-function askChemical(kind) {
-  const list = CHEMICALS[kind];
-  if (!list?.length) return null;
-
-  const text = list.map((c, i) => `${i + 1}. ${c.label}`).join('\n');
-  const choice = window.prompt(`Choose a ${kind}:\n${text}`);
-  if (choice === null) return null;
-  const idx = parseInt(choice, 10) - 1;
-  return (idx >= 0 && idx < list.length) ? list[idx] : null;
-}
 
 // ======================================================
 // SMART SPAWN & COLLISION
@@ -710,21 +698,13 @@ function makeVessel(id, x, y, w, h, title, chem, vtype, vol, cap) {
     // NEW: THE CHEMICAL BRAIN (For Double Indicator Test)
     // ======================================================
     contents: {
-      // Precise volume tracking for marking
-      mixture_vol: 0,       // Volume of Na2CO3 + NaHCO3 (Analyte)
-      hcl_vol: 0,           // Volume of HCl added (Titrant)
-      water_vol: 0,         // For rinsing/dilution checks
-
-      // Indicator Tracking
-      pp_drops: 0,          // Phenolphthalein drops
-      mo_drops: 0,          // Methyl Orange drops
-
-      // Assessment Flags (Procedural Marking)
-      isRinsed: false,      // Did student clean it before use?
-      isContaminated: false, // Flagged if wrong chemicals mixed
-      titrationStage: 1,    // 1 = V1 (PP), 2 = V2 (MO)
-
-      // Target values (Updated dynamically during experiment)
+      mixture_vol: 0,       // Analyte volume
+      titrant_vol: 0,       // Titrant volume added
+      water_vol: 0,         // Water added
+      indicators: {},       // e.g. {'Phenolphthalein': 0}
+      isRinsed: false,
+      isContaminated: false,
+      titrationStage: 1,
       theoreticalV1: 10.0,
       theoreticalV2: 25.0
     }
@@ -740,32 +720,38 @@ function makeResponsiveVessel(id, type) {
 
 function getTitrationColor(v) {
   const c = v.contents;
-  // Ensure we use the randomized target from your student_views.py
-  // Fallback to 10.0 if for some reason the config didn't load
   const targetV1 = (typeof THEORETICAL_V1 !== 'undefined') ? THEORETICAL_V1 : 10.0;
   const targetV2 = (typeof THEORETICAL_V2 !== 'undefined') ? THEORETICAL_V2 : 25.0;
 
-  // 1. If flask is basically empty, show water
   if (c.mixture_vol < 0.5) return [200, 220, 255, 100];
 
-  // 2. Stage 1: Phenolphthalein (Analyte + PP = PINK)
-  if (c.pp_drops > 0 && c.mo_drops === 0) {
-    if (c.hcl_vol < targetV1) {
-      // Fade intensity near the endpoint
-      let intensity = map(c.hcl_vol, targetV1 - 1.5, targetV1, 220, 30, true);
-      return [255, 105, 180, intensity];
-    } else {
-      return [245, 245, 255, 100]; // Endpoint reached: Colorless
+  const type = experimentData?.type || 'simple_titration';
+
+  if (type === 'double_indicator') {
+    const pp = c.indicators['Phenolphthalein'] || 0;
+    const mo = c.indicators['Methyl Orange'] || 0;
+
+    if (pp > 0 && mo === 0) {
+      if (c.titrant_vol < targetV1) {
+        let intensity = map(c.titrant_vol, targetV1 - 1.5, targetV1, 220, 30, true);
+        return [255, 105, 180, intensity];
+      } else {
+        return [245, 245, 255, 100];
+      }
+    }
+    if (mo > 0) {
+      if (c.titrant_vol < targetV2) return [255, 210, 0, 180];
+      else return [255, 80, 0, 220];
+    }
+  } else {
+    // Basic Acid-Base for other titrations
+    const indicator = Object.keys(c.indicators).find(k => c.indicators[k] > 0);
+    if (indicator) {
+      if (c.titrant_vol < targetV1) return [255, 200, 200, 180]; // Before endpoint
+      else return [200, 255, 200, 180]; // At passed endpoint
     }
   }
 
-  // 3. Stage 2: Methyl Orange (After V1 + MO = YELLOW)
-  if (c.mo_drops > 0) {
-    if (c.hcl_vol < targetV2) return [255, 210, 0, 180]; // Yellow
-    else return [255, 80, 0, 220]; // Red/Orange Endpoint
-  }
-
-  // 4. Default Analyte color (Amber/Tan)
   return [235, 215, 160, 160];
 }
 
@@ -1067,6 +1053,12 @@ function handleIndicatorDrops() {
   }
 }
 
+function engineIsIndicator(id) {
+  if (!id) return false;
+  let lower = id.toLowerCase();
+  return lower.includes('phenolphthalein') || lower.includes('methyl');
+}
+
 function handlePipetteInteraction() {
   if (!isDragging || isDragging.type !== 'pipette') return;
   const pipette = isDragging;
@@ -1083,7 +1075,6 @@ function handlePipetteInteraction() {
       let amt = min(rate, source.targetVolume, pipette.capacity - pipette.targetVolume);
       source.targetVolume -= amt;
       pipette.targetVolume += amt;
-      // Transfer identity to pipette
       pipette.color = source.color;
       pipette.chemicalId = source.chemicalId;
       pipette.chem = source.chem;
@@ -1097,19 +1088,13 @@ function handlePipetteInteraction() {
       pipette.targetVolume -= amt;
       receiver.targetVolume += amt;
 
-      // --- MIXING LOGIC: Don't overwrite the flask if it's already an Analyte ---
-      const isIndicator = pipette.chemicalId === 'phenolphthalein' || pipette.chemicalId === 'methyl_orange';
-
-      if (pipette.chemicalId === 'na2co3_nahco3') {
+      if (receiver.contents.mixture_vol < 0.1 || !engineIsIndicator(pipette.chemicalId)) {
         receiver.contents.mixture_vol += amt;
         receiver.chemicalId = pipette.chemicalId;
-        receiver.chem = "Analyte Mixture";
+        receiver.chem = pipette.chemicalId;
         receiver.color = pipette.color;
-      } else if (isIndicator) {
-        // Update the "Brain" counts only
-        if (pipette.chemicalId === 'phenolphthalein') receiver.contents.pp_drops += (amt * 10);
-        if (pipette.chemicalId === 'methyl_orange') receiver.contents.mo_drops += (amt * 10);
-        // Note: We DO NOT change receiver.chem or receiver.color here
+      } else {
+        receiver.contents.indicators[pipette.chemicalId] = (receiver.contents.indicators[pipette.chemicalId] || 0) + (amt * 10);
       }
 
       // ADD TURBULENCE (Ripples) - MORE SUBTLE
@@ -2309,20 +2294,15 @@ function keyPressed() {
   // Logic: If you are dragging an indicator bottle over a flask/beaker, press 'D' to add a drop.
   // Inside keyPressed()
   if (keyL === 'd' && isDragging) {
-    // Use a wider distance (120) because students drag bottles loosely
     const target = Object.values(vessels).find(v =>
       (v.type === 'conical_flask' || v.type === 'beaker') && dist(isDragging.x, isDragging.y, v.x, v.y) < 120
     );
 
     if (target) {
-      if (isDragging.chemicalId === 'phenolphthalein') {
-        target.contents.pp_drops += 1;
+      if (isDragging.isChemical) {
+        target.contents.indicators[isDragging.chemicalId] = (target.contents.indicators[isDragging.chemicalId] || 0) + 1;
         createParticles(isDragging.x, isDragging.y + 30, 2, 'drip');
-        console.log("SUCCESS: PP drops added to Brain. Count:", target.contents.pp_drops);
-      } else if (isDragging.chemicalId === 'methyl_orange') {
-        target.contents.mo_drops += 1;
-        createParticles(isDragging.x, isDragging.y + 30, 2, 'drip');
-        console.log("SUCCESS: MO drops added to Brain. Count:", target.contents.mo_drops);
+        console.log("SUCCESS: " + isDragging.chemicalId + " drops added to Brain. Count:", target.contents.indicators[isDragging.chemicalId]);
       }
     } else {
       console.log("HINT: Move bottle closer to the flask center to drop.");
@@ -2362,7 +2342,7 @@ function keyPressed() {
         } else {
           receiver.targetVolume += flow;
           studentVolume += flow;
-          receiver.contents.hcl_vol += flow;
+          receiver.contents.titrant_vol += flow;
           receiver.turbulence = min((receiver.turbulence || 0) + 0.3, 2);
         }
 
@@ -2634,14 +2614,11 @@ function spawnApparatusFromCatalog(item) {
     }
   }
   else if (type === 'bottle') {
-    const chem = askChemical('base'); // Default to base for titration
-    if (!chem) return;
     v = makeResponsiveVessel(nextId('bottle'), 'bottle');
     if (v) {
-      v.chem = chem.label;
-      v.title = 'Reagent Bottle';
-      v.volume = 100;
-      v.chemicalId = chem.id;
+      v.title = 'Empty Bottle';
+      v.volume = 0;
+      v.capacity = 250;
     }
   }
   else if (type === 'funnel') {
@@ -2783,14 +2760,7 @@ function spawnChemicalBottle(chem) {
   bottle.targetVolume = 100;
   bottle.capacity = 250;
   bottle.isChemical = true;
-
-  switch (chem.id) {
-    case 'na2co3_nahco3': bottle.title = '25% Carbonate Mixture'; break;
-    case 'hcl_0_1M': bottle.title = '0.1M HCl (Titration)'; break;
-    case 'phenolphthalein': bottle.title = 'Phenolphthalein'; break;
-    case 'methyl_orange': bottle.title = 'Methyl Orange'; break;
-    default: bottle.title = chem.label;
-  }
+  bottle.title = chem.label;
 
   vessels[bottle.id] = bottle;
   console.log(`Spawned: ${bottle.title}`);

@@ -1,0 +1,294 @@
+{% extends 'hod_template/base_template.html' %}
+
+{% block page_title %}
+Manage Catalogs & Reactions
+{% endblock page_title %}
+
+{% block content %}
+<section class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Left Column: Databases (Chemicals & Apparatus) -->
+            <div class="col-md-7">
+
+                <!-- Chemical Catalog -->
+                <div class="card card-primary">
+                    <div class="card-header">
+                        <h3 class="card-title">Chemical Catalog</h3>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-bordered table-hover mt-3">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Formula</th>
+                                    <th>Molarity/Density</th>
+                                    <th>Color</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for chem in chemicals %}
+                                <tr>
+                                    <td>{{ chem.name }}</td>
+                                    <td>{{ chem.formula }}</td>
+                                    <td>{{ chem.molarity }}M / {{ chem.density }}g/ml</td>
+                                    <td>
+                                        <div
+                                            style="width: 20px; height: 20px; background-color: {{ chem.default_color_hex }}; border: 1px solid #000; display: inline-block;">
+                                        </div>
+                                        <small>{{ chem.default_color_hex }}</small>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'delete_chemical' chem.id %}" class="btn btn-sm btn-danger"
+                                            onclick="return confirm('Delete this chemical?');">Delete</a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center">No chemicals defined.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+
+                        <hr>
+                        <h5>Add New Chemical</h5>
+                        <form action="{% url 'add_chemical' %}" method="POST">
+                            {% csrf_token %}
+                            <div class="form-row">
+                                <div class="form-group col-md-4">
+                                    <label>Name</label>
+                                    <input type="text" class="form-control" name="name" required
+                                        placeholder="e.g. Hydrochloric Acid">
+                                </div>
+                                <div class="form-group col-md-3">
+                                    <label>Formula</label>
+                                    <input type="text" class="form-control" name="formula" required
+                                        placeholder="e.g. HCl">
+                                </div>
+                                <div class="form-group col-md-2">
+                                    <label>State</label>
+                                    <select name="state" class="form-control">
+                                        <option value="liquid">Liquid</option>
+                                        <option value="solid">Solid</option>
+                                        <option value="gas">Gas</option>
+                                    </select>
+                                </div>
+                                <div class="form-group col-md-3">
+                                    <label>Color (Hex)</label>
+                                    <input type="text" class="form-control" name="default_color_hex" value="#FFFFFF">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-md-3">
+                                    <label>Molarity (M)</label>
+                                    <input type="number" step="0.01" class="form-control" name="molarity" value="1.0">
+                                </div>
+                                <div class="form-group col-md-3">
+                                    <label>Density (g/ml)</label>
+                                    <input type="number" step="0.01" class="form-control" name="density" value="1.0">
+                                </div>
+                                <div class="form-group col-md-6 align-self-end">
+                                    <button type="submit" class="btn btn-primary btn-block">Add Chemical</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Apparatus Catalog -->
+                <div class="card card-warning mt-4">
+                    <div class="card-header">
+                        <h3 class="card-title">Apparatus Catalog</h3>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-bordered table-hover mt-3">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Capacity</th>
+                                    <th>Flags</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for app in apparatus %}
+                                <tr>
+                                    <td>{{ app.name }}</td>
+                                    <td>{{ app.type }}</td>
+                                    <td>{{ app.max_capacity }}ml</td>
+                                    <td>
+                                        {% if app.is_container %}<span class="badge badge-info">Container</span>{% endif
+                                        %}
+                                        {% if app.is_heatable %}<span class="badge badge-danger">Heatable</span>{% endif
+                                        %}
+                                        {% if app.can_pour %}<span class="badge badge-success">Pourable</span>{% endif
+                                        %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'delete_apparatus' app.id %}" class="btn btn-sm btn-danger"
+                                            onclick="return confirm('Delete this apparatus?');">Delete</a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center">No apparatus defined.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+
+                        <hr>
+                        <h5>Add New Apparatus</h5>
+                        <form action="{% url 'add_apparatus' %}" method="POST">
+                            {% csrf_token %}
+                            <div class="form-row">
+                                <div class="form-group col-md-4">
+                                    <label>Name</label>
+                                    <input type="text" class="form-control" name="name" required
+                                        placeholder="e.g. 250ml Beaker">
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label>Type ID</label>
+                                    <input type="text" class="form-control" name="type" required
+                                        placeholder="e.g. beaker">
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label>Max Capacity (ml)</label>
+                                    <input type="number" class="form-control" name="max_capacity" value="250">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label>SVG Sprite URL</label>
+                                    <input type="text" class="form-control" name="svg_sprite_url"
+                                        value="/static/assets/beaker.svg">
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label>Behaviors</label><br>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" name="is_container" checked>
+                                        <label class="form-check-label">Container</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" name="is_heatable" checked>
+                                        <label class="form-check-label">Heatable</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" name="can_pour" checked>
+                                        <label class="form-check-label">Can Pour</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-warning btn-block">Add Apparatus</button>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Column: Reactions -->
+            <div class="col-md-5">
+                <div class="card card-success">
+                    <div class="card-header">
+                        <h3 class="card-title">Chemical Reactions (Stoichiometry)</h3>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-bordered table-sm mt-3">
+                            <thead>
+                                <tr>
+                                    <th>A + B</th>
+                                    <th>Product</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for rxn in reactions %}
+                                <tr>
+                                    <td>
+                                        <b>{{ rxn.reactant_a.name }}</b> + <br>
+                                        <b>{{ rxn.reactant_b.name }}</b>
+                                    </td>
+                                    <td>
+                                        {{ rxn.product_name }}<br>
+                                        <span class="badge badge-secondary"
+                                            style="background-color: {{ rxn.product_color_hex }}">{{
+                                            rxn.product_color_hex }}</span>
+                                    </td>
+                                    <td class="align-middle text-center">
+                                        <a href="{% url 'delete_reaction' rxn.id %}" class="btn btn-sm btn-danger"
+                                            onclick="return confirm('Delete reaction?');"><i
+                                                class="fas fa-trash"></i></a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center">No reactions defined.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+
+                        <hr>
+                        <h5>Add New Reaction</h5>
+                        <form action="{% url 'add_reaction' %}" method="POST">
+                            {% csrf_token %}
+                            <div class="form-group">
+                                <label>Reactant A</label>
+                                <select name="reactant_a" class="form-control" required>
+                                    {% for chem in chemicals %}
+                                    <option value="{{ chem.id }}">{{ chem.name }} ({{ chem.formula }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Reactant B</label>
+                                <select name="reactant_b" class="form-control" required>
+                                    {% for chem in chemicals %}
+                                    <option value="{{ chem.id }}">{{ chem.name }} ({{ chem.formula }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Product Name</label>
+                                <input type="text" class="form-control" name="product_name" required
+                                    placeholder="e.g. Salt Water">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label>Product Color (Hex)</label>
+                                    <input type="text" class="form-control" name="product_color_hex" value="#FFFFFF">
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label>&nbsp;</label>
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" name="is_exothermic">
+                                        <label class="form-check-label">Is Exothermic</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-block">Add Reaction</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="form-group mt-4">
+                    {% if messages %}
+                    {% for message in messages %}
+                    {% if message.tags == 'error' %}
+                    <div class="alert alert-danger">{{ message }}</div>
+                    {% endif %}
+                    {% if message.tags == 'success' %}
+                    <div class="alert alert-success">{{ message }}</div>
+                    {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock content %}
