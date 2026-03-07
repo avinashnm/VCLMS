@@ -901,8 +901,8 @@ def lab_experiment_simulation(request, slug):
         chemicals_list = [
             {
                 "id": c.id, "name": c.name, "formula": c.formula,
-                "state": c.state, "molarity": c.molarity, "density": c.density,
-                "color": c.default_color_hex
+                "molarity": c.molarity, "density": c.density,
+                "color": c.default_color_hex, "is_indicator": c.is_indicator
             } for c in ChemicalCatalog.objects.all()
         ]
         
@@ -910,15 +910,18 @@ def lab_experiment_simulation(request, slug):
             {
                 "id": a.id, "name": a.name, "type": a.type,
                 "max_capacity": a.max_capacity, "sprite": a.svg_sprite_url,
-                "is_container": a.is_container, "is_heatable": a.is_heatable, "can_pour": a.can_pour
+                "is_heatable": a.is_heatable, "can_measure_vol": a.can_measure_vol, "can_pour": a.can_pour
             } for a in ApparatusCatalog.objects.all()
         ]
         
         reactions_list = [
             {
-                "id": r.id, "reactant_a": r.reactant_a.id, "reactant_b": r.reactant_b.id,
-                "product_name": r.product_name, "product_color": r.product_color_hex,
-                "is_exothermic": r.is_exothermic
+                "id": r.id, 
+                "chemical_a": r.chemical_a.id, 
+                "chemical_b": r.chemical_b.id,
+                "product": r.product.id if r.product else None,
+                "reaction_color_hex": r.reaction_color_hex,
+                "ph_change": r.ph_change
             } for r in ChemicalReaction.objects.all()
         ]
             

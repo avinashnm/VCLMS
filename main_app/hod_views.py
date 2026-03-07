@@ -1484,8 +1484,14 @@ def edit_experiment(request, experiment_id):
         return redirect(reverse("manage_experiments"))
         
     else:
+        try:
+            target_config = experiment.target_config
+        except ExperimentTargetConfig.DoesNotExist:
+            target_config = None
+
         context = {
             'experiment': experiment,
+            'target_config': target_config,
             'materials': experiment.materials.all(),
             'steps': experiment.steps.all().order_by('step_number'),
             'milestones': experiment.milestones.all()
@@ -1565,19 +1571,20 @@ def add_apparatus(request):
 
 def add_reaction(request):
     if request.method == "POST":
-        reactant_a_id = request.POST.get('reactant_a')
-        reactant_b_id = request.POST.get('reactant_b')
-        product_name = request.POST.get('product_name')
-        product_color_hex = request.POST.get('product_color_hex')
-        is_exothermic = request.POST.get('is_exothermic') == 'on'
+        chemical_a_id = request.POST.get('chemical_a_id')
+        chemical_b_id = request.POST.get('chemical_b_id')
+        product_id = request.POST.get('product_id')
+        reaction_color_hex = request.POST.get('reaction_color_hex', '#FFFFFF80')
+        ph_change = float(request.POST.get('ph_change', 0.0))
         
         try:
-            r_a = ChemicalCatalog.objects.get(id=reactant_a_id)
-            r_b = ChemicalCatalog.objects.get(id=reactant_b_id)
+            c_a = ChemicalCatalog.objects.get(id=chemical_a_id)
+            c_b = ChemicalCatalog.objects.get(id=chemical_b_id)
+            product = ChemicalCatalog.objects.get(id=product_id) if product_id else None
             ChemicalReaction.objects.create(
-                reactant_a=r_a, reactant_b=r_b,
-                product_name=product_name, product_color_hex=product_color_hex,
-                is_exothermic=is_exothermic
+                chemical_a=c_a, chemical_b=c_b,
+                product=product, reaction_color_hex=reaction_color_hex,
+                ph_change=ph_change
             )
             messages.success(request, "Reaction added successfully!")
         except Exception as e:

@@ -236,37 +236,38 @@ Manage Catalogs & Reactions
                         <form action="{% url 'add_reaction' %}" method="POST">
                             {% csrf_token %}
                             <div class="form-group">
-                                <label>Reactant A</label>
-                                <select name="reactant_a" class="form-control" required>
+                                <label>Chemical A</label>
+                                <select name="chemical_a_id" class="form-control" required>
                                     {% for chem in chemicals %}
                                     <option value="{{ chem.id }}">{{ chem.name }} ({{ chem.formula }})</option>
                                     {% endfor %}
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>Reactant B</label>
-                                <select name="reactant_b" class="form-control" required>
+                                <label>Chemical B</label>
+                                <select name="chemical_b_id" class="form-control" required>
                                     {% for chem in chemicals %}
                                     <option value="{{ chem.id }}">{{ chem.name }} ({{ chem.formula }})</option>
                                     {% endfor %}
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>Product Name</label>
-                                <input type="text" class="form-control" name="product_name" required
-                                    placeholder="e.g. Salt Water">
+                                <label>Product</label>
+                                <select name="product_id" class="form-control">
+                                    <option value="">None (Color/pH Change Only)</option>
+                                    {% for chem in chemicals %}
+                                    <option value="{{ chem.id }}">{{ chem.name }} ({{ chem.formula }})</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             <div class="form-row">
                                 <div class="form-group col-md-6">
-                                    <label>Product Color (Hex)</label>
-                                    <input type="text" class="form-control" name="product_color_hex" value="#FFFFFF">
+                                    <label>Reaction Color (Hex)</label>
+                                    <input type="text" class="form-control" name="reaction_color_hex" value="#FFFFFF80">
                                 </div>
                                 <div class="form-group col-md-6">
-                                    <label>&nbsp;</label>
-                                    <div class="form-check mt-2">
-                                        <input class="form-check-input" type="checkbox" name="is_exothermic">
-                                        <label class="form-check-label">Is Exothermic</label>
-                                    </div>
+                                    <label>pH Change</label>
+                                    <input type="number" step="0.1" class="form-control" name="ph_change" value="0.0">
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-success btn-block">Add Reaction</button>
