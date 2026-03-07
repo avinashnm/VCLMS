@@ -67,13 +67,12 @@ Manage Catalogs & Reactions
                                     <input type="text" class="form-control" name="formula" required
                                         placeholder="e.g. HCl">
                                 </div>
-                                <div class="form-group col-md-2">
-                                    <label>State</label>
-                                    <select name="state" class="form-control">
-                                        <option value="liquid">Liquid</option>
-                                        <option value="solid">Solid</option>
-                                        <option value="gas">Gas</option>
-                                    </select>
+                                <div class="form-group col-md-2 mt-4 pt-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="is_indicator"
+                                            id="is_indicator">
+                                        <label class="form-check-label" for="is_indicator">Is Indicator</label>
+                                    </div>
                                 </div>
                                 <div class="form-group col-md-3">
                                     <label>Color (Hex)</label>
@@ -120,7 +119,8 @@ Manage Catalogs & Reactions
                                     <td>{{ app.type }}</td>
                                     <td>{{ app.max_capacity }}ml</td>
                                     <td>
-                                        {% if app.is_container %}<span class="badge badge-info">Container</span>{% endif
+                                        {% if app.can_measure_vol %}<span class="badge badge-info">Measures Vol</span>{%
+                                        endif
                                         %}
                                         {% if app.is_heatable %}<span class="badge badge-danger">Heatable</span>{% endif
                                         %}
@@ -169,8 +169,8 @@ Manage Catalogs & Reactions
                                 <div class="form-group col-md-6">
                                     <label>Behaviors</label><br>
                                     <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" name="is_container" checked>
-                                        <label class="form-check-label">Container</label>
+                                        <input class="form-check-input" type="checkbox" name="can_measure_vol" checked>
+                                        <label class="form-check-label">Measures Vol</label>
                                     </div>
                                     <div class="form-check form-check-inline">
                                         <input class="form-check-input" type="checkbox" name="is_heatable" checked>

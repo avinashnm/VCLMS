@@ -1523,19 +1523,20 @@ def add_chemical(request):
     if request.method == "POST":
         name = request.POST.get('name')
         formula = request.POST.get('formula')
-        state = request.POST.get('state')
         molarity = request.POST.get('molarity')
         density = request.POST.get('density')
-        default_color_hex = request.POST.get('default_color_hex')
+        default_color_hex = request.POST.get('default_color_hex', '#FFFFFF80')
+        is_indicator = request.POST.get('is_indicator') == 'on'
         
         try:
             molarity_val = float(molarity) if molarity else 1.0
             density_val = float(density) if density else 1.0
             
             ChemicalCatalog.objects.create(
-                name=name, formula=formula, state=state,
+                name=name, formula=formula,
                 molarity=molarity_val, density=density_val,
-                default_color_hex=default_color_hex
+                default_color_hex=default_color_hex,
+                is_indicator=is_indicator
             )
             messages.success(request, "Chemical added successfully!")
         except Exception as e:
@@ -1551,7 +1552,7 @@ def add_apparatus(request):
         svg_sprite_url = request.POST.get('svg_sprite_url')
         
         # Checkboxes
-        is_container = request.POST.get('is_container') == 'on'
+        can_measure_vol = request.POST.get('can_measure_vol') == 'on'
         is_heatable = request.POST.get('is_heatable') == 'on'
         can_pour = request.POST.get('can_pour') == 'on'
         
@@ -1561,7 +1562,7 @@ def add_apparatus(request):
             ApparatusCatalog.objects.create(
                 name=name, type=type_val, max_capacity=cap_val,
                 svg_sprite_url=svg_sprite_url,
-                is_container=is_container, is_heatable=is_heatable, can_pour=can_pour
+                can_measure_vol=can_measure_vol, is_heatable=is_heatable, can_pour=can_pour
             )
             messages.success(request, "Apparatus added successfully!")
         except Exception as e:
