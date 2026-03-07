@@ -208,14 +208,14 @@ Manage Catalogs & Reactions
                                 {% for rxn in reactions %}
                                 <tr>
                                     <td>
-                                        <b>{{ rxn.reactant_a.name }}</b> + <br>
-                                        <b>{{ rxn.reactant_b.name }}</b>
+                                        <b>{{ rxn.chemical_a.name }}</b> + <br>
+                                        <b>{{ rxn.chemical_b.name }}</b>
                                     </td>
                                     <td>
-                                        {{ rxn.product_name }}<br>
+                                        {{ rxn.product.name }}<br>
                                         <span class="badge badge-secondary"
-                                            style="background-color: {{ rxn.product_color_hex }}">{{
-                                            rxn.product_color_hex }}</span>
+                                            style="background-color: {{ rxn.reaction_color_hex }}">{{
+                                            rxn.reaction_color_hex }}</span>
                                     </td>
                                     <td class="align-middle text-center">
                                         <a href="{% url 'delete_reaction' rxn.id %}" class="btn btn-sm btn-danger"
