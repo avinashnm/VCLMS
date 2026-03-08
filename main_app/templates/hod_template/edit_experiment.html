@@ -44,10 +44,14 @@
                                 <!-- prettier-ignore -->
                                 <!-- djlint:off -->
                                 <select class="form-control" name="type" required>
-                                    <option value="simple_titration" {% if experiment.type == 'simple_titration' %}selected{% endif %}>Simple Titration</option>
-                                    <option value="double_indicator" {% if experiment.type == 'double_indicator' %}selected{% endif %}>Double Indicator Titration</option>
-                                    <option value="rast" {% if experiment.type == 'rast' %}selected{% endif %}>Rast Method</option>
-                                    <option value="placeholder" {% if experiment.type == 'placeholder' %}selected{% endif %}>Placeholder</option>
+                                    <option value="simple_titration" {% if experiment.type=='simple_titration'
+                                        %}selected{% endif %}>Simple Titration</option>
+                                    <option value="double_indicator" {% if experiment.type=='double_indicator'
+                                        %}selected{% endif %}>Double Indicator Titration</option>
+                                    <option value="rast" {% if experiment.type=='rast' %}selected{% endif %}>Rast Method
+                                    </option>
+                                    <option value="placeholder" {% if experiment.type=='placeholder' %}selected{% endif
+                                        %}>Placeholder</option>
                                 </select>
                                 <!-- djlint:on -->
                                 <small class="text-muted">Choose the simulation template to be used.</small>
@@ -169,6 +173,8 @@
                                                         value="{{ rule.target_property }}" placeholder="Property">
                                                 </div>
                                                 <div class="col-md-2">
+                                                    <!-- prettier-ignore -->
+                                                    <!-- djlint:off -->
                                                     <select class="form-control form-control-sm"
                                                         name="rule-op-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}">
                                                         <option value=">=" {% if rule.operator=='>=' %}selected{% endif
@@ -186,6 +192,7 @@
                                                         <option value="CONTAINS" {% if rule.operator=='CONTAINS'
                                                             %}selected{% endif %}>Contains</option>
                                                     </select>
+                                                    <!-- djlint:on -->
                                                 </div>
                                                 <div class="col-md-3">
                                                     <input type="text" class="form-control form-control-sm"
