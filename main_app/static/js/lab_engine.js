@@ -468,7 +468,12 @@ function setup() {
 
   updateResponsivePositions();
 
-  apparatusCatalog = new LabCatalog({ scale: 0.75 });
+  // Dynamic Apparatus Loading
+  let dynamicApparatus = [];
+  if (experimentData && experimentData.catalogs && experimentData.catalogs.apparatus) {
+    dynamicApparatus = experimentData.catalogs.apparatus;
+  }
+  apparatusCatalog = new LabCatalog({ scale: 0.75, apparatus: dynamicApparatus });
   apparatusCatalog.initSprites({
     beaker: imgBeaker, pipette: imgPipette, bottle: imgBottle,
     burette: imgBurette, conical_flask: imgConical,

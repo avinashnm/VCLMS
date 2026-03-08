@@ -863,67 +863,44 @@ def lab_experiment_info(request, slug):
 
 
 def lab_experiment_simulation(request, slug):
+    # 1. ALWAYS FETCH CATALOGS (For both DB models and hardcoded fallback)
+    chemicals_list = [
+        {
+            "id": c.id, "name": c.name, "formula": c.formula,
+            "molarity": c.molarity, "density": c.density,
+            "color": c.default_color_hex, "is_indicator": c.is_indicator
+        } for c in ChemicalCatalog.objects.all()
+    ]
+    
+    apparatus_list = [
+        {
+            "id": a.id, "name": a.name, "type": a.type,
+            "max_capacity": a.max_capacity, "sprite": a.svg_sprite_url,
+            "is_heatable": a.is_heatable, "can_measure_vol": a.can_measure_vol, "can_pour": a.can_pour
+        } for a in ApparatusCatalog.objects.all()
+    ]
+    
+    reactions_list = [
+        {
+            "id": r.id, 
+            "chemical_a": r.chemical_a.id, 
+            "chemical_b": r.chemical_b.id,
+            "product": r.product.id if r.product else None,
+            "reaction_color_hex": r.reaction_color_hex,
+            "ph_change": r.ph_change
+        } for r in ChemicalReaction.objects.all()
+    ]
+
+    catalogs_dict = {
+        "chemicals": chemicals_list,
+        "apparatus": apparatus_list,
+        "reactions": reactions_list
+    }
+
     try:
         experiment_obj = LabExperiment.objects.get(slug=slug)
         
         milestones_list = []
-        for ms in experiment_obj.milestones.all():
-            rules_list = [
-                {
-                    "target_vessel": r.target_vessel,
-                    "target_property": r.target_property,
-                    "operator": r.operator,
-                    "value": r.value
-                } for r in ms.rules.all()
-            ]
-            milestones_list.append({
-                "id": ms.milestone_id, 
-                "desc": ms.description, 
-                "points": ms.points,
-                "rules": rules_list
-            })
-        
-        targets = {}
-        if hasattr(experiment_obj, 'target_config') and experiment_obj.target_config:
-            cfg = experiment_obj.target_config
-            targets = {
-                "v1": round(random.uniform(cfg.v1_min, cfg.v1_max), 2),
-                "v2": round(random.uniform(cfg.v2_min, cfg.v2_max), 2)
-            }
-        else:
-            # Fallback targets if no config is set
-            targets = {
-                "v1": round(random.uniform(9.5, 11.5), 2),
-                "v2": round(random.uniform(23.0, 27.0), 2)
-            }
-            
-        # Fetch Catalogs
-        chemicals_list = [
-            {
-                "id": c.id, "name": c.name, "formula": c.formula,
-                "molarity": c.molarity, "density": c.density,
-                "color": c.default_color_hex, "is_indicator": c.is_indicator
-            } for c in ChemicalCatalog.objects.all()
-        ]
-        
-        apparatus_list = [
-            {
-                "id": a.id, "name": a.name, "type": a.type,
-                "max_capacity": a.max_capacity, "sprite": a.svg_sprite_url,
-                "is_heatable": a.is_heatable, "can_measure_vol": a.can_measure_vol, "can_pour": a.can_pour
-            } for a in ApparatusCatalog.objects.all()
-        ]
-        
-        reactions_list = [
-            {
-                "id": r.id, 
-                "chemical_a": r.chemical_a.id, 
-                "chemical_b": r.chemical_b.id,
-                "product": r.product.id if r.product else None,
-                "reaction_color_hex": r.reaction_color_hex,
-                "ph_change": r.ph_change
-            } for r in ChemicalReaction.objects.all()
-        ]
             
         experiment_data = {
             "name": experiment_obj.title,
@@ -931,11 +908,7 @@ def lab_experiment_simulation(request, slug):
             "type": experiment_obj.type,
             "milestones": milestones_list,
             "targets": targets,
-            "catalogs": {
-                "chemicals": chemicals_list,
-                "apparatus": apparatus_list,
-                "reactions": reactions_list
-            }
+            "catalogs": catalogs_dict
         }
         
     except LabExperiment.DoesNotExist:
@@ -964,6 +937,9 @@ def lab_experiment_simulation(request, slug):
         experiment_data = experiment_map.get(slug)
         if not experiment_data:
             raise Http404()
+            
+        # Inject the database catalogs into the hardcoded fallback
+        experiment_data["catalogs"] = catalogs_dict
 
     context = {
         "slug": slug,
