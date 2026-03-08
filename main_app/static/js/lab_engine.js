@@ -494,7 +494,7 @@ function setup() {
       let r = 200, g = 200, b = 200;
       if (c.color && c.color.startsWith('#')) {
         let hex = c.color.replace('#', '');
-        if (hex.length === 6) {
+        if (hex.length >= 6) {
           r = parseInt(hex.substring(0, 2), 16);
           g = parseInt(hex.substring(2, 4), 16);
           b = parseInt(hex.substring(4, 6), 16);
@@ -1283,6 +1283,13 @@ function draw() {
   drawClearShelfButton(); // Magic button on the shelf
 }
 function getChemicalInfo(chemicalId) {
+  // 1. Search DB-Driven Chemicals First
+  if (typeof chemicalCatalog !== 'undefined' && chemicalCatalog && chemicalCatalog.chemicals) {
+    let found = chemicalCatalog.chemicals.find(c => c.id === chemicalId);
+    if (found) return found;
+  }
+
+  // 2. Fallback to hardcoded list
   const catalog = [
     { id: 'na2co3_nahco3', name: 'Sodium Carbonate + Bicarbonate', formula: 'Na₂CO₃ + NaHCO₃', conc: '25%' },
     { id: 'hcl_0_1M', name: 'Hydrochloric Acid', formula: 'HCl', conc: '0.1M' },
