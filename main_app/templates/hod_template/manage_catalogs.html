@@ -119,13 +119,17 @@ Manage Catalogs & Reactions
                                     <td>{{ app.type }}</td>
                                     <td>{{ app.max_capacity }}ml</td>
                                     <td>
-                                        {% if app.can_measure_vol %}<span class="badge badge-info">Measures Vol</span>{%
-                                        endif
-                                        %}
-                                        {% if app.is_heatable %}<span class="badge badge-danger">Heatable</span>{% endif
-                                        %}
-                                        {% if app.can_pour %}<span class="badge badge-success">Pourable</span>{% endif
-                                        %}
+                                        {% if app.can_measure_vol %}
+                                        <span class="badge badge-info">Measures Vol</span>
+                                        {% endif %}
+
+                                        {% if app.is_heatable %}
+                                        <span class="badge badge-danger">Heatable</span>
+                                        {% endif %}
+
+                                        {% if app.can_pour %}
+                                        <span class="badge badge-success">Pourable</span>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         <a href="{% url 'delete_apparatus' app.id %}" class="btn btn-sm btn-danger"
