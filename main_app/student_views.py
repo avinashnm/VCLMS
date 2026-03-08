@@ -901,6 +901,35 @@ def lab_experiment_simulation(request, slug):
         experiment_obj = LabExperiment.objects.get(slug=slug)
         
         milestones_list = []
+        for ms in experiment_obj.milestones.all():
+            rules_list = [
+                {
+                    "target_vessel": r.target_vessel,
+                    "target_property": r.target_property,
+                    "operator": r.operator,
+                    "value": r.value
+                } for r in ms.rules.all()
+            ]
+            milestones_list.append({
+                "id": ms.milestone_id, 
+                "desc": ms.description, 
+                "points": ms.points,
+                "rules": rules_list
+            })
+        
+        targets = {}
+        if hasattr(experiment_obj, 'target_config') and experiment_obj.target_config:
+            cfg = experiment_obj.target_config
+            targets = {
+                "v1": round(random.uniform(cfg.v1_min, cfg.v1_max), 2),
+                "v2": round(random.uniform(cfg.v2_min, cfg.v2_max), 2)
+            }
+        else:
+            # Fallback targets if no config is set
+            targets = {
+                "v1": round(random.uniform(9.5, 11.5), 2),
+                "v2": round(random.uniform(23.0, 27.0), 2)
+            }
             
         experiment_data = {
             "name": experiment_obj.title,
