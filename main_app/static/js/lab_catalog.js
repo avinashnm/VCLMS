@@ -13,16 +13,44 @@ class LabCatalog {
   }
 
   _buildGroups() {
-    this.groups = {};
+    // ⭐ GENERIC FUNCTION-BASED GROUPS (Core Library)
+    this.groups = {
+      volumetric: [
+        { id: 'beaker', name: 'Beaker', spriteKey: 'beaker' },
+        { id: 'pipette', name: 'Pipette', spriteKey: 'pipette' },
+        { id: 'volumetric_flask', name: 'Vol. Flask', spriteKey: 'volumetric_flask' }
+      ],
+      titration: [
+        { id: 'burette_tube', name: 'Burette Tube', spriteKey: 'burette_tube' },
+        { id: 'common_stand', name: 'Common Stand', spriteKey: 'common_stand' },
+        { id: 'conical_flask', name: 'Conical Flask', spriteKey: 'conical_flask' },
+        { id: 'burette', name: 'Classic Burette', spriteKey: 'burette' }
+      ],
+      heating: [
+        { id: 'hotplate', name: 'Hotplate', spriteKey: 'hotplate' },
+        { id: 'bunsen_burner', name: 'Bunsen Burner', spriteKey: 'bunsen_burner' },
+        { id: 'liebig_condensor', name: 'Condenser', spriteKey: 'liebig_condensor' }
+      ],
+      separation: [
+        { id: 'separatory_funnel', name: 'Sep. Funnel', spriteKey: 'separatory_funnel' },
+        { id: 'funnel', name: 'Filter Funnel', spriteKey: 'funnel' },
+        { id: 'crucible', name: 'Crucible', spriteKey: 'crucible' }
+      ],
+      analytical: [
+        { id: 'pH_meter', name: 'pH Meter', spriteKey: 'pH_meter' },
+        { id: 'balance', name: 'Analytical Balance', spriteKey: 'balance' },
+        { id: 'meltingpoint_apparatus', name: 'M.P. Apparatus', spriteKey: 'meltingpoint_apparatus' },
+        { id: 'TLC_plate', name: 'TLC Plate', spriteKey: 'TLC_plate' }
+      ],
+      utility: [
+        { id: 'bottle', name: 'Reagent Bottle', spriteKey: 'bottle' },
+        { id: 'wash_bottle', name: 'Wash Bottle', spriteKey: 'wash_bottle' }
+      ],
+      other: []
+    };
 
+    // MERGE dynamically added database apparatus
     if (this.config.apparatus && this.config.apparatus.length > 0) {
-      // Initialize logical containers
-      this.groups = {
-        volumetric: [], titration: [], heating: [],
-        separation: [], analytical: [], utility: [], other: []
-      };
-
-      // Map apparatus types to logical categories (since DB only stores 'type')
       const categoryMap = {
         'beaker': 'volumetric', 'pipette': 'volumetric', 'volumetric_flask': 'volumetric',
         'burette': 'titration', 'burette_tube': 'titration', 'common_stand': 'titration', 'conical_flask': 'titration',
@@ -34,53 +62,24 @@ class LabCatalog {
 
       this.config.apparatus.forEach(app => {
         let cat = categoryMap[app.type] || 'other';
-        this.groups[cat].push({
-          id: app.type, // Map ID to type because spawnApparatus uses it
-          name: app.name,
-          spriteKey: app.type, // Assuming sprite key matches type
-          db_id: app.id,
-          capacity: app.max_capacity
-        });
-      });
 
-      // Remove empty groups
-      for (const [key, items] of Object.entries(this.groups)) {
-        if (items.length === 0) delete this.groups[key];
-      }
-    } else {
-      // ⭐ GENERIC FUNCTION-BASED GROUPS (Fallback)
-      this.groups = {
-        volumetric: [
-          { id: 'beaker', name: 'Beaker', spriteKey: 'beaker' },
-          { id: 'pipette', name: 'Pipette', spriteKey: 'pipette' },
-          { id: 'volumetric_flask', name: 'Vol. Flask', spriteKey: 'volumetric_flask' }
-        ],
-        titration: [
-          { id: 'burette_tube', name: 'Burette Tube', spriteKey: 'burette_tube' },
-          { id: 'common_stand', name: 'Common Stand', spriteKey: 'common_stand' },
-          { id: 'conical_flask', name: 'Conical Flask', spriteKey: 'conical_flask' }
-        ],
-        heating: [
-          { id: 'hotplate', name: 'Hotplate', spriteKey: 'hotplate' },
-          { id: 'bunsen_burner', name: 'Bunsen Burner', spriteKey: 'bunsen_burner' },
-          { id: 'liebig_condensor', name: 'Condenser', spriteKey: 'liebig_condensor' }
-        ],
-        separation: [
-          { id: 'separatory_funnel', name: 'Sep. Funnel', spriteKey: 'separatory_funnel' },
-          { id: 'funnel', name: 'Filter Funnel', spriteKey: 'funnel' },
-          { id: 'crucible', name: 'Crucible', spriteKey: 'crucible' }
-        ],
-        analytical: [
-          { id: 'pH_meter', name: 'pH Meter', spriteKey: 'pH_meter' },
-          { id: 'balance', name: 'Analytical Balance', spriteKey: 'balance' },
-          { id: 'meltingpoint_apparatus', name: 'M.P. Apparatus', spriteKey: 'meltingpoint_apparatus' },
-          { id: 'TLC_plate', name: 'TLC Plate', spriteKey: 'TLC_plate' }
-        ],
-        utility: [
-          { id: 'bottle', name: 'Reagent Bottle', spriteKey: 'bottle' },
-          { id: 'wash_bottle', name: 'Wash Bottle', spriteKey: 'wash_bottle' }
-        ]
-      };
+        // Prevent exact duplicates from showing up twice if user configures "Beaker" in DB
+        const exists = this.groups[cat].some(existing => existing.id === app.type && existing.name === app.name);
+        if (!exists) {
+          this.groups[cat].push({
+            id: app.type,
+            name: app.name,
+            spriteKey: app.type, // Map UI sprite graphic
+            db_id: app.id,
+            capacity: app.max_capacity
+          });
+        }
+      });
+    }
+
+    // Remove empty groups
+    for (const [key, items] of Object.entries(this.groups)) {
+      if (items.length === 0) delete this.groups[key];
     }
   }
 
