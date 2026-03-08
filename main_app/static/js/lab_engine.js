@@ -1829,8 +1829,8 @@ function drawDataPanel() {
 
     fill(255); textStyle(NORMAL);
     rect(panelX + 20, 125, panelW - 40, 60, 8);
-    fill(0); textAlign(CENTER, CENTER); textSize(12);
-    text(currentTask.desc, panelX + panelW / 2, 157, panelW - 55, 55);
+    fill(0); textAlign(CENTER, TOP); textStyle(NORMAL); textSize(12);
+    text(currentTask.desc, panelX + 22, 129, panelW - 44, 56);
 
     // 4. Instructions Box (Cleanly positioned)
     fill(40, 180, 255, 40); noStroke();
