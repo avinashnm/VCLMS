@@ -195,11 +195,11 @@ class ChemicalCatalog {
   drawPanel(x, y, w, h, scale = 0.8) {
     // Title
     noStroke(); fill(0); textAlign(LEFT); textSize(15 * scale); textStyle(BOLD);
-    text('🧴 CHEMICALS', x + 12, y + 25);
+    text('\uD83E\uDDF4 CHEMICALS', x + 12, y + 25);
     textStyle(NORMAL); textSize(11 * scale);
     text('Click to spawn bottle', x + 12, y + 42);
 
-    const colW = 140 * scale, rowH = 110 * scale, margin = 15 * scale;
+    const colW = 140 * scale, rowH = 115 * scale, margin = 15 * scale;
     this.hoverItem = null;
 
     for (let i = 0; i < this.chemicals.length; i++) {
@@ -211,24 +211,69 @@ class ChemicalCatalog {
       const over = mouseX > px && mouseX < px + colW &&
         mouseY > py && mouseY < py + rowH;
 
-      // Hover effect
+      // Tile background
       if (over) {
-        fill(255, 200, 200, 220); stroke(255, 100, 100); strokeWeight(2 * scale);
+        fill(220, 235, 255, 230); stroke(100, 150, 255); strokeWeight(2 * scale);
         this.hoverItem = item;
       } else {
-        fill(255, 240, 240, 200); stroke(200); strokeWeight(1 * scale);
+        fill(248, 250, 255, 210); stroke(210, 220, 240); strokeWeight(1 * scale);
       }
       rect(px, py, colW, rowH, 12);
 
-      // Chemical color preview (bottle shape)
-      fill(...item.color, 200); noStroke();
-      rect(px + 20, py + 30, colW - 40, 55, 25, 5, 25, 5);
-      fill(...item.color, 180);
-      rect(px + 25, py + 45, colW - 50, 35, 20);
+      // --- Draw Reagent Bottle ---
+      push();
+      const [r, g, b] = item.color;
+      const bx = px + colW / 2;       // bottle center X
+      const by = py + 14 * scale;     // bottle top Y
+      const bw = 32 * scale;          // bottle body width
+      const bh = 52 * scale;          // bottle body height
+      const neckW = 14 * scale;       // neck width
+      const neckH = 12 * scale;       // neck height
 
-      // Label
-      fill(50); textAlign(CENTER); textSize(11 * scale);
-      text(item.label, px + colW / 2, py + 95);
+      // 1. Bottle body glass (faint tint)
+      noStroke();
+      fill(r, g, b, 45);
+      rect(bx - bw / 2, by + neckH, bw, bh, 4, 4, 12, 12);
+
+      // 2. Liquid fill (chemical color)
+      let fillH = bh * 0.68;
+      fill(r, g, b, 200);
+      rect(bx - bw / 2 + 2, by + neckH + (bh - fillH) - 2, bw - 4, fillH + 2, 2, 2, 11, 11);
+
+      // 3. Glass highlight stripe
+      fill(255, 255, 255, 70);
+      rect(bx - bw / 2 + 4, by + neckH + 6, 5 * scale, bh - 14, 3);
+
+      // 4. Bottle outline
+      noFill(); stroke(r, g, b, 140); strokeWeight(1.5 * scale);
+      rect(bx - bw / 2, by + neckH, bw, bh, 4, 4, 12, 12);
+
+      // 5. Neck
+      noStroke(); fill(r, g, b, 90);
+      rect(bx - neckW / 2, by + 6, neckW, neckH, 3);
+      noFill(); stroke(r, g, b, 140); strokeWeight(1.2 * scale);
+      rect(bx - neckW / 2, by + 6, neckW, neckH, 3);
+
+      // 6. Cap (dark cap on top)
+      noStroke(); fill(40, 40, 40, 220);
+      rect(bx - neckW / 2 - 2, by, neckW + 4, 8 * scale, 3, 3, 0, 0);
+      fill(255, 255, 255, 40);
+      rect(bx - neckW / 2, by + 1, neckW / 2, 3 * scale, 2);
+
+      // 7. White label band with initials
+      fill(255, 255, 255, 200); noStroke();
+      let labelY = by + neckH + bh * 0.28;
+      rect(bx - bw / 2 + 2, labelY, bw - 4, 16 * scale, 2);
+      fill(max(0, r - 60), max(0, g - 60), max(0, b - 60), 255);
+      textAlign(CENTER, CENTER); textStyle(BOLD); textSize(9 * scale);
+      let initials = item.name ? item.name.split(' ').map(w => w[0]).join('').substring(0, 3) : '?';
+      text(initials, bx, labelY + 8 * scale);
+
+      pop();
+
+      // Chemical name label below the bottle
+      noStroke(); fill(40); textAlign(CENTER); textStyle(NORMAL); textSize(10 * scale);
+      text(item.label, px + colW / 2, py + rowH - 8 * scale);
     }
   }
 
