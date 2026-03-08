@@ -3,12 +3,21 @@
 
 {% block content %}
 <style>
-  body { overflow: hidden; margin: 0; }
+  body {
+    overflow: hidden;
+    margin: 0;
+  }
 
-  #sidebar, .main-sidebar, .sidebar, 
-  .main-header, .navbar, .nav-header,
-  .navbar-toggler, .nav-link[data-widget="pushmenu"], 
-  .sidebar-toggle, .hamburger-menu {
+  #sidebar,
+  .main-sidebar,
+  .sidebar,
+  .main-header,
+  .navbar,
+  .nav-header,
+  .navbar-toggler,
+  .nav-link[data-widget="pushmenu"],
+  .sidebar-toggle,
+  .hamburger-menu {
     display: none !important;
   }
 
@@ -27,9 +36,10 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 25px;
-    background: #1a237e; /* Professional Deep Blue */
+    background: #1a237e;
+    /* Professional Deep Blue */
     color: white;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
   }
 
   .lab-title {
@@ -49,31 +59,41 @@
   .btn-lab-toggle {
     background: #3949ab;
     color: white;
-    border: 1px solid rgba(255,255,255,0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     padding: 6px 14px;
     border-radius: 4px;
     font-size: 13px;
     cursor: pointer;
     transition: 0.2s;
   }
-  .btn-lab-toggle:hover { background: #5c6bc0; }
 
-  .lab-main { position: relative; flex: 1; }
-  #simulation-canvas { position: absolute; inset: 0; }
+  .btn-lab-toggle:hover {
+    background: #5c6bc0;
+  }
+
+  .lab-main {
+    position: relative;
+    flex: 1;
+  }
+
+  #simulation-canvas {
+    position: absolute;
+    inset: 0;
+  }
 </style>
 
 <div class="lab-root">
   <div class="lab-header">
     <h2 class="lab-title">🧪 {{ experiment.name }}</h2>
-    
+
     <div class="header-actions">
-        <!-- New Manual Toggles -->
-        <button class="btn-lab-toggle" onclick="toggleCatalog()">📦 Apparatus Catalog</button>
-        <button class="btn-lab-toggle" onclick="toggleControls()">⌨️ Controls Guide</button>
-        <button class="btn-lab-toggle" onclick="toggleAssistant()">🧪 Lab Assistant</button>
-        <a href="{% url 'lab_experiment' slug %}" class="btn btn-danger btn-sm" style="font-weight: bold;">
-          Exit Lab
-        </a>
+      <!-- New Manual Toggles -->
+      <button class="btn-lab-toggle" onclick="toggleCatalog()">📦 Apparatus Catalog</button>
+      <button class="btn-lab-toggle" onclick="toggleControls()">⌨️ Controls Guide</button>
+      <button class="btn-lab-toggle" onclick="toggleAssistant()">🧪 Lab Assistant</button>
+      <a href="{% url 'lab_experiment' slug %}" class="btn btn-danger btn-sm" style="font-weight: bold;">
+        Exit Lab
+      </a>
     </div>
   </div>
 
@@ -82,39 +102,39 @@
   </div>
 </div>
 <script>
-    // Link HTML buttons to p5.js engine variables
-    function toggleCatalog() { 
-        if (typeof catalogVisible !== 'undefined') {
-            catalogVisible = !catalogVisible; 
-        }
+  // Link HTML buttons to p5.js engine variables
+  function toggleCatalog() {
+    if (typeof catalogVisible !== 'undefined') {
+      catalogVisible = !catalogVisible;
     }
-    
-    function toggleControls() { 
-        if (typeof controlsVisible !== 'undefined') {
-            controlsVisible = !controlsVisible; 
-        }
-    }
+  }
 
-    function toggleAssistant() {
-        if (typeof assistantVisible !== 'undefined') {
-            assistantVisible = !assistantVisible;
-        }
+  function toggleControls() {
+    if (typeof controlsVisible !== 'undefined') {
+      controlsVisible = !controlsVisible;
     }
+  }
+
+  function toggleAssistant() {
+    if (typeof assistantVisible !== 'undefined') {
+      assistantVisible = !assistantVisible;
+    }
+  }
 </script>
 
 <script>
-  
-    // 1. Capture the rules from Django
-    const EXPERIMENT_CONFIG = JSON.parse('{{ config_json|safe }}');
-    
-    // 2. Set the theoretical targets in the global scope for the engine
-    const THEORETICAL_V1 = EXPERIMENT_CONFIG.targets.v1;
-    const THEORETICAL_V2 = EXPERIMENT_CONFIG.targets.v2;
-    
-    console.log("Lab Config Loaded. Target V1:", THEORETICAL_V1);
+
+  // 1. Capture the rules from Django
+  const EXPERIMENT_CONFIG = JSON.parse('{{ config_json|safe }}');
+
+  // 2. Set the theoretical targets in the global scope for the engine
+  const THEORETICAL_V1 = EXPERIMENT_CONFIG.targets.v1;
+  const THEORETICAL_V2 = EXPERIMENT_CONFIG.targets.v2;
+
+  console.log("Lab Config Loaded. Target V1:", THEORETICAL_V1);
 </script>
 
 <script src="{% static 'js/p5.min.js' %}"></script>
-<script src="{% static 'js/lab_catalog.js' %}"></script>
-<script src="{% static 'js/lab_engine.js' %}"></script>
+<script src="{% static 'js/lab_catalog.js' %}?v=2026_1"></script>
+<script src="{% static 'js/lab_engine.js' %}?v=2026_1"></script>
 {% endblock %}
