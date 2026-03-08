@@ -7,293 +7,461 @@ Manage Catalogs & Reactions
 {% block content %}
 <section class="content">
     <div class="container-fluid">
-        <div class="row">
-            <!-- Left Column: Databases (Chemicals & Apparatus) -->
-            <div class="col-md-7">
+        <!-- Dismissible Alerts -->
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show shadow-sm"
+            role="alert">
+            {{ message }}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        {% endfor %}
+        {% endif %}
 
-                <!-- Chemical Catalog -->
-                <div class="card card-primary">
-                    <div class="card-header">
-                        <h3 class="card-title">Chemical Catalog</h3>
+        <!-- Nav Pills -->
+        <ul class="nav nav-pills mb-4 mt-2" id="catalogTabs" role="tablist">
+            <li class="nav-item mr-2">
+                <a class="nav-link active shadow-sm" id="chemicals-tab" data-toggle="pill" href="#chemicals" role="tab"
+                    style="font-weight: 600;">
+                    <i class="fas fa-flask mr-2"></i> Chemicals ({{ chemicals|length }})
+                </a>
+            </li>
+            <li class="nav-item mr-2">
+                <a class="nav-link shadow-sm" id="apparatus-tab" data-toggle="pill" href="#apparatus" role="tab"
+                    style="font-weight: 600;">
+                    <i class="fas fa-balance-scale mr-2"></i> Apparatus ({{ apparatus|length }})
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link shadow-sm" id="reactions-tab" data-toggle="pill" href="#reactions" role="tab"
+                    style="font-weight: 600;">
+                    <i class="fas fa-random mr-2"></i> Reactions ({{ reactions|length }})
+                </a>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="catalogTabsContent">
+
+            <!-- CHEMICALS TAB -->
+            <div class="tab-pane fade show active" id="chemicals" role="tabpanel">
+                <div class="card card-primary card-outline shadow-lg border-0 rounded-lg">
+                    <div class="card-header bg-white border-bottom">
+                        <h3 class="card-title mt-1 font-weight-bolder text-dark">Global Chemical Inventory</h3>
+                        <div class="card-tools">
+                            <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm" data-toggle="modal"
+                                data-target="#addChemicalModal">
+                                <i class="fas fa-plus"></i> Add New Chemical
+                            </button>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <table class="table table-bordered table-hover mt-3">
-                            <thead>
+                    <div class="card-body p-0">
+                        <table class="table table-striped table-hover m-0">
+                            <thead class="bg-light text-muted text-uppercase" style="font-size: 0.85rem;">
                                 <tr>
-                                    <th>Name</th>
-                                    <th>Formula</th>
-                                    <th>Molarity/Density</th>
-                                    <th>Color</th>
-                                    <th>Action</th>
+                                    <th class="border-0">Chemical Name</th>
+                                    <th class="border-0">Formula</th>
+                                    <th class="border-0">Properties (Molarity / Density)</th>
+                                    <th class="border-0">Default Color</th>
+                                    <th class="border-0 text-center" style="width: 100px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for chem in chemicals %}
                                 <tr>
-                                    <td>{{ chem.name }}</td>
-                                    <td>{{ chem.formula }}</td>
-                                    <td>{{ chem.molarity }}M / {{ chem.density }}g/ml</td>
-                                    <td>
-                                        <div
-                                            style="width: 20px; height: 20px; background-color: {{ chem.default_color_hex }}; border: 1px solid #000; display: inline-block;">
-                                        </div>
-                                        <small>{{ chem.default_color_hex }}</small>
+                                    <td class="align-middle font-weight-bold text-dark">
+                                        {{ chem.name }}
+                                        {% if chem.is_indicator %}
+                                        <span class="badge badge-warning ml-2">Indicator</span>
+                                        {% endif %}
                                     </td>
-                                    <td>
-                                        <a href="{% url 'delete_chemical' chem.id %}" class="btn btn-sm btn-danger"
-                                            onclick="return confirm('Delete this chemical?');">Delete</a>
+                                    <td class="align-middle"><code>{{ chem.formula }}</code></td>
+                                    <td class="align-middle text-muted">{{ chem.molarity }}M &nbsp;|&nbsp; {{
+                                        chem.density }} g/ml</td>
+                                    <td class="align-middle">
+                                        <div class="d-flex align-items-center">
+                                            <div style="width: 24px; height: 24px; border-radius: 4px; background-color: {{ chem.default_color_hex }}; border: 1px solid rgba(0,0,0,0.1); margin-right: 10px;"
+                                                class="shadow-sm"></div>
+                                            <small class="text-muted">{{ chem.default_color_hex }}</small>
+                                        </div>
+                                    </td>
+                                    <td class="align-middle text-center">
+                                        <a href="{% url 'delete_chemical' chem.id %}"
+                                            class="btn btn-sm btn-outline-danger shadow-sm"
+                                            onclick="return confirm('Delete this chemical permanently?');">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </a>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="5" class="text-center">No chemicals defined.</td>
+                                    <td colspan="5" class="text-center py-5 text-muted">No chemicals exist in the
+                                        database. Use the button above to add one.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
-
-                        <hr>
-                        <h5>Add New Chemical</h5>
-                        <form action="{% url 'add_chemical' %}" method="POST">
-                            {% csrf_token %}
-                            <div class="form-row">
-                                <div class="form-group col-md-4">
-                                    <label>Name</label>
-                                    <input type="text" class="form-control" name="name" required
-                                        placeholder="e.g. Hydrochloric Acid">
-                                </div>
-                                <div class="form-group col-md-3">
-                                    <label>Formula</label>
-                                    <input type="text" class="form-control" name="formula" required
-                                        placeholder="e.g. HCl">
-                                </div>
-                                <div class="form-group col-md-2 mt-4 pt-2">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="is_indicator"
-                                            id="is_indicator">
-                                        <label class="form-check-label" for="is_indicator">Is Indicator</label>
-                                    </div>
-                                </div>
-                                <div class="form-group col-md-3">
-                                    <label>Color (Hex)</label>
-                                    <input type="text" class="form-control" name="default_color_hex" value="#FFFFFF">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group col-md-3">
-                                    <label>Molarity (M)</label>
-                                    <input type="number" step="0.01" class="form-control" name="molarity" value="1.0">
-                                </div>
-                                <div class="form-group col-md-3">
-                                    <label>Density (g/ml)</label>
-                                    <input type="number" step="0.01" class="form-control" name="density" value="1.0">
-                                </div>
-                                <div class="form-group col-md-6 align-self-end">
-                                    <button type="submit" class="btn btn-primary btn-block">Add Chemical</button>
-                                </div>
-                            </div>
-                        </form>
                     </div>
                 </div>
+            </div>
 
-                <!-- Apparatus Catalog -->
-                <div class="card card-warning mt-4">
-                    <div class="card-header">
-                        <h3 class="card-title">Apparatus Catalog</h3>
+            <!-- APPARATUS TAB -->
+            <div class="tab-pane fade" id="apparatus" role="tabpanel">
+                <div class="card card-warning card-outline shadow-lg border-0 rounded-lg">
+                    <div class="card-header bg-white border-bottom">
+                        <h3 class="card-title mt-1 font-weight-bolder text-dark">Apparatus Engine Catalog</h3>
+                        <div class="card-tools">
+                            <button type="button"
+                                class="btn btn-warning btn-sm px-3 shadow-sm text-dark font-weight-bold"
+                                data-toggle="modal" data-target="#addApparatusModal">
+                                <i class="fas fa-plus"></i> Add New Apparatus
+                            </button>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <table class="table table-bordered table-hover mt-3">
-                            <thead>
+                    <div class="card-body p-0">
+                        <table class="table table-striped table-hover m-0">
+                            <thead class="bg-light text-muted text-uppercase" style="font-size: 0.85rem;">
                                 <tr>
-                                    <th>Name</th>
-                                    <th>Type</th>
-                                    <th>Capacity</th>
-                                    <th>Flags</th>
-                                    <th>Action</th>
+                                    <th class="border-0">Apparatus Name</th>
+                                    <th class="border-0">Engine Type ID</th>
+                                    <th class="border-0">Max Capacity</th>
+                                    <th class="border-0">Physics Behaviors</th>
+                                    <th class="border-0 text-center" style="width: 100px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for app in apparatus %}
                                 <tr>
-                                    <td>{{ app.name }}</td>
-                                    <td>{{ app.type }}</td>
-                                    <td>{{ app.max_capacity }}ml</td>
-                                    <td>
-                                        {% if app.can_measure_vol %}
-                                        <span class="badge badge-info">Measures Vol</span>
-                                        {% endif %}
-
-                                        {% if app.is_heatable %}
-                                        <span class="badge badge-danger">Heatable</span>
-                                        {% endif %}
-
-                                        {% if app.can_pour %}
-                                        <span class="badge badge-success">Pourable</span>
-                                        {% endif %}
+                                    <td class="align-middle font-weight-bold text-dark">{{ app.name }}</td>
+                                    <td class="align-middle"><code>{{ app.type }}</code></td>
+                                    <td class="align-middle text-muted">{{ app.max_capacity }} ml</td>
+                                    <td class="align-middle">
+                                        {% if app.can_measure_vol %}<span
+                                            class="badge badge-info shadow-sm mr-1">Volumetric</span>{% endif %}
+                                        {% if app.is_heatable %}<span
+                                            class="badge badge-danger shadow-sm mr-1">Heatable</span>{% endif %}
+                                        {% if app.can_pour %}<span
+                                            class="badge badge-success shadow-sm mr-1">Pourable</span>{% endif %}
                                     </td>
-                                    <td>
-                                        <a href="{% url 'delete_apparatus' app.id %}" class="btn btn-sm btn-danger"
-                                            onclick="return confirm('Delete this apparatus?');">Delete</a>
+                                    <td class="align-middle text-center">
+                                        <a href="{% url 'delete_apparatus' app.id %}"
+                                            class="btn btn-sm btn-outline-danger shadow-sm"
+                                            onclick="return confirm('Delete this apparatus permanently?');">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </a>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="5" class="text-center">No apparatus defined.</td>
+                                    <td colspan="5" class="text-center py-5 text-muted">No apparatus exist in the
+                                        database.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
-
-                        <hr>
-                        <h5>Add New Apparatus</h5>
-                        <form action="{% url 'add_apparatus' %}" method="POST">
-                            {% csrf_token %}
-                            <div class="form-row">
-                                <div class="form-group col-md-4">
-                                    <label>Name</label>
-                                    <input type="text" class="form-control" name="name" required
-                                        placeholder="e.g. 250ml Beaker">
-                                </div>
-                                <div class="form-group col-md-4">
-                                    <label>Type ID</label>
-                                    <input type="text" class="form-control" name="type" required
-                                        placeholder="e.g. beaker">
-                                </div>
-                                <div class="form-group col-md-4">
-                                    <label>Max Capacity (ml)</label>
-                                    <input type="number" class="form-control" name="max_capacity" value="250">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group col-md-6">
-                                    <label>SVG Sprite URL</label>
-                                    <input type="text" class="form-control" name="svg_sprite_url"
-                                        value="/static/assets/beaker.svg">
-                                </div>
-                                <div class="form-group col-md-6">
-                                    <label>Behaviors</label><br>
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" name="can_measure_vol" checked>
-                                        <label class="form-check-label">Measures Vol</label>
-                                    </div>
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" name="is_heatable" checked>
-                                        <label class="form-check-label">Heatable</label>
-                                    </div>
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" name="can_pour" checked>
-                                        <label class="form-check-label">Can Pour</label>
-                                    </div>
-                                </div>
-                            </div>
-                            <button type="submit" class="btn btn-warning btn-block">Add Apparatus</button>
-                        </form>
                     </div>
                 </div>
-
             </div>
 
-            <!-- Right Column: Reactions -->
-            <div class="col-md-5">
-                <div class="card card-success">
-                    <div class="card-header">
-                        <h3 class="card-title">Chemical Reactions (Stoichiometry)</h3>
+            <!-- REACTIONS TAB -->
+            <div class="tab-pane fade" id="reactions" role="tabpanel">
+                <div class="card card-success card-outline shadow-lg border-0 rounded-lg">
+                    <div class="card-header bg-white border-bottom">
+                        <h3 class="card-title mt-1 font-weight-bolder text-dark">Stoichiometric Linkages</h3>
+                        <div class="card-tools">
+                            <button type="button" class="btn btn-success btn-sm px-3 shadow-sm" data-toggle="modal"
+                                data-target="#addReactionModal">
+                                <i class="fas fa-plus"></i> Link New Reaction
+                            </button>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <table class="table table-bordered table-sm mt-3">
-                            <thead>
+                    <div class="card-body p-0">
+                        <table class="table table-striped table-hover m-0">
+                            <thead class="bg-light text-muted text-uppercase" style="font-size: 0.85rem;">
                                 <tr>
-                                    <th>A + B</th>
-                                    <th>Product</th>
-                                    <th>Action</th>
+                                    <th class="border-0">Reactants (A + B)</th>
+                                    <th class="border-0">Product Created</th>
+                                    <th class="border-0">Visual Result (Color/pH)</th>
+                                    <th class="border-0 text-center" style="width: 100px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for rxn in reactions %}
                                 <tr>
-                                    <td>
-                                        <b>{{ rxn.chemical_a.name }}</b> + <br>
-                                        <b>{{ rxn.chemical_b.name }}</b>
+                                    <td class="align-middle">
+                                        <span class="font-weight-bold text-primary">{{ rxn.chemical_a.name }}</span>
+                                        <br><span class="text-muted"><i class="fas fa-plus fa-xs"></i></span><br>
+                                        <span class="font-weight-bold text-info">{{ rxn.chemical_b.name }}</span>
                                     </td>
-                                    <td>
-                                        {{ rxn.product.name }}<br>
-                                        <span class="badge badge-secondary"
-                                            style="background-color: {{ rxn.reaction_color_hex }}">{{
-                                            rxn.reaction_color_hex }}</span>
+                                    <td class="align-middle font-weight-bold text-success">
+                                        {% if rxn.product %}
+                                        {{ rxn.product.name }}
+                                        {% else %}
+                                        <span class="text-muted font-italic font-weight-normal">No physical
+                                            product</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="align-middle">
+                                        <div class="d-flex align-items-center mb-1">
+                                            <div style="width: 20px; height: 20px; border-radius: 50%; background-color: {{ rxn.reaction_color_hex }}; border: 1px solid rgba(0,0,0,0.1); margin-right: 8px;"
+                                                class="shadow-sm"></div>
+                                            <code class="text-dark">{{ rxn.reaction_color_hex }}</code>
+                                        </div>
+                                        <small class="text-muted font-weight-bold">ΔpH: {{ rxn.ph_change }}</small>
                                     </td>
                                     <td class="align-middle text-center">
-                                        <a href="{% url 'delete_reaction' rxn.id %}" class="btn btn-sm btn-danger"
-                                            onclick="return confirm('Delete reaction?');"><i
-                                                class="fas fa-trash"></i></a>
+                                        <a href="{% url 'delete_reaction' rxn.id %}"
+                                            class="btn btn-sm btn-outline-danger shadow-sm"
+                                            onclick="return confirm('Delete this reaction linkage?');">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </a>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="3" class="text-center">No reactions defined.</td>
+                                    <td colspan="4" class="text-center py-5 text-muted">No reactions defined. Adding
+                                        reactions allows chemicals to interact when mixed.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
-
-                        <hr>
-                        <h5>Add New Reaction</h5>
-                        <form action="{% url 'add_reaction' %}" method="POST">
-                            {% csrf_token %}
-                            <div class="form-group">
-                                <label>Chemical A</label>
-                                <select name="chemical_a_id" class="form-control" required>
-                                    {% for chem in chemicals %}
-                                    <option value="{{ chem.id }}">{{ chem.name }} ({{ chem.formula }})</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Chemical B</label>
-                                <select name="chemical_b_id" class="form-control" required>
-                                    {% for chem in chemicals %}
-                                    <option value="{{ chem.id }}">{{ chem.name }} ({{ chem.formula }})</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Product</label>
-                                <select name="product_id" class="form-control">
-                                    <option value="">None (Color/pH Change Only)</option>
-                                    {% for chem in chemicals %}
-                                    <option value="{{ chem.id }}">{{ chem.name }} ({{ chem.formula }})</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group col-md-6">
-                                    <label>Reaction Color (Hex)</label>
-                                    <input type="text" class="form-control" name="reaction_color_hex" value="#FFFFFF80">
-                                </div>
-                                <div class="form-group col-md-6">
-                                    <label>pH Change</label>
-                                    <input type="number" step="0.1" class="form-control" name="ph_change" value="0.0">
-                                </div>
-                            </div>
-                            <button type="submit" class="btn btn-success btn-block">Add Reaction</button>
-                        </form>
                     </div>
                 </div>
-
-                <div class="form-group mt-4">
-                    {% if messages %}
-                    {% for message in messages %}
-                    {% if message.tags == 'error' %}
-                    <div class="alert alert-danger">{{ message }}</div>
-                    {% endif %}
-                    {% if message.tags == 'success' %}
-                    <div class="alert alert-success">{{ message }}</div>
-                    {% endif %}
-                    {% endfor %}
-                    {% endif %}
-                </div>
-
             </div>
+
+        </div> <!-- /.tab-content -->
+    </div> <!-- /.container-fluid -->
+</section>
+
+<!-- ================= MODALS ================= -->
+
+<!-- Add Chemical Modal -->
+<div class="modal fade" id="addChemicalModal" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow-lg" style="border-top: 5px solid #007bff !important;">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title font-weight-bold text-primary"><i class="fas fa-flask mr-2"></i> Register New
+                    Chemical</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="{% url 'add_chemical' %}" method="POST">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    <div class="row">
+                        <div class="col-md-6 form-group">
+                            <label class="text-muted font-weight-bold tracking-wide">Display Name <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-lg bg-light border-0" name="name"
+                                required placeholder="e.g. Hydrochloric Acid">
+                        </div>
+                        <div class="col-md-6 form-group">
+                            <label class="text-muted font-weight-bold">Chemical Formula <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-lg bg-light border-0 text-monospace"
+                                name="formula" required placeholder="e.g. HCl">
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-4 form-group">
+                            <label class="text-muted font-weight-bold">Molarity (M)</label>
+                            <input type="number" step="0.01" class="form-control bg-light border-0" name="molarity"
+                                value="1.0">
+                        </div>
+                        <div class="col-md-4 form-group">
+                            <label class="text-muted font-weight-bold">Density (g/ml)</label>
+                            <input type="number" step="0.01" class="form-control bg-light border-0" name="density"
+                                value="1.0">
+                        </div>
+                        <div class="col-md-4 form-group">
+                            <label class="text-muted font-weight-bold">Color (Hex + Alpha)</label>
+                            <input type="text" class="form-control bg-light border-0 text-monospace fw-bold"
+                                name="default_color_hex" value="#FFFFFF80" placeholder="#RRGGBBAA">
+                        </div>
+                    </div>
+                    <div class="p-3 bg-light rounded mt-3 border">
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox" class="custom-control-input" id="isIndicatorSwitch"
+                                name="is_indicator">
+                            <label class="custom-control-label font-weight-bold" for="isIndicatorSwitch">Mark as an
+                                Indicator</label>
+                            <small class="d-block text-muted">Indicators are used specifically for pH
+                                titrations.</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top-0">
+                    <button type="button" class="btn btn-light shadow-sm" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary shadow px-4"><i class="fas fa-save mr-1"></i> Save
+                        Chemical</button>
+                </div>
+            </form>
         </div>
     </div>
-</section>
+</div>
+
+<!-- Add Apparatus Modal -->
+<div class="modal fade" id="addApparatusModal" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow-lg" style="border-top: 5px solid #ffc107 !important;">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title font-weight-bold text-dark"><i
+                        class="fas fa-balance-scale mr-2 text-warning"></i> Register New Apparatus</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="{% url 'add_apparatus' %}" method="POST">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    <div class="row">
+                        <div class="col-md-5 form-group">
+                            <label class="text-muted font-weight-bold">Display Name <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-lg bg-light border-0" name="name"
+                                required placeholder="e.g. 500ml Flask">
+                        </div>
+                        <div class="col-md-4 form-group">
+                            <label class="text-muted font-weight-bold">Engine Type ID <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-lg bg-light border-0 text-monospace"
+                                name="type" required placeholder="e.g. conical_flask">
+                            <small class="text-warning font-weight-bold" style="font-size: 0.75rem;">Crucial for physics
+                                bindings.</small>
+                        </div>
+                        <div class="col-md-3 form-group">
+                            <label class="text-muted font-weight-bold">Max Vol (ml)</label>
+                            <input type="number" class="form-control form-control-lg bg-light border-0"
+                                name="max_capacity" value="250">
+                        </div>
+                    </div>
+
+                    <div class="row mt-4 pt-4 border-top">
+                        <div class="col-12">
+                            <label class="d-block mb-3 text-muted font-weight-bold text-uppercase"
+                                style="font-size: 0.85rem;">Physics Engine Behaviors</label>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="custom-control custom-checkbox">
+                                <input class="custom-control-input" type="checkbox" id="canMeasure"
+                                    name="can_measure_vol" checked>
+                                <label class="custom-control-label font-weight-bold text-info" for="canMeasure">Measures
+                                    Volume</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="custom-control custom-checkbox">
+                                <input class="custom-control-input" type="checkbox" id="canHeat" name="is_heatable"
+                                    checked>
+                                <label class="custom-control-label font-weight-bold text-danger" for="canHeat">Safe to
+                                    Heat</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="custom-control custom-checkbox">
+                                <input class="custom-control-input" type="checkbox" id="canPour" name="can_pour"
+                                    checked>
+                                <label class="custom-control-label font-weight-bold text-success" for="canPour">Can Pour
+                                    Liquids</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Remove svg sprite url for now as it's hardcoded usually, or just leave it hidden if the model needs it -->
+                <input type="hidden" name="svg_sprite_url" value="/static/assets/placeholder.svg">
+
+                <div class="modal-footer bg-light border-top-0">
+                    <button type="button" class="btn btn-light shadow-sm" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning font-weight-bold shadow px-4"><i
+                            class="fas fa-save mr-1"></i> Save Apparatus</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Reaction Modal -->
+<div class="modal fade" id="addReactionModal" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow-lg" style="border-top: 5px solid #28a745 !important;">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title font-weight-bold text-success"><i class="fas fa-random mr-2"></i> Link
+                    Stoichiometric Reaction</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="{% url 'add_reaction' %}" method="POST">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    <div class="row bg-light p-4 rounded mb-4 border d-flex align-items-center">
+                        <div class="col-md-5">
+                            <label class="text-muted font-weight-bold">Reactant A <span
+                                    class="text-danger">*</span></label>
+                            <select name="chemical_a_id" class="form-control custom-select bg-white shadow-sm border-0"
+                                required>
+                                <option value="" disabled selected>Select Chemical...</option>
+                                {% for chem in chemicals %}
+                                <option value="{{ chem.id }}">{{ chem.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2 text-center py-2">
+                            <div class="rounded-circle bg-success text-white d-inline-flex justify-content-center align-items-center shadow"
+                                style="width: 40px; height: 40px; font-size: 1.2rem; font-weight: bold;">+</div>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="text-muted font-weight-bold">Reactant B <span
+                                    class="text-danger">*</span></label>
+                            <select name="chemical_b_id" class="form-control custom-select bg-white shadow-sm border-0"
+                                required>
+                                <option value="" disabled selected>Select Chemical...</option>
+                                {% for chem in chemicals %}
+                                <option value="{{ chem.id }}">{{ chem.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12 form-group">
+                            <label class="text-muted font-weight-bold">Resultant Product <span
+                                    class="badge badge-light border ml-1">Optional</span></label>
+                            <select name="product_id"
+                                class="form-control custom-select bg-light border-0 font-weight-bold text-success">
+                                <option value="">No distinct chemical created (Color/pH change only)</option>
+                                {% for chem in chemicals %}
+                                <option value="{{ chem.id }}">{{ chem.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row pt-3 mt-2 border-top">
+                        <div class="col-md-6 form-group">
+                            <label class="text-muted font-weight-bold">Reaction Color (Hex + Alpha)</label>
+                            <input type="text" class="form-control bg-light border-0 text-monospace"
+                                name="reaction_color_hex" value="#FFFFFF80" placeholder="#RRGGBBAA">
+                            <small class="text-muted">Color of solution when mixed.</small>
+                        </div>
+                        <div class="col-md-6 form-group">
+                            <label class="text-muted font-weight-bold">Net pH Change</label>
+                            <input type="number" step="0.1" class="form-control bg-light border-0 font-weight-bold"
+                                name="ph_change" value="0.0">
+                            <small class="text-muted">Positive = basic, Negative = acidic.</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top-0">
+                    <button type="button" class="btn btn-light shadow-sm" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success shadow px-4"><i class="fas fa-link mr-1"></i> Create
+                        Linkage</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock content %}
