@@ -452,6 +452,7 @@ class ExperimentMilestone(models.Model):
     experiment = models.ForeignKey(LabExperiment, on_delete=models.CASCADE, related_name='milestones')
     milestone_id = models.CharField(max_length=100) # e.g., 'fill_burette'
     description = models.CharField(max_length=200)
+    instruction = models.TextField(blank=True, null=True, help_text="Shown in the Lab Assistant panel as guidance to the student for completing this step.")
     points = models.IntegerField(default=10)
 
     def __str__(self):

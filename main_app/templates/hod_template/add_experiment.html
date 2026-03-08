@@ -78,18 +78,30 @@
                                 score points.</p>
 
                             <div id="milestones-container">
-                                <div class="milestone-row form-row mb-2">
-                                    <div class="col-md-3">
-                                        <input type="text" class="form-control" name="milestone-id-0"
-                                            placeholder="ID (e.g., fill_burette)">
-                                    </div>
-                                    <div class="col-md-7">
-                                        <input type="text" class="form-control" name="milestone-desc-0"
-                                            placeholder="Description shown to student">
-                                    </div>
-                                    <div class="col-md-2">
-                                        <input type="number" class="form-control" name="milestone-pts-0"
-                                            placeholder="Points (e.g., 10)">
+                                <div class="milestone-row card mb-3">
+                                    <div class="card-body pb-2">
+                                        <div class="form-row mb-2">
+                                            <div class="col-md-3">
+                                                <input type="text" class="form-control" name="milestone-id-0"
+                                                    placeholder="ID (e.g., fill_burette)">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input type="text" class="form-control" name="milestone-desc-0"
+                                                    placeholder="Short description (shown in CURRENT TASK box)">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <input type="number" class="form-control" name="milestone-pts-0"
+                                                    placeholder="Points">
+                                            </div>
+                                            <div class="col-md-1"><span class="text-muted">pts</span></div>
+                                        </div>
+                                        <div class="form-group mb-0">
+                                            <textarea class="form-control form-control-sm bg-light" rows="2"
+                                                name="milestone-instruction-0"
+                                                placeholder="💡 Lab Assistant instruction (optional) — e.g., 'From the catalog spawn the burette and HCl bottle. Drag HCl on top to fill, then use UP/DOWN arrow keys to pour.'"></textarea>
+                                            <small class="text-muted">Displayed as the step-by-step hint in the Lab
+                                                Assistant panel during simulation.</small>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -169,7 +181,7 @@
                             <input type="text" class="form-control" name="milestone-id-${count}" placeholder="Milestone ID (e.g., fill_burette)">
                         </div>
                         <div class="col-md-6">
-                            <input type="text" class="form-control" name="milestone-desc-${count}" placeholder="Description shown to student">
+                            <input type="text" class="form-control" name="milestone-desc-${count}" placeholder="Short description (CURRENT TASK box)">
                         </div>
                         <div class="col-md-2">
                             <input type="number" class="form-control" name="milestone-pts-${count}" placeholder="Points">
@@ -177,6 +189,12 @@
                         <div class="col-md-1">
                             <button type="button" class="btn btn-sm btn-outline-danger btn-block" onclick="this.parentElement.parentElement.parentElement.parentElement.remove()">X</button>
                         </div>
+                    </div>
+                    <div class="form-group mb-2">
+                        <textarea class="form-control form-control-sm bg-light" rows="2"
+                            name="milestone-instruction-${count}"
+                            placeholder="💡 Lab Assistant instruction (optional) — tell the student what to do for this step"></textarea>
+                        <small class="text-muted">Displayed as the step-by-step hint in the Lab Assistant panel during simulation.</small>
                     </div>
                     
                     <!-- Rules Section -->

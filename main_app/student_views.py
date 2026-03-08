@@ -912,7 +912,8 @@ def lab_experiment_simulation(request, slug):
             ]
             milestones_list.append({
                 "id": ms.milestone_id, 
-                "desc": ms.description, 
+                "desc": ms.description,
+                "instruction": ms.instruction or "",
                 "points": ms.points,
                 "rules": rules_list
             })

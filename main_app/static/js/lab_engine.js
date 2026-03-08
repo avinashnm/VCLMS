@@ -1828,9 +1828,9 @@ function drawDataPanel() {
     text("CURRENT TASK:", panelX + 20, 115);
 
     fill(255); textStyle(NORMAL);
-    rect(panelX + 20, 125, panelW - 40, 50, 8);
-    fill(0); textAlign(CENTER, CENTER);
-    text(currentTask.desc, panelX + panelW / 2, 150);
+    rect(panelX + 20, 125, panelW - 40, 60, 8);
+    fill(0); textAlign(CENTER, CENTER); textSize(12);
+    text(currentTask.desc, panelX + panelW / 2, 157, panelW - 55, 55);
 
     // 4. Instructions Box (Cleanly positioned)
     fill(40, 180, 255, 40); noStroke();
@@ -1847,7 +1847,8 @@ function drawDataPanel() {
       "reach_v2": "Titrate until the yellow turns Red. Click the ORANGE button to enter your final reading.",
       "submit_calc": "Titration complete! Click the GREEN button below. You must calculate the mass of Carbonate/Bicarbonate using your readings."
     };
-    let hintText = hints[currentTask.id] || "Follow the laboratory manual steps.";
+    // Prefer DB-stored instruction, fallback to hardcoded hints, then generic
+    let hintText = currentTask.instruction || hints[currentTask.id] || "Follow the laboratory manual steps.";
     text("💡 INSTRUCTION:\n" + hintText, panelX + 30, 195, panelW - 60);
   }
 
@@ -1860,7 +1861,7 @@ function drawDataPanel() {
     textSize(10); textStyle(NORMAL);
     let displayList = penalties.slice(-4);
     displayList.forEach((p, i) => {
-      text(p, panelX + 20, 335 + (i * 18));
+      text(p, panelX + 20, 335 + (i * 18), panelW - 40);
     });
   }
 

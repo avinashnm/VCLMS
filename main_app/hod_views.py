@@ -1343,10 +1343,12 @@ def add_experiment(request):
                     break
                 if m_id.strip() and m_desc.strip():
                     pts = int(m_pts) if m_pts and m_pts.isdigit() else 10
+                    m_instruction = request.POST.get(f"milestone-instruction-{k}", "").strip()
                     milestone = ExperimentMilestone.objects.create(
                         experiment=experiment, 
                         milestone_id=m_id.strip(), 
-                        description=m_desc.strip(), 
+                        description=m_desc.strip(),
+                        instruction=m_instruction or None,
                         points=pts
                     )
                     
@@ -1449,10 +1451,12 @@ def edit_experiment(request, experiment_id):
                     break
             if m_id and m_desc and m_id.strip() and m_desc.strip():
                 pts = int(m_pts) if m_pts and str(m_pts).strip().isdigit() else 10
+                m_instruction = request.POST.get(f"milestone-instruction-{k}", "").strip()
                 milestone = ExperimentMilestone.objects.create(
                     experiment=experiment, 
                     milestone_id=m_id.strip(), 
-                    description=m_desc.strip(), 
+                    description=m_desc.strip(),
+                    instruction=m_instruction or None,
                     points=pts
                 )
                 
