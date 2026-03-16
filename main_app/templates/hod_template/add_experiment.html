@@ -267,13 +267,13 @@
     // Inject catalog data from Django context
     const apparatusList = [
         {% for app in apparatus_list %}
-    { id: { { app.id } }, name: "{{ app.name|escapejs }}", type: "{{ app.type|escapejs }}" },
+    { id: {{ app.id }}, name: "{{ app.name|escapejs }}", type: "{{ app.type|escapejs }}" },
     {% endfor %}
     ];
 
     const chemicalList = [
         {% for chem in chemicals_list %}
-    { id: { { chem.id } }, name: "{{ chem.name|escapejs }}" },
+    { id: {{ chem.id }}, name: "{{ chem.name|escapejs }}" },
     {% endfor %}
     ];
 

@@ -525,6 +525,139 @@ function setup() {
   // Expose global physics reactions from dynamic payload
   window.CHEMICAL_REACTIONS = (experimentData && experimentData.catalogs) ? experimentData.catalogs.reactions : [];
 
+  // AUTO-SPAWN from Scene Builder initial_state
+  spawnFromInitialState();
+}
+
+// ======================================================
+// INITIAL STATE SPAWNER (From Scene Builder JSON)
+// ======================================================
+function spawnFromInitialState() {
+  if (!experimentData || !experimentData.initial_state || !experimentData.initial_state.length) {
+    console.log("No initial_state defined for this experiment.");
+    return;
+  }
+
+  console.log("Spawning initial state:", experimentData.initial_state);
+
+  experimentData.initial_state.forEach((item, index) => {
+    const type = item.type;
+    if (!type) return;
+
+    // 1. Determine spawn location based on Scene Builder selection
+    let spawnSurface = labSurfaces.table; // default
+    if (item.location === 'shelfTop') spawnSurface = labSurfaces.shelfTop;
+    else if (item.location === 'shelfBottom') spawnSurface = labSurfaces.shelfBottom;
+
+    // 2. Calculate position on the chosen surface
+    const surfaceWidth = spawnSurface.maxX - spawnSurface.minX;
+    const spacing = surfaceWidth / (experimentData.initial_state.length + 1);
+    const targetX = spawnSurface.minX + spacing * (index + 1);
+    const size = currentPositions.sizes[type] || currentPositions.sizes.beaker;
+    const targetY = spawnSurface.y - (size.h / 2) - 5;
+    const pos = findCollisionFreePosition(targetX, targetY, type);
+
+    // 3. Create the vessel
+    const id = nextId(type);
+    let v = makeVessel(id, pos.x, pos.y, size.w, size.h, type, 'Empty', type, 0, 100);
+
+    // 4. Set type-specific defaults
+    if (type === 'beaker') {
+      v.capacity = 250;
+      v.title = '250 mL Beaker';
+    } else if (type === 'conical_flask') {
+      v.capacity = 250;
+      v.title = 'Conical Flask';
+    } else if (type === 'pipette') {
+      v.capacity = 25;
+      v.title = '25 mL Pipette';
+    } else if (type === 'burette_tube') {
+      v.capacity = 50;
+      v.title = '50 mL Burette Tube';
+      v.isBurette = true;
+      v.mountedTo = null;
+      v.clampOffset = 0;
+    } else if (type === 'common_stand') {
+      v.title = 'Common Stand';
+    } else if (type === 'funnel') {
+      v.title = 'Filter Funnel';
+    } else if (type === 'wash_bottle') {
+      v.chem = 'Distilled Water';
+      v.capacity = 250;
+      v.title = 'Wash Bottle';
+    } else if (type === 'bottle') {
+      v.capacity = 250;
+      v.title = 'Empty Bottle';
+    } else if (type === 'volumetric_flask') {
+      v.capacity = 250;
+      v.title = '250 mL Volumetric Flask';
+    } else if (type === 'burette') {
+      v.capacity = 50;
+      v.title = '50 mL Burette';
+      v.targetVolume = 0;
+      v.contents.hcl_vol = 0;
+    } else if (type === 'bunsen_burner') {
+      v.title = 'Bunsen Burner';
+    } else if (type === 'balance') {
+      v.title = 'Analytical Balance';
+      v.tareOffset = 0;
+      v.rawWeight = 0;
+      v.displayWeight = 0;
+      v.mass = 0;
+    } else if (type === 'crucible') {
+      v.capacity = 20;
+      v.title = 'Porcelain Crucible';
+    } else if (type === 'hotplate') {
+      v.title = 'Digital Hotplate';
+      v.temperature = 25;
+      v.heating = false;
+    } else if (type === 'pH_meter') {
+      v.title = 'Digital pH Meter';
+      v.reading = 7.0;
+    } else {
+      v.title = type.replace(/_/g, ' ');
+    }
+
+    // 5. Fill with chemical if defined in initialContents
+    if (item.initialContents && item.initialContents.type) {
+      const chemName = item.initialContents.type;
+      const chemVol = item.initialContents.volume || 0;
+
+      // Look up color from the chemical catalog
+      let chemColor = [200, 220, 255];
+      if (chemicalCatalog && chemicalCatalog.chemicals) {
+        const found = chemicalCatalog.chemicals.find(c => c.name === chemName || c.id === chemName);
+        if (found && found.color) {
+          chemColor = found.color;
+        }
+      }
+
+      v.chem = chemName;
+      v.chemicalId = chemName;
+      v.color = chemColor;
+      v.volume = chemVol;
+      v.targetVolume = chemVol;
+
+      // For bottles, mark as chemical bottle
+      if (type === 'bottle') {
+        v.isChemical = true;
+        v.title = chemName;
+      }
+
+      // For conical flasks/beakers, set contents brain
+      if (type === 'conical_flask' || type === 'beaker') {
+        v.contents.mixture_vol = chemVol;
+      }
+
+      // For burettes, set burette-specific volumes
+      if (type === 'burette' || type === 'burette_tube') {
+        v.contents.hcl_vol = chemVol;
+      }
+    }
+
+    vessels[v.id] = v;
+    console.log(`Auto-spawned: ${v.title} at (${Math.round(pos.x)}, ${Math.round(pos.y)}) on ${item.location || 'table'}`);
+  });
 }
 
 function windowResized() {

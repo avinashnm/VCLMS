@@ -932,13 +932,22 @@ def lab_experiment_simulation(request, slug):
                 "v2": round(random.uniform(23.0, 27.0), 2)
             }
             
+            
+        initial_state = []
+        if experiment_obj.initial_state_json:
+            try:
+                initial_state = json.loads(experiment_obj.initial_state_json)
+            except Exception:
+                pass
+                
         experiment_data = {
             "name": experiment_obj.title,
             "objective": experiment_obj.objective,
             "type": experiment_obj.type,
             "milestones": milestones_list,
             "targets": targets,
-            "catalogs": catalogs_dict
+            "catalogs": catalogs_dict,
+            "initial_state": initial_state
         }
         
     except LabExperiment.DoesNotExist:
