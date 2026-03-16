@@ -108,7 +108,21 @@
                             <button type="button" class="btn btn-sm btn-outline-secondary mt-2"
                                 onclick="addMilestone()">+ Add Milestone</button>
 
-                            <br><br>
+                            <br>
+                            <hr>
+
+                            <!-- Scene Builder (Initial State) -->
+                            <h4 class="text-primary mt-4 mb-3">Initial Scene Configuration</h4>
+                            <p class="text-muted small mb-3">Define the apparatus and chemicals that spawn on the lab
+                                bench or shelf when the experiment begins.</p>
+                            <div id="scene-builder-container" class="row">
+                                <!-- Scene items go here -->
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2 mb-4"
+                                onclick="addSceneItem()">+ Add Apparatus</button>
+                            <!-- Hidden input to store JSON array for backend -->
+                            <input type="hidden" name="initial_state_json" id="initial_state_json_input" value="[]">
+
                             <div class="form-group mt-4">
                                 {% if messages %}
                                 {% for message in messages %}
@@ -246,5 +260,92 @@
         container.insertAdjacentHTML('beforeend', html);
         countInput.value = ruleIndex + 1;
     }
+
+    // --- Scene Builder Logic ---
+    let sceneItemCount = 0;
+
+    // Inject catalog data from Django context
+    const apparatusList = [
+        {% for app in apparatus_list %}
+    { id: { { app.id } }, name: "{{ app.name|escapejs }}", type: "{{ app.type|escapejs }}" },
+    {% endfor %}
+    ];
+
+    const chemicalList = [
+        {% for chem in chemicals_list %}
+    { id: { { chem.id } }, name: "{{ chem.name|escapejs }}" },
+    {% endfor %}
+    ];
+
+    function addSceneItem(existingData = null) {
+        const container = document.getElementById('scene-builder-container');
+        const idx = sceneItemCount++;
+
+        let appOptions = apparatusList.map(a => `<option value="${a.type}">${a.name}</option>`).join('');
+        let chemOptions = `<option value="">-- Empty --</option>` + chemicalList.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+
+        const html = `
+        <div class="col-md-6 mb-3 scene-item-card" id="scene-item-${idx}">
+            <div class="card bg-light border-secondary">
+                <div class="card-header py-2 d-flex justify-content-between align-items-center bg-secondary text-white">
+                    <span class="font-weight-bold">Apparatus ${idx + 1}</span>
+                    <button type="button" class="btn btn-sm btn-danger py-0 px-2" onclick="document.getElementById('scene-item-${idx}').remove()">X</button>
+                </div>
+                <div class="card-body p-2">
+                    <div class="form-group mb-2">
+                        <label class="small mb-1 font-weight-bold">Select Apparatus</label>
+                        <select class="form-control form-control-sm scene-app-type">
+                            ${appOptions}
+                        </select>
+                    </div>
+                    <div class="form-group mb-2">
+                        <label class="small mb-1 font-weight-bold">Initial Location</label>
+                        <select class="form-control form-control-sm scene-location">
+                            <option value="table">Lab Bench (Table)</option>
+                            <option value="shelfTop">Top Shelf</option>
+                            <option value="shelfBottom">Bottom Shelf</option>
+                        </select>
+                    </div>
+                    <hr class="my-2 border-secondary">
+                    <div class="form-group mb-2">
+                        <label class="small mb-1 font-weight-bold">Contains Chemical (Optional)</label>
+                        <select class="form-control form-control-sm scene-chem">
+                            ${chemOptions}
+                        </select>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label class="small mb-1 font-weight-bold">Volume (mL)</label>
+                        <input type="number" class="form-control form-control-sm scene-vol" placeholder="e.g. 50" min="0" step="0.1">
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+    }
+
+    // Hook form submission to build the JSON array from the cards
+    document.querySelector('form').addEventListener('submit', function (e) {
+        const items = document.querySelectorAll('.scene-item-card');
+        let stateArray = [];
+        items.forEach(card => {
+            const type = card.querySelector('.scene-app-type').value;
+            const loc = card.querySelector('.scene-location').value;
+            const chem = card.querySelector('.scene-chem').value;
+            const vol = card.querySelector('.scene-vol').value;
+
+            let itemData = { type: type, location: loc };
+            if (chem) {
+                let volumeParsed = parseFloat(vol);
+                if (isNaN(volumeParsed)) volumeParsed = 0;
+                itemData.initialContents = {
+                    type: chem,
+                    volume: volumeParsed
+                };
+            }
+            stateArray.push(itemData);
+        });
+        document.getElementById('initial_state_json_input').value = JSON.stringify(stateArray);
+    });
 </script>
 {% endblock content %}

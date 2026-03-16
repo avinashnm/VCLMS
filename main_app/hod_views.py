@@ -1299,7 +1299,7 @@ def student_reports(request):
 # EXPERIMENT CREATION MODULE (DYNAMIC LAB)
 # ==========================================
 
-from .models import LabExperiment, ExperimentMaterial, ExperimentStep, ExperimentMilestone, ExperimentTargetConfig
+from .models import LabExperiment, ExperimentMaterial, ExperimentStep, ExperimentMilestone, ExperimentTargetConfig, ApparatusCatalog, ChemicalCatalog
 from .forms import LabExperimentForm
 
 def add_experiment(request):
@@ -1307,6 +1307,8 @@ def add_experiment(request):
         form = LabExperimentForm(request.POST)
         if form.is_valid():
             experiment = form.save()
+            experiment.initial_state_json = request.POST.get("initial_state_json", "[]")
+            experiment.save()
             
             # 1. Process Materials
             # Expecting fields like material-0, material-1...
@@ -1387,7 +1389,12 @@ def add_experiment(request):
             
     else:
         form = LabExperimentForm()
-        return render(request, "hod_template/add_experiment.html", {"form": form})
+        context = {
+            "form": form,
+            "apparatus_list": ApparatusCatalog.objects.all(),
+            "chemicals_list": ChemicalCatalog.objects.all()
+        }
+        return render(request, "hod_template/add_experiment.html", context)
 
 def manage_experiments(request):
     experiments = LabExperiment.objects.all().order_by('-created_at')
@@ -1407,6 +1414,7 @@ def edit_experiment(request, experiment_id):
         experiment.objective = request.POST.get('objective')
         experiment.principle = request.POST.get('principle')
         experiment.type = request.POST.get('type')
+        experiment.initial_state_json = request.POST.get('initial_state_json', '[]')
         experiment.save()
         
         # Clear existing related data
@@ -1498,7 +1506,9 @@ def edit_experiment(request, experiment_id):
             'target_config': target_config,
             'materials': experiment.materials.all(),
             'steps': experiment.steps.all().order_by('step_number'),
-            'milestones': experiment.milestones.all()
+            'milestones': experiment.milestones.all(),
+            'apparatus_list': ApparatusCatalog.objects.all(),
+            'chemicals_list': ChemicalCatalog.objects.all()
         }
         return render(request, "hod_template/edit_experiment.html", context)
 

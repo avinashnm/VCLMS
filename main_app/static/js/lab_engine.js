@@ -1983,7 +1983,7 @@ function clearShelves() {
   });
 
   if (clearedCount > 0) {
-    console.log(`Magically cleared ${clearedCount} items from shelves.`);
+    console.log(`Cleared ${clearedCount} items from shelves.`);
   }
 }
 
