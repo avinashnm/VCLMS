@@ -142,9 +142,33 @@
                 </ul>
             </li>
 
-
-
-
+            <li class="nav-item has-treeview">
+                <a href="#" class="nav-link">
+                    <i class="nav-icon fas fa-project-diagram"></i>
+                    <p>
+                        Learning Paths
+                        <i class="fas fa-angle-left right"></i>
+                    </p>
+                </a>
+                <ul class="nav nav-treeview">
+                    <li class="nav-item">
+                        {% url 'add_module' as add_module %}
+                        <a href="{{add_module}}"
+                            class="nav-link  {% if add_module == request.path %} active {% endif %}">
+                            <i class="far fa-circle nav-icon"></i>
+                            <p>Add Module</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        {% url 'manage_modules' as manage_modules %}
+                        <a href="{{manage_modules}}"
+                            class="nav-link  {% if manage_modules == request.path %} active {% endif %}">
+                            <i class="far fa-circle nav-icon"></i>
+                            <p>Manage Modules</p>
+                        </a>
+                    </li>
+                </ul>
+            </li>
 
             <li class="nav-item has-treeview">
                 <a href="#" class="nav-link">

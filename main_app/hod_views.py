@@ -1624,3 +1624,54 @@ def delete_reaction(request, rid):
     r.delete()
     messages.success(request, "Reaction removed successfully!")
     return redirect(reverse("manage_catalogs"))
+
+# ==========================================
+# PHASE 4: PATH-BASED LMS
+# ==========================================
+
+from .models import LessonModule
+from .forms import LessonModuleForm
+
+def add_module(request):
+    form = LessonModuleForm(request.POST or None)
+    if request.method == "POST":
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Lesson Module created successfully!")
+            return redirect(reverse('manage_modules'))
+        else:
+            messages.error(request, "Failed to create Lesson Module. Please check the form.")
+    
+    context = {"form": form, "page_title": "Add Lesson Module"}
+    return render(request, "hod_template/add_module.html", context)
+
+def manage_modules(request):
+    modules = LessonModule.objects.all().order_by('-created_at')
+    context = {
+        'modules': modules,
+        'page_title': 'Manage Lesson Modules'
+    }
+    return render(request, 'hod_template/manage_modules.html', context)
+
+def edit_module(request, module_id):
+    module = get_object_or_404(LessonModule, id=module_id)
+    form = LessonModuleForm(request.POST or None, instance=module)
+    if request.method == "POST":
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Lesson Module updated successfully!")
+            return redirect(reverse('manage_modules'))
+        else:
+            messages.error(request, "Failed to update Lesson Module.")
+    
+    context = {"form": form, "page_title": "Edit Lesson Module", "module": module}
+    return render(request, "hod_template/edit_module.html", context)
+
+def delete_module(request, module_id):
+    module = get_object_or_404(LessonModule, id=module_id)
+    try:
+        module.delete()
+        messages.success(request, "Lesson Module deleted successfully!")
+    except Exception as e:
+        messages.error(request, f"Failed to delete Lesson Module: {e}")
+    return redirect(reverse('manage_modules'))

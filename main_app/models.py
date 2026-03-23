@@ -525,3 +525,37 @@ class MilestoneRule(models.Model):
     
     def __str__(self):
         return f"Rule: IF {self.target_vessel}.{self.target_property} {self.operator} {self.value}"
+
+# ==========================================
+# PHASE 4: PATH-BASED LMS
+# ==========================================
+
+class LessonModule(models.Model):
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name="modules")
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    video_course = models.ForeignKey(VideoCourse, null=True, blank=True, on_delete=models.SET_NULL)
+    quiz = models.ForeignKey(Quiz, null=True, blank=True, on_delete=models.SET_NULL)
+    experiment = models.ForeignKey(LabExperiment, null=True, blank=True, on_delete=models.SET_NULL)
+    pass_percentage = models.FloatField(default=60.0, help_text="Minimum Quiz % to unlock lab")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.title} ({self.subject.name})"
+
+class StudentProgress(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="progress")
+    lesson_module = models.ForeignKey(LessonModule, on_delete=models.CASCADE, related_name="progress")
+    video_watched = models.BooleanField(default=False)
+    quiz_passed = models.BooleanField(default=False)
+    latest_quiz_score = models.FloatField(default=0.0)
+    lab_completed = models.BooleanField(default=False)
+    lab_score = models.FloatField(default=0.0)
+    overall_grade = models.FloatField(default=0.0)
+    last_accessed = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('student', 'lesson_module')
+
+    def __str__(self):
+        return f"{self.student.admin.first_name} - {self.lesson_module.title}"

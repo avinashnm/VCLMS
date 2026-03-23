@@ -38,6 +38,15 @@ def student_home(request):
         subject_name.append(subject.name)
         data_present.append(present_count)
         data_absent.append(absent_count)
+    # LMS Pathway logic
+    modules = LessonModule.objects.filter(subject__course=student.course).order_by('created_at')
+    # Pre-fetch progress
+    enhanced_modules = []
+    for m in modules:
+        prog, _ = StudentProgress.objects.get_or_create(student=student, lesson_module=m)
+        setattr(m, 'student_progress', prog)
+        enhanced_modules.append(m)
+
     context = {
         'total_attendance': total_attendance,
         'percent_present': percent_present,
@@ -47,8 +56,8 @@ def student_home(request):
         'data_present': data_present,
         'data_absent': data_absent,
         'data_name': subject_name,
-        'page_title': 'Student Homepage'
-
+        'page_title': 'Student Homepage',
+        'modules': enhanced_modules
     }
     return render(request, 'student_template/home_content.html', context)
 
@@ -192,6 +201,17 @@ def save_lab_report(request):
                 total_score=data.get('totalScore'),
                 penalty_log=data.get('log')
             )
+            
+            # --- START PROGRESSION UPDATE ---
+            modules = LessonModule.objects.filter(experiment__title=data.get('name'), subject__course=student.course)
+            for module in modules:
+                progress = StudentProgress.objects.filter(student=student, lesson_module=module).first()
+                if progress:
+                    progress.lab_completed = True
+                    progress.lab_score = float(data.get('totalScore', 0))
+                    progress.save()
+            # --- END PROGRESSION UPDATE ---
+
             return JsonResponse({"status": "success", "message": "Experiment saved!"})
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=400)
@@ -295,19 +315,31 @@ def take_quiz(request, quiz_id):
     quiz = get_object_or_404(Quiz, pk=quiz_id)
     student = get_object_or_404(Student, admin_id=request.user.id)
     questions = quiz.question_set.all()
+    
+    # Progression Logic Check
+    modules = LessonModule.objects.filter(quiz=quiz, subject__course=student.course)
+    for module in modules:
+        progress, _ = StudentProgress.objects.get_or_create(student=student, lesson_module=module)
+        if module.video_course and not progress.video_watched:
+            messages.error(request, "You must watch the theory video before taking the assessment.")
+            return redirect(reverse('student_home'))
+
     total_questions = questions.count()
     correct_answers = 0
 
     if request.method == 'POST':
         for question in questions:
             selected_option_id = request.POST.get(f'question-{question.id}-options')
-            selected_option = question.option_set.get(pk=selected_option_id)
-
-            if selected_option.is_correct:
-                correct_answers += 1
+            if selected_option_id:
+                try:
+                    selected_option = question.option_set.get(pk=selected_option_id)
+                    if selected_option.is_correct:
+                        correct_answers += 1
+                except Option.DoesNotExist:
+                    pass
 
         score = correct_answers 
-        percentage = (correct_answers / total_questions) * 100
+        percentage = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
 
         quiz_result = QuizResult(
             student=student,
@@ -316,6 +348,14 @@ def take_quiz(request, quiz_id):
             percentage=percentage
         )
         quiz_result.save()
+        
+        # Advance Student Progress
+        for module in modules:
+            progress, _ = StudentProgress.objects.get_or_create(student=student, lesson_module=module)
+            progress.latest_quiz_score = percentage
+            if percentage >= module.pass_percentage:
+                progress.quiz_passed = True
+            progress.save()
 
         messages.success(request, f'You scored {correct_answers} out of {total_questions} in the {quiz.title} quiz.')
 
@@ -522,6 +562,15 @@ from .models import VideoCourse
 
 def watch_video(request, course_id):
     video_course = get_object_or_404(VideoCourse, id=course_id)
+    student = get_object_or_404(Student, admin=request.user)
+    
+    # Mark as watched for related modules
+    modules = LessonModule.objects.filter(video_course=video_course, subject__course=student.course)
+    for module in modules:
+        progress, _ = StudentProgress.objects.get_or_create(student=student, lesson_module=module)
+        progress.video_watched = True
+        progress.save()
+        
     return render(request, 'hod_template/watch_video.html', {'video_course': video_course})
 
 
@@ -804,10 +853,20 @@ def lab_rast_method(request):
     return render(request, "student_template/lab_rast_method.html", context)
 
 # shows description/materials/procedure for any experiment
+@login_required
 def lab_experiment_info(request, slug):
     # Fetch from database
     try:
         experiment_obj = LabExperiment.objects.get(slug=slug)
+        student = get_object_or_404(Student, admin=request.user)
+        
+        # Progression Logic Check
+        modules = LessonModule.objects.filter(experiment=experiment_obj, subject__course=student.course)
+        for module in modules:
+            progress, _ = StudentProgress.objects.get_or_create(student=student, lesson_module=module)
+            if module.quiz and not progress.quiz_passed:
+                messages.error(request, f"You must pass the quiz for '{module.title}' before accessing the virtual lab.")
+                return redirect(reverse('student_home'))
         
         # Format materials and procedure into lists as the template expects
         materials_list = [mat.name for mat in experiment_obj.materials.all()]
@@ -987,3 +1046,82 @@ def lab_experiment_simulation(request, slug):
         "page_title": "Simulation: " + experiment_data['name']
     }
     return render(request, "student_template/lab_simulation.html", context)
+
+
+def download_unified_report(request, module_id):
+    student = get_object_or_404(Student, admin=request.user)
+    module = get_object_or_404(LessonModule, id=module_id)
+    progress = get_object_or_404(StudentProgress, student=student, lesson_module=module)
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=portrait(letter))
+    elements = []
+    
+    styles = getSampleStyleSheet()
+    
+    # Title
+    elements.append(Paragraph(f"Unified Assessment Report: {module.title}", styles['Title']))
+    elements.append(Spacer(1, 0.4 * inch))
+
+    # Student Details
+    student_data = [
+        ['Student Name:', f"{student.admin.first_name} {student.admin.last_name}"],
+        ['Email:', student.admin.email],
+        ['Course:', student.course.name],
+        ['Subject:', module.subject.name],
+    ]
+    t_student = Table(student_data, colWidths=[150, 300])
+    t_student.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), HexColor('#1e3a8a')),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.white),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+        ('PADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+    ]))
+    elements.append(t_student)
+    elements.append(Spacer(1, 0.4 * inch))
+
+    # Progression Status
+    prog_data = [
+        ['Component', 'Status / Score'],
+        ['1. Theory (Video)', 'Completed' if progress.video_watched else 'Incomplete'],
+        ['2. Assessment (Quiz)', f"Score: {progress.latest_quiz_score}% (Min {module.pass_percentage}%)"],
+        ['3. Practical (Virtual Lab)', f"Score: {progress.lab_score}" if progress.lab_completed else 'Incomplete'],
+    ]
+    t_prog = Table(prog_data, colWidths=[200, 250])
+    t_prog.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#1e3a8a')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('PADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+    ]))
+    elements.append(t_prog)
+    elements.append(Spacer(1, 0.4 * inch))
+
+    # Lab Submission Details
+    if progress.lab_completed and module.experiment:
+        submission = VirtualLabSubmission.objects.filter(student=student, experiment_name=module.experiment.title).last()
+        if submission:
+            elements.append(Paragraph("Virtual Lab Submission Log", styles['Heading3']))
+            elements.append(Spacer(1, 0.2 * inch))
+            sub_data = [
+                ['Observed V1', str(submission.v1_observed)],
+                ['Observed V2', str(submission.v2_observed)],
+                ['Calculated Na2CO3', str(submission.calc_na2co3)],
+                ['Calculated NaHCO3', str(submission.calc_nahco3)],
+                ['Penalty Log', submission.penalty_log or "None"],
+            ]
+            t_sub = Table(sub_data, colWidths=[200, 250])
+            t_sub.setStyle(TableStyle([
+                ('PADDING', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ]))
+            elements.append(t_sub)
+
+    doc.build(elements)
+    buffer.seek(0)
+    
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="Report_{student.admin.first_name}_{module.title}.pdf"'
+    return response

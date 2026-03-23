@@ -112,6 +112,12 @@ path('watch/<int:course_id>/', hod_views.watch_video, name='watch_video'),
  path('student/video_courses/',student_views.video_course_lists,name='video_courses'),
 path('student/watch/<int:course_id>/', student_views.watch_video, name='watch_video'),
 
+    # Learning Paths Module (LMS)
+    path('modules/add/', hod_views.add_module, name='add_module'),
+    path('modules/manage/', hod_views.manage_modules, name='manage_modules'),
+    path('modules/edit/<int:module_id>/', hod_views.edit_module, name='edit_module'),
+    path('modules/delete/<int:module_id>/', hod_views.delete_module, name='delete_module'),
+
     # Experiment Creation Module
     path('experiment/add/', hod_views.add_experiment, name='add_experiment'),
     path('experiment/manage/', hod_views.manage_experiments, name='manage_experiments'),
@@ -198,9 +204,8 @@ path('student/quiz_score/<int:quiz_result_id>/',student_views.quiz_score, name='
    
    
 #Report urls
-
-
 path('student_reports/',staff_views.student_reports,name="student_reports"),
+path('student/report/download/<int:module_id>/', student_views.download_unified_report, name='download_unified_report'),
 
 path("staff/send/student/notifications/", staff_views.send_student_notifications,
          name='send_student_notifications'),

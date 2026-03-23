@@ -430,4 +430,13 @@ class LabExperimentForm(FormSettings):
             'principle': forms.Textarea(attrs={'rows': 3}),
         }
 
-    
+class LessonModuleForm(FormSettings):
+    def __init__(self, *args, **kwargs):
+        super(LessonModuleForm, self).__init__(*args, **kwargs)
+        
+    class Meta:
+        model = LessonModule
+        fields = ['subject', 'title', 'description', 'video_course', 'quiz', 'experiment', 'pass_percentage']
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 4}),
+        }
