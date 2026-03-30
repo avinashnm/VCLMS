@@ -120,17 +120,16 @@ class MarkingManager {
             break;
           }
 
-          // Extract the property value to check
+          // Extract the property value to check generically
           let propValue = null;
           if (rule.target_property === "reading") { // Special case for burette reading
-            propValue = abs(targetVessel.capacity - targetVessel.targetVolume);
+            propValue = targetVessel.capacity - targetVessel.targetVolume;
           } else if (rule.target_property === "capacity") {
-            propValue = targetVessel.targetVolume; // How much liquid is inside
-          } else if (targetVessel.contents && targetVessel.contents[rule.target_property] !== undefined) {
-            propValue = targetVessel.contents[rule.target_property];
-          } else if (targetVessel.contents && targetVessel.contents.indicators) {
-            // Treat unknown properties as indicators (default 0 if not yet added)
-            propValue = targetVessel.contents.indicators[rule.target_property] || 0;
+            propValue = targetVessel.targetVolume; // How much total liquid is inside
+          } else if (targetVessel.contents && targetVessel.contents.chemicals) {
+            // Universal Phase 5 Check: Search the liquid contents dictionary
+            let chemReference = targetVessel.contents.chemicals[rule.target_property];
+            propValue = chemReference ? chemReference.volume : 0;
           } else {
             propValue = 0;
           }
@@ -166,141 +165,75 @@ class MarkingManager {
   completeMilestone(id) {
     if (this.completedIds.has(id)) return;
     let m = this.milestones.find(item => item.id === id);
-    if (m) {
-      this.completedIds.add(id);
-      sessionMarks += m.points;
-      currentStepIndex = Math.min(this.milestones.length - 1, this.completedIds.size);
-      console.log("Milestone Achieved:", m.desc);
-    }
-  }
+    if (!m) return;
 
-  addPenalty(id, points, reason) {
-    if (this.mistakesMade.has(id)) return;
-    this.mistakesMade.add(id);
-    sessionMarks -= points;
-    penalties.push(`-${points}: ${reason}`);
-  }
-
-  // --- MANUAL ENTRY: V1 ---
-  openV1Input() {
-    let promptText = "LAB OBSERVATION:\nEnter the Phenolphthalein endpoint (V1) reading in mL:";
-    if (this.config?.type === 'simple_titration') {
-      promptText = "LAB OBSERVATION:\nEnter the titration endpoint (V1) reading in mL:";
-    }
-
-    let val = window.prompt(promptText);
-    if (val !== null && val !== "") {
-      let userV1 = parseFloat(val);
-      const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-      let trueV1 = flask.contents.titrant_vol; // The real volume added in simulation
-
-      // Mark accuracy of observation (within 0.2 mL tolerance)
-      if (abs(userV1 - trueV1) > 0.2) {
-        this.addPenalty("obs_v1", 10, `Inaccurate V1 observation. Entered: ${userV1}, Actual: ${trueV1.toFixed(2)}`);
-      }
-      this.recordedV1 = userV1;
-      this.completeMilestone("reach_v1");
-    }
-  }
-
-  // --- MANUAL ENTRY: V2 ---
-  openV2Input() {
-    let val = window.prompt("LAB OBSERVATION:\nEnter the Methyl Orange endpoint (V2) reading in mL:");
-    if (val !== null && val !== "") {
-      let userV2 = parseFloat(val);
-      const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-      let trueV2 = flask.contents.titrant_vol;
-
-      // Mark accuracy of observation (within 0.2 mL tolerance)
-      if (abs(userV2 - trueV2) > 0.2) {
-        this.addPenalty("obs_v2", 10, `Inaccurate V2 observation. Entered: ${userV2}, Actual: ${trueV2.toFixed(2)}`);
-      }
-      this.recordedV2 = userV2;
-      this.completeMilestone("reach_v2");
-    }
-  }
-
-  // --- FINAL CHECKPOINT: CALCULATIONS ---
-  openCalculationModal() {
-    setTimeout(() => {
-      if (this.config?.type === 'double_indicator') {
-        const confirmed = confirm("TITRATION COMPLETE\n\nAre you ready to submit your final mass calculations based on your V1 and V2 observations?");
-        if (!confirmed) return;
-
-        let m1 = window.prompt(`Step 1: Use your V1 (${this.recordedV1} mL) to calculate:\nMass of Na2CO3 in grams:`);
-        let m2 = window.prompt(`Step 2: Use your V2 (${this.recordedV2} mL) to calculate:\nMass of NaHCO3 in grams:`);
-
-        if (m1 !== null && m2 !== null && m1 !== "" && m2 !== "") {
-          this.verifyCalculationsDoubleIndicator(parseFloat(m1), parseFloat(m2));
-        } else {
-          alert("Submission cancelled. Please calculate and enter both values.");
+    // Trigger Generic Observation Prompts Sequentially
+    if (m.observation_prompts && m.observation_prompts.length > 0) {
+      for (let p of m.observation_prompts) {
+        let val = window.prompt(`LAB OBSERVATION:\n${p.description}`);
+        if (val !== null && val.trim() !== "") {
+          let userVal = parseFloat(val);
+          let trueVal = 0;
+          let targetVessel = Object.values(vessels).find(v => v.type === p.target_vessel || (p.target_vessel === "burette" && (v.type === "burette" || (v.type === "burette_tube" && v.mountedTo))));
+          if (targetVessel) {
+             if (p.target_property === "reading") trueVal = targetVessel.capacity - targetVessel.targetVolume;
+             else if (p.target_property === "capacity") trueVal = targetVessel.targetVolume;
+             else if (targetVessel.contents && targetVessel.contents.chemicals && targetVessel.contents.chemicals[p.target_property]) {
+                trueVal = targetVessel.contents.chemicals[p.target_property].volume;
+             }
+          }
+          if (abs(userVal - trueVal) > p.tolerance) {
+             this.addPenalty(`obs_${p.title}`, p.penalty_points, `Inaccurate observation for ${p.title}. Expected approx: ${trueVal.toFixed(2)}`);
+          }
+          this.studentObservations = this.studentObservations || {};
+          this.studentObservations[p.title] = userVal;
         }
-      } else if (this.config?.type === 'simple_titration') {
-        const confirmed = confirm("TITRATION COMPLETE\n\nAre you ready to submit your final concentration calculation based on your V1 observation?");
-        if (!confirmed) return;
-
-        let c1 = window.prompt(`Calculate:\nMolarity of unknown solution using V1 (${this.recordedV1} mL):`);
-        if (c1 !== null && c1 !== "") {
-          this.verifyCalculationsSimpleTitration(parseFloat(c1));
-        } else {
-          alert("Submission cancelled. Please calculate and enter the value.");
-        }
-      } else {
-        alert("Calculations complete for this experiment.");
-        this.saveResults({}, {});
       }
-    }, 100);
-  }
-
-  verifyCalculationsDoubleIndicator(massNa2CO3, massNaHCO3) {
-    const M = 0.1;
-    const trueV1 = TARGET_V1;
-    const trueV2 = TARGET_V2;
-
-    let expectedNa2CO3 = (2 * trueV1 * M * 53) / 1000;
-    let expectedNaHCO3 = ((trueV2 - (2 * trueV1)) * M * 84) / 1000;
-
-    if (abs(massNa2CO3 - expectedNa2CO3) < 0.05) {
-      console.log("Carbonate math correct");
-    } else {
-      this.addPenalty("calc_na2co3", 12, "Incorrect Mass calculation for Sodium Carbonate.");
     }
 
-    if (abs(massNaHCO3 - expectedNaHCO3) < 0.05) {
-      console.log("Bicarbonate math correct");
-    } else {
-      this.addPenalty("calc_nahco3", 13, "Incorrect Mass calculation for Sodium Bicarbonate.");
+    // Trigger Generic Calculation Prompts Sequentially
+    if (m.calculation_prompts && m.calculation_prompts.length > 0) {
+      for (let c of m.calculation_prompts) {
+        let val = window.prompt(`CALCULATION:\n${c.description}`);
+        if (val !== null && val.trim() !== "") {
+          let userVal = parseFloat(val);
+          let parsedFormula = c.formula;
+          if (this.studentObservations) {
+             for (let key in this.studentObservations) {
+                // simple variable substitution loop (replace var name with float)
+                let re = new RegExp(`\\b${key}\\b`, 'g');
+                parsedFormula = parsedFormula.replace(re, this.studentObservations[key]);
+             }
+          }
+          let trueVal = 0;
+          try { trueVal = eval(parsedFormula); } catch(e) { console.error("Formula eval failed:", e); }
+          if (abs(userVal - trueVal) > c.tolerance) {
+             this.addPenalty(`calc_${c.title}`, c.points, `Incorrect calculation for ${c.title}. The correct derived value was roughly ${trueVal.toFixed(3)}.`);
+          }
+          this.studentCalculations = this.studentCalculations || {};
+          this.studentCalculations[c.title] = userVal;
+        }
+      }
     }
 
-    this.completeMilestone("submit_calc");
-    this.saveResults(massNa2CO3, massNaHCO3);
-  }
-
-  verifyCalculationsSimpleTitration(concentration) {
-    const M_titrant = 0.1;
-    const V_titrand = 20.0;
-    const trueV1 = TARGET_V1;
-
-    let expectedConcentration = (M_titrant * trueV1) / V_titrand;
-
-    if (abs(concentration - expectedConcentration) < 0.01) {
-      console.log("Concentration math correct");
-    } else {
-      this.addPenalty("calc_conc", 15, "Incorrect calculation for unknown concentration.");
+    this.completedIds.add(id);
+    sessionMarks += m.points;
+    currentStepIndex = Math.min(this.milestones.length - 1, this.completedIds.size);
+    console.log("Milestone Achieved:", m.desc);
+    
+    // Check if this was the last milestone in the sequence
+    if (this.completedIds.size >= this.milestones.length && this.milestones.length > 0) {
+      alert("All milestones complete! Committing final experiment results.");
+      this.saveResults(); // Autonomous generic dispatch
     }
-
-    this.completeMilestone("submit_calc");
-    this.saveResults(concentration, 0); // Reuse saveResults
   }
 
-  saveResults(m1, m2) {
+  saveResults() {
     const payload = {
       name: experimentData.name,
       totalScore: sessionMarks,
-      v1_observed: this.recordedV1,
-      v2_observed: this.recordedV2,
-      calc_na2co3: m1,
-      calc_nahco3: m2,
+      observations: this.studentObservations || {},
+      calculations: this.studentCalculations || {},
       log: penalties.join(" | ")
     };
 
@@ -317,14 +250,7 @@ class MarkingManager {
   }
 }
 
-function drawEndpointButtons(x, y, w) {
-  const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-  if (!flask || flask.contents.mixture_vol < 1 && flask.contents.titrant_vol < 1) return;
-
-  if (manager.config?.type === 'double_indicator') {
-    if (idIsDone("add_pp") && !idIsDone("reach_v1")) {
-      drawButton(x, y, w, 40, "ENTER V1 READING", [255, 105, 180]);
-    } else if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
+ else if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
       drawButton(x, y, w, 40, "ENTER V2 READING", [255, 160, 0]);
     } else if (idIsDone("reach_v2") && !idIsDone("submit_calc")) {
       drawButton(x, y, w, 40, "SUBMIT CALCULATIONS", [0, 200, 100]);
@@ -644,15 +570,8 @@ function spawnFromInitialState() {
         v.title = chemName;
       }
 
-      // For conical flasks/beakers, set contents brain
-      if (type === 'conical_flask' || type === 'beaker') {
-        v.contents.mixture_vol = chemVol;
-      }
-
-      // For burettes, set burette-specific volumes
-      if (type === 'burette' || type === 'burette_tube') {
-        v.contents.hcl_vol = chemVol;
-      }
+      // Initialize dynamic chemical dictionary
+      v.contents.chemicals[chemName] = { volume: chemVol, color: chemColor };
     }
 
     vessels[v.id] = v;
@@ -833,18 +752,15 @@ function makeVessel(id, x, y, w, h, title, chem, vtype, vol, cap) {
     color: [200, 220, 255, 150],
 
     // ======================================================
-    // NEW: THE CHEMICAL BRAIN (For Double Indicator Test)
+    // THE CHEMICAL BRAIN (Generic Liquid Matrix)
     // ======================================================
     contents: {
-      mixture_vol: 0,       // Analyte volume
-      titrant_vol: 0,       // Titrant volume added
-      water_vol: 0,         // Water added
-      indicators: {},       // e.g. {'Phenolphthalein': 0}
+      chemicals: {},       // e.g. {'HCl': { volume: 20.0, color: [255,0,0] } }
       isRinsed: false,
       isContaminated: false,
-      titrationStage: 1,
-      theoreticalV1: 10.0,
-      theoreticalV2: 25.0
+      pH: 7.0,
+      temperature: 25.0,
+      solidMass: 0
     }
   };
 }
@@ -1178,15 +1094,14 @@ function near(a, b, radius) {
 function handleIndicatorDrops() {
   if (!isDragging || !mouseIsPressed) return;
 
-  const flask = Object.values(vessels).find(v => v.type === 'conical_flask' && near(isDragging, v, 70));
-  if (flask && (isDragging.chemicalId === 'phenolphthalein' || isDragging.chemicalId === 'methyl_orange')) {
-
-    // Slow down drop rate
+  const flask = Object.values(vessels).find(v => (v.type === 'conical_flask' || v.type === 'beaker') && near(isDragging, v, 70));
+  if (flask && isDragging.type === 'bottle') {
+    // Treat as generic dropper bottle: any bottle drops liquid into flask below it
     if (frameCount % 30 === 0) {
-      if (isDragging.chemicalId === 'phenolphthalein') flask.contents.pp_drops++;
-      if (isDragging.chemicalId === 'methyl_orange') flask.contents.mo_drops++;
+      if (typeof transferLiquid === "function") {
+          transferLiquid(isDragging, flask, 0.05); // 1 drop = 0.05 mL
+      }
       createParticles(isDragging.x, isDragging.y + 30, 2, 'drip');
-      console.log("Indicator mixed into flask");
     }
   }
 }
@@ -1209,36 +1124,18 @@ function handlePipetteInteraction() {
 
   if (source && keyIsDown(SHIFT)) {
     let rate = 0.5 * (deltaTime / 50);
-    if (pipette.targetVolume < pipette.capacity && source.targetVolume > 0) {
-      let amt = min(rate, source.targetVolume, pipette.capacity - pipette.targetVolume);
-      source.targetVolume -= amt;
-      pipette.targetVolume += amt;
-      pipette.color = source.color;
-      pipette.chemicalId = source.chemicalId;
-      pipette.chem = source.chem;
+    if (typeof transferLiquid === "function") {
+        transferLiquid(source, pipette, rate);
     }
   }
 
   if (receiver && keyIsDown(SHIFT)) {
     let rate = 0.5 * (deltaTime / 50);
     if (pipette.targetVolume > 0.01 && receiver.targetVolume < receiver.capacity) {
-      let amt = min(rate, pipette.targetVolume, receiver.capacity - receiver.targetVolume);
-      pipette.targetVolume -= amt;
-      receiver.targetVolume += amt;
-
-      if (receiver.contents.mixture_vol < 0.1 || !engineIsIndicator(pipette.chemicalId)) {
-        receiver.contents.mixture_vol += amt;
-        receiver.chemicalId = pipette.chemicalId;
-        receiver.chem = pipette.chemicalId;
-        receiver.color = pipette.color;
-      } else {
-        receiver.contents.indicators[pipette.chemicalId] = (receiver.contents.indicators[pipette.chemicalId] || 0) + (amt * 10);
+      if (typeof transferLiquid === "function") {
+          transferLiquid(pipette, receiver, rate);
       }
-
-      // ADD TURBULENCE (Ripples) - MORE SUBTLE
       receiver.turbulence = min((receiver.turbulence || 0) + 0.5, 3);
-
-      // Thinner stream for pipette - ORIGIN AT TIP (v.h/2)
       drawPouringStream(pipette.x, pipette.y + pipette.h / 2 - 5, receiver.x, receiver.y - 15, color(...(pipette.color || [255, 255, 255])), 2);
     }
   }
@@ -1553,7 +1450,7 @@ function drawVessel(v) {
     image(imgConical, 0, 0, v.w, v.h);
 
     // NEW: Calculate dynamic titration color
-    drawRealisticLiquid(v, color(...getTitrationColor(v)));
+    drawRealisticLiquid(v, v.color ? color(...v.color) : color(200, 220, 255, 100));
   }
   else if (v.type === 'volumetric_flask') image(imgVolumetric, 0, 0, v.w, v.h);
   else if (v.type === 'funnel') image(imgFunnel, 0, 0, v.w, v.h);
@@ -1999,17 +1896,10 @@ function drawDataPanel() {
   }
 
   // 6. Action Buttons are drawn by drawEndpointButtons at Y=500
-  drawEndpointButtons(panelX + 20, 510, panelW - 40);
+  
 }
 
-function drawEndpointButtons(x, y, w) {
-  const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-  // Allow button even if volume is small to avoid logic traps
-  if (!flask) return;
 
-  if (idIsDone("add_pp") && !idIsDone("reach_v1")) {
-    drawButton(x, y, w, 45, "ENTER V1 READING", [255, 105, 180]);
-  }
   else if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
     drawButton(x, y, w, 45, "ENTER V2 READING", [255, 160, 0]);
   }
@@ -2395,13 +2285,7 @@ function handleBuretteDrainage() {
   let rate = keyIsDown(SHIFT) ? 0.2 : 0.01;
   let amt = rate * (deltaTime / 100);
 
-  b.targetVolume = max(0, b.targetVolume - amt);
   if (waste && waste.targetVolume < waste.capacity) {
-    waste.targetVolume += amt;
-    waste.turbulence = min((waste.turbulence || 0) + 1, 3); // Ripples in waste beaker
-    b.hint = "Draining into Beaker";
-  } else {
-    // If no waste container, still show drainage (spilling to bench)
     b.hint = "Draining (Waste)";
   }
 }
@@ -2478,22 +2362,23 @@ function keyPressed() {
 
       const flow = keyIsDown(SHIFT) ? 0.4 : 0.1; // Slower for precision
       if (burette.targetVolume >= flow && receiver.targetVolume < receiver.capacity) {
-        burette.targetVolume -= flow;
 
         if (isTooHigh) {
           // Spilling logic
+          burette.targetVolume -= flow;
           manager.addPenalty("spilling", 5, "Burette tip is too high above the flask, causing liquid spill.");
           createParticles(snapX, dripTipY, 2, 'drip');
           // Liquid is lost, not added to receiver
         } else {
-          receiver.targetVolume += flow;
+          if (typeof transferLiquid === "function") {
+              transferLiquid(burette, receiver, flow);
+          }
           studentVolume += flow;
-          receiver.contents.titrant_vol += flow;
           receiver.turbulence = min((receiver.turbulence || 0) + 0.3, 2);
         }
 
         // USE DROPLETS INSTEAD OF STREAM
-        drawDroplets(snapX, dripTipY - 10, receiver.x, receiver.y - 15, color(255, 160, 100));
+        drawDroplets(snapX, dripTipY - 10, receiver.x, receiver.y - 15, burette.color ? color(...burette.color) : color(255, 160, 100));
       }
     }
   }
@@ -2542,14 +2427,9 @@ function handleBuretteFilling() {
     if (flowRate > 0 && isDragging.targetVolume > 0) {
       // NEW: Allow filling up to 5mL past capacity (Realistic mistake zone)
       if (burette.targetVolume < burette.capacity + 5) {
-
-        burette.targetVolume += actualFlow;
-        isDragging.targetVolume -= actualFlow;
-
-        // Sync Chemical Metadata to the Burette
-        burette.color = isDragging.color;
-        burette.chemicalId = isDragging.chemicalId;
-        burette.chem = isDragging.chem;
+        if (typeof transferLiquid === "function") {
+            transferLiquid(isDragging, burette, actualFlow);
+        }
 
         // Visual Feedback - Thinner stream for filling
         drawPouringStream(isDragging.x, isDragging.y, buretteTopX, buretteTopY - 5, color(...isDragging.color), 3);
@@ -2924,3 +2804,68 @@ window.mouseDragged = mouseDragged;
 window.mouseReleased = mouseReleased;
 window.mouseClicked = mouseClicked;
 window.keyPressed = keyPressed;
+
+// ======================================================
+// GENERIC LIQUID TRANSFER & STOICHIOMETRY ENGINE
+// ======================================================
+function transferLiquid(source, target, transferVol) {
+  if (transferVol <= 0 || source.targetVolume <= 0) return;
+  if (target.targetVolume >= target.capacity) return; 
+
+  let actualVol = min(transferVol, source.targetVolume, target.capacity - target.targetVolume);
+  if (actualVol <= 0.001) return;
+
+  let totalSourceVol = 0;
+  for (let c in source.contents.chemicals) totalSourceVol += source.contents.chemicals[c].volume;
+
+  // Initial State Fallback: if dictionary empty but has volume
+  if (totalSourceVol <= 0.01 && source.chemicalId) {
+    source.contents.chemicals[source.chemicalId] = { volume: source.targetVolume, color: source.color || [200, 220, 255] };
+    totalSourceVol = source.targetVolume;
+  }
+
+  for (let c in source.contents.chemicals) {
+    let transferAmount = (source.contents.chemicals[c].volume / totalSourceVol) * actualVol;
+    
+    // Remove from source
+    source.contents.chemicals[c].volume -= transferAmount;
+    if (source.contents.chemicals[c].volume <= 0.001) delete source.contents.chemicals[c];
+    
+    // Add to target
+    if (!target.contents.chemicals[c]) {
+      target.contents.chemicals[c] = { volume: 0, color: source.contents.chemicals[c].color };
+    }
+    target.contents.chemicals[c].volume += transferAmount;
+  }
+  
+  source.targetVolume -= actualVol;
+  target.targetVolume += actualVol;
+  
+  // Mix visual identities
+  if (!target.chemicalId) target.chemicalId = source.chemicalId || source.chem;
+  
+  computeReaction(target);
+}
+
+function computeReaction(vessel) {
+  // PHASE 5.A: Pure volumetric color averaging based on dictionary contents
+  // Overrides hardcoded titration colors
+  let r=0, g=0, b=0, total=0;
+  for (let c in vessel.contents.chemicals) {
+    let chem = vessel.contents.chemicals[c];
+    if (chem.volume > 0) {
+      r += chem.color[0] * chem.volume;
+      g += chem.color[1] * chem.volume;
+      b += chem.color[2] * chem.volume;
+      total += chem.volume;
+    }
+  }
+  
+  if (total > 0 && typeof CHEMICAL_REACTIONS !== 'undefined' && CHEMICAL_REACTIONS.length > 0) {
+     // Active Stoichiometry Matrix checking
+     // TODO: Implement ReactionCatalog cross-referencing for Phase 5.B
+     vessel.color = [r/total, g/total, b/total, 180];
+  } else if (total > 0) {
+     vessel.color = [r/total, g/total, b/total, 180];
+  }
+}

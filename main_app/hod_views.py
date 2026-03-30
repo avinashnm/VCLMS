@@ -1299,7 +1299,7 @@ def student_reports(request):
 # EXPERIMENT CREATION MODULE (DYNAMIC LAB)
 # ==========================================
 
-from .models import LabExperiment, ExperimentMaterial, ExperimentStep, ExperimentMilestone, ExperimentTargetConfig, ApparatusCatalog, ChemicalCatalog
+from .models import LabExperiment, ExperimentMaterial, ExperimentStep, ExperimentMilestone, ExperimentTargetConfig, ApparatusCatalog, ChemicalCatalog, MilestoneRule, ObservationPrompt, CalculationPrompt
 from .forms import LabExperimentForm
 
 def add_experiment(request):
@@ -1376,6 +1376,38 @@ def add_experiment(request):
                                 )
                             except ValueError:
                                 pass # ignore rules with invalid float values
+                    
+                    # Process Observation Prompts
+                    obs_count_str = request.POST.get(f"obs-count-{k}", "0")
+                    obs_count = int(obs_count_str) if obs_count_str.isdigit() else 0
+                    for o in range(obs_count):
+                        obs_title = request.POST.get(f"obs-title-{k}-{o}")
+                        obs_desc = request.POST.get(f"obs-desc-{k}-{o}")
+                        obs_vessel = request.POST.get(f"obs-vessel-{k}-{o}", "burette")
+                        obs_prop = request.POST.get(f"obs-prop-{k}-{o}", "reading")
+                        if obs_title and obs_title.strip() and obs_desc and obs_desc.strip():
+                            ObservationPrompt.objects.create(
+                                milestone=milestone,
+                                title=obs_title.strip(),
+                                description=obs_desc.strip(),
+                                target_vessel=obs_vessel.strip() if obs_vessel.strip() else 'burette',
+                                target_property=obs_prop.strip() if obs_prop.strip() else 'reading'
+                            )
+                            
+                    # Process Calculation Prompts
+                    calc_count_str = request.POST.get(f"calc-count-{k}", "0")
+                    calc_count = int(calc_count_str) if calc_count_str.isdigit() else 0
+                    for c in range(calc_count):
+                        calc_title = request.POST.get(f"calc-title-{k}-{c}")
+                        calc_desc = request.POST.get(f"calc-desc-{k}-{c}")
+                        calc_form = request.POST.get(f"calc-form-{k}-{c}")
+                        if calc_title and calc_title.strip() and calc_form and calc_form.strip():
+                            CalculationPrompt.objects.create(
+                                milestone=milestone,
+                                title=calc_title.strip(),
+                                description=calc_desc.strip() if calc_desc else "",
+                                formula=calc_form.strip()
+                            )
                 k += 1
                 
             # 4. Save Target Config (Default values for now, can be expanded in UI later)
@@ -1490,6 +1522,38 @@ def edit_experiment(request, experiment_id):
                             )
                         except ValueError:
                             pass # ignore rules with invalid float values
+                                
+                    # Process Observation Prompts
+                    obs_count_str = request.POST.get(f"obs-count-{k}", "0")
+                    obs_count = int(obs_count_str) if obs_count_str.isdigit() else 0
+                    for o in range(obs_count):
+                        obs_title = request.POST.get(f"obs-title-{k}-{o}")
+                        obs_desc = request.POST.get(f"obs-desc-{k}-{o}")
+                        obs_vessel = request.POST.get(f"obs-vessel-{k}-{o}", "burette")
+                        obs_prop = request.POST.get(f"obs-prop-{k}-{o}", "reading")
+                        if obs_title and obs_title.strip() and obs_desc and obs_desc.strip():
+                            ObservationPrompt.objects.create(
+                                milestone=milestone,
+                                title=obs_title.strip(),
+                                description=obs_desc.strip(),
+                                target_vessel=obs_vessel.strip() if obs_vessel.strip() else 'burette',
+                                target_property=obs_prop.strip() if obs_prop.strip() else 'reading'
+                            )
+                            
+                    # Process Calculation Prompts
+                    calc_count_str = request.POST.get(f"calc-count-{k}", "0")
+                    calc_count = int(calc_count_str) if calc_count_str.isdigit() else 0
+                    for c in range(calc_count):
+                        calc_title = request.POST.get(f"calc-title-{k}-{c}")
+                        calc_desc = request.POST.get(f"calc-desc-{k}-{c}")
+                        calc_form = request.POST.get(f"calc-form-{k}-{c}")
+                        if calc_title and calc_title.strip() and calc_form and calc_form.strip():
+                            CalculationPrompt.objects.create(
+                                milestone=milestone,
+                                title=calc_title.strip(),
+                                description=calc_desc.strip() if calc_desc else "",
+                                formula=calc_form.strip()
+                            )
             k += 1
             
         messages.success(request, "Experiment updated successfully!")

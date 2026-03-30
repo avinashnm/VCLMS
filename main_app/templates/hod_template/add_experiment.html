@@ -219,10 +219,83 @@
                     <button type="button" class="btn btn-xs btn-outline-secondary mt-1" onclick="addRule(${count})">+ Add Rule</button>
                     <!-- Hidden input to track rule count for this milestone -->
                     <input type="hidden" name="rule-count-${count}" id="rule-count-${count}" value="0">
+
+                    <hr class="my-3 border-secondary">
+                    <!-- Generic Prompt System -->
+                    <div class="prompts-container bg-light p-2 rounded" id="prompts-container-${count}">
+                        <h6 class="text-info mb-2"><i class="fas fa-question-circle"></i> Assessment Prompts (Optional)</h6>
+                        <small class="text-muted d-block mb-2">Configure dynamic popups asking students for math/values.</small>
+                    </div>
+                    <div class="d-flex mt-1">
+                        <button type="button" class="btn btn-xs btn-outline-info mr-2" onclick="addObservationPrompt(${count})">+ Add Observation</button>
+                        <button type="button" class="btn btn-xs btn-outline-primary" onclick="addCalculationPrompt(${count})">+ Add Calculation</button>
+                    </div>
+                    <input type="hidden" name="obs-count-${count}" id="obs-count-${count}" value="0">
+                    <input type="hidden" name="calc-count-${count}" id="calc-count-${count}" value="0">
+
                 </div>
             </div>
         `;
         container.insertAdjacentHTML('beforeend', html);
+    }
+
+    function addObservationPrompt(milestoneIndex) {
+        const container = document.getElementById(`prompts-container-${milestoneIndex}`);
+        const countInput = document.getElementById(`obs-count-${milestoneIndex}`);
+        const obsIndex = parseInt(countInput.value);
+
+        const html = `
+            <div class="obs-row card border-info mb-2 p-2 shadow-sm">
+                <div class="d-flex justify-content-between">
+                    <b class="text-info small">Observation Prompt</b>
+                    <button type="button" class="btn btn-sm text-danger py-0" onclick="this.parentElement.parentElement.remove()">X</button>
+                </div>
+                <div class="form-row mt-1">
+                    <div class="col-md-3">
+                        <input type="text" class="form-control form-control-sm" name="obs-title-${milestoneIndex}-${obsIndex}" placeholder="Variable Name (e.g. v1)">
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" class="form-control form-control-sm" name="obs-desc-${milestoneIndex}-${obsIndex}" placeholder="Question text">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" class="form-control form-control-sm" name="obs-vessel-${milestoneIndex}-${obsIndex}" placeholder="Target Vessel">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" class="form-control form-control-sm" name="obs-prop-${milestoneIndex}-${obsIndex}" placeholder="Target Prop">
+                    </div>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+        countInput.value = obsIndex + 1;
+    }
+
+    function addCalculationPrompt(milestoneIndex) {
+        const container = document.getElementById(`prompts-container-${milestoneIndex}`);
+        const countInput = document.getElementById(`calc-count-${milestoneIndex}`);
+        const calcIndex = parseInt(countInput.value);
+
+        const html = `
+            <div class="calc-row card border-primary mb-2 p-2 shadow-sm">
+                <div class="d-flex justify-content-between">
+                    <b class="text-primary small">Calculation Prompt</b>
+                    <button type="button" class="btn btn-sm text-danger py-0" onclick="this.parentElement.parentElement.remove()">X</button>
+                </div>
+                <div class="form-row mt-1">
+                    <div class="col-md-3">
+                        <input type="text" class="form-control form-control-sm" name="calc-title-${milestoneIndex}-${calcIndex}" placeholder="Variable Name (e.g. mass)">
+                    </div>
+                    <div class="col-md-5">
+                        <input type="text" class="form-control form-control-sm" name="calc-desc-${milestoneIndex}-${calcIndex}" placeholder="Question text">
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" class="form-control form-control-sm" name="calc-form-${milestoneIndex}-${calcIndex}" placeholder="Formula (e.g. v1 * 0.1)">
+                    </div>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+        countInput.value = calcIndex + 1;
     }
 
     function addRule(milestoneIndex) {
@@ -264,18 +337,16 @@
     // --- Scene Builder Logic ---
     let sceneItemCount = 0;
 
-    // Inject catalog data from Django context
-    const apparatusList = [
-        {% for app in apparatus_list %}
-    { id: {{ app.id }}, name: "{{ app.name|escapejs }}", type: "{{ app.type|escapejs }}" },
+    // Inject catalog data from Django context securely
+    const apparatusList = [];
+    {% for app in apparatus_list %}
+        apparatusList.push({ id: {{ app.id|default:0 }}, name: "{{ app.name|escapejs }}", type: "{{ app.type|escapejs }}" });
     {% endfor %}
-    ];
 
-    const chemicalList = [
-        {% for chem in chemicals_list %}
-    { id: {{ chem.id }}, name: "{{ chem.name|escapejs }}" },
+    const chemicalList = [];
+    {% for chem in chemicals_list %}
+        chemicalList.push({ id: {{ chem.id|default:0 }}, name: "{{ chem.name|escapejs }}" });
     {% endfor %}
-    ];
 
     function addSceneItem(existingData = null) {
         const container = document.getElementById('scene-builder-container');

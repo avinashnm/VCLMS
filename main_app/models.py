@@ -405,10 +405,8 @@ class VirtualLabSubmission(models.Model):
     # Wrap Student in quotes 'Student' to make it a string reference
     student = models.ForeignKey('Student', on_delete=models.CASCADE) 
     experiment_name = models.CharField(max_length=200)
-    v1_observed = models.FloatField()
-    v2_observed = models.FloatField()
-    calc_na2co3 = models.FloatField()
-    calc_nahco3 = models.FloatField()
+    observations = models.JSONField(default=dict)
+    calculations = models.JSONField(default=dict)
     total_score = models.IntegerField()
     penalty_log = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -525,6 +523,29 @@ class MilestoneRule(models.Model):
     
     def __str__(self):
         return f"Rule: IF {self.target_vessel}.{self.target_property} {self.operator} {self.value}"
+
+class ObservationPrompt(models.Model):
+    milestone = models.ForeignKey(ExperimentMilestone, on_delete=models.CASCADE, related_name='observation_prompts')
+    title = models.CharField(max_length=200, help_text="e.g., 'v1_reading'")
+    description = models.TextField(help_text="e.g., 'Enter the endpoint (V1) reading in mL:'")
+    target_vessel = models.CharField(max_length=100, default="burette", help_text="Vessel to check against")
+    target_property = models.CharField(max_length=100, default="reading", help_text="Property to check (e.g. 'reading', 'volume')")
+    tolerance = models.FloatField(default=0.2, help_text="Margin of error allowed for students")
+    penalty_points = models.IntegerField(default=10)
+
+    def __str__(self):
+        return f"Obs Prompt: {self.title} ({self.milestone.experiment.title})"
+
+class CalculationPrompt(models.Model):
+    milestone = models.ForeignKey(ExperimentMilestone, on_delete=models.CASCADE, related_name='calculation_prompts')
+    title = models.CharField(max_length=200, help_text="e.g., 'mass_na2co3'")
+    description = models.TextField(help_text="Math problem instructions for the student.")
+    formula = models.CharField(max_length=255, help_text="e.g., '(v1_reading * 0.1 * 106) / 1000'. Extracted variables must match Observation titles.")
+    tolerance = models.FloatField(default=0.05, help_text="Allowed math variance")
+    points = models.IntegerField(default=15)
+
+    def __str__(self):
+        return f"Calc Prompt: {self.title} ({self.milestone.experiment.title})"
 
 # ==========================================
 # PHASE 4: PATH-BASED LMS

@@ -194,12 +194,10 @@ def save_lab_report(request):
             VirtualLabSubmission.objects.create(
                 student=student,
                 experiment_name=data.get('name'),
-                v1_observed=data.get('v1_observed'),
-                v2_observed=data.get('v2_observed'),
-                calc_na2co3=data.get('calc_na2co3'),
-                calc_nahco3=data.get('calc_nahco3'),
-                total_score=data.get('totalScore'),
-                penalty_log=data.get('log')
+                observations=data.get('observations', {}),
+                calculations=data.get('calculations', {}),
+                total_score=data.get('totalScore', 0),
+                penalty_log=data.get('log', '')
             )
             
             # --- START PROGRESSION UPDATE ---
@@ -776,19 +774,45 @@ def generate_report(request, student_id):
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
     ]))
     
+    v_submissions = VirtualLabSubmission.objects.filter(student=student)
+    v_heading = Paragraph('Virtual Lab Autograder Metrics', styles['Heading4'])
+    v_data = [['Experiment', 'Observations', 'Calculations', 'Log', 'Score']]
+    for sub in v_submissions:
+        obs_str = ", ".join([f"{k}: {v}" for k, v in sub.observations.items()]) if sub.observations else "N/A"
+        calc_str = ", ".join([f"{k}: {v}" for k, v in sub.calculations.items()]) if sub.calculations else "N/A"
+        log_str = sub.penalty_log if sub.penalty_log else "Perfect"
+        v_data.append([sub.experiment_name, Paragraph(obs_str, styles['Normal']), Paragraph(calc_str, styles['Normal']), Paragraph(log_str, styles['Normal']), str(sub.total_score)])
+        
+    v_table = Table([ [v_heading], *v_data ], colWidths=[120, 120, 120, 140, 50])
+    v_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4CAF50')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#FFFFFF')),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F5F5F5')),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 10),
+        ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+    ]))
+
     # Build the PDF
     story = []
     story.extend([
-    student_table,
-    Spacer(0, 50),
-    quiz_table,
-    Spacer(0, 50),
-    experiment_table,
-    Spacer(0,50),
-    m_table,
-  
-   
-])
+        student_table,
+        Spacer(0, 50),
+        quiz_table,
+        Spacer(0, 50),
+        experiment_table,
+        Spacer(0, 50),
+        v_table,
+        Spacer(0, 50),
+        m_table,
+    ])
 
    
     doc.build(story)
@@ -969,12 +993,36 @@ def lab_experiment_simulation(request, slug):
                     "value": r.value
                 } for r in ms.rules.all()
             ]
+            
+            obs_prompts_list = [
+                {
+                    "title": op.title,
+                    "description": op.description,
+                    "target_vessel": op.target_vessel,
+                    "target_property": op.target_property,
+                    "tolerance": op.tolerance,
+                    "penalty_points": op.penalty_points
+                } for op in ms.observation_prompts.all()
+            ]
+            
+            calc_prompts_list = [
+                {
+                    "title": cp.title,
+                    "description": cp.description,
+                    "formula": cp.formula,
+                    "tolerance": cp.tolerance,
+                    "points": cp.points
+                } for cp in ms.calculation_prompts.all()
+            ]
+
             milestones_list.append({
                 "id": ms.milestone_id, 
                 "desc": ms.description,
                 "instruction": ms.instruction or "",
                 "points": ms.points,
-                "rules": rules_list
+                "rules": rules_list,
+                "observation_prompts": obs_prompts_list,
+                "calculation_prompts": calc_prompts_list
             })
         
         targets = {}
