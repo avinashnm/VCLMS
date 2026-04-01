@@ -198,7 +198,10 @@ EMAIL_ALIASES = {
  
 }
 
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+if not DEBUG:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+else:
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # Configure Database from DATABASE_URL if available (Heroku/Render/Railway)
 import dj_database_url
