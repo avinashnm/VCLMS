@@ -105,6 +105,9 @@
         </tbody>
       </table>
       <div class="text-center">
+        {% if active_module and active_module.experiment %}
+        <a href="{% url 'lab_experiment' active_module.experiment.slug %}" class="btn btn-success mt-3 mr-2">Complete! Next: Virtual Lab</a>
+        {% endif %}
         <button class="btn btn-primary mt-3" onclick="window.print()">Print</button>
       </div>
     </div>
@@ -145,6 +148,10 @@ var quizResultScore = parseInt('{{ quiz_result.score }}');
 var totalScoreLabel = document.getElementById('total-score');
 var totalScore = parseInt(localStorage.getItem('totalScore'));
 
+if (isNaN(totalScore)) {
+    totalScore = 0;
+}
+
 // Add the total score to the quiz result score
 var finalScore = totalScore + quizResultScore;
 
@@ -153,7 +160,6 @@ localStorage.setItem('finalScore', finalScore);
 
 // Update the total score label
 totalScoreLabel.innerHTML = finalScore;
-
 
 </script>
 </html>

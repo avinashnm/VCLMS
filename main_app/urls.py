@@ -111,7 +111,8 @@ path('watch/<int:course_id>/', hod_views.watch_video, name='watch_video'),
 
  path('student/video_courses/',student_views.video_course_lists,name='video_courses'),
 path('student/watch/<int:course_id>/', student_views.watch_video, name='watch_video'),
-
+path('student/module/<int:module_id>/watch/', student_views.module_watch_video, name='module_watch_video'),
+path('student/module/<int:module_id>/mark_watched/', student_views.module_mark_watched, name='module_mark_watched'),
     # Learning Paths Module (LMS)
     path('modules/add/', hod_views.add_module, name='add_module'),
     path('modules/manage/', hod_views.manage_modules, name='manage_modules'),

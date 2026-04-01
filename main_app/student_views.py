@@ -44,7 +44,7 @@ def student_home(request):
     enhanced_modules = []
     for m in modules:
         prog, _ = StudentProgress.objects.get_or_create(student=student, lesson_module=m)
-        setattr(m, 'student_progress', prog)
+        setattr(m, 'current_progress', prog)
         enhanced_modules.append(m)
 
     context = {
@@ -394,6 +394,15 @@ def quiz_score(request, quiz_result_id):
     context = {
         'quiz_result': quiz_result
     }
+    
+    active_module_id = request.session.get('active_module_id')
+    if active_module_id:
+        try:
+            from .models import LessonModule
+            module = LessonModule.objects.get(id=active_module_id)
+            context['active_module'] = module
+        except Exception:
+            pass
 
     return render(request, 'hod_template/quiz_score.html', context)
 
@@ -571,8 +580,36 @@ def watch_video(request, course_id):
         
     return render(request, 'hod_template/watch_video.html', {'video_course': video_course})
 
+def module_watch_video(request, module_id):
+    module = get_object_or_404(LessonModule, id=module_id)
+    student = get_object_or_404(Student, admin=request.user)
+    progress, _ = StudentProgress.objects.get_or_create(student=student, lesson_module=module)
+    
+    return render(request, 'student_template/module_watch_video.html', {
+        'module': module,
+        'video_course': module.video_course,
+        'progress': progress
+    })
 
-
+def module_mark_watched(request, module_id):
+    if request.method == 'POST':
+        module = get_object_or_404(LessonModule, id=module_id)
+        student = get_object_or_404(Student, admin=request.user)
+        progress, _ = StudentProgress.objects.get_or_create(student=student, lesson_module=module)
+        
+        progress.video_watched = True
+        progress.save()
+        messages.success(request, f"Theory completed for {module.title}!")
+        
+        # Store module in session to maintain active sequence into quiz
+        request.session['active_module_id'] = module.id
+        
+        if module.quiz:
+            return redirect(reverse('take_quiz', args=[module.quiz.id]))
+        elif module.experiment:
+            return redirect(reverse('lab_experiment', args=[module.experiment.slug]))
+            
+    return redirect(reverse('student_home'))
 def experiment(request):
     return render(request, 'hod_template/Exp1.html')
 
@@ -945,7 +982,21 @@ def lab_experiment_info(request, slug):
     )
 
 
+@login_required
 def lab_experiment_simulation(request, slug):
+    # 0. GATEKEEPER: Block access if student hasn't passed the prerequisite quiz
+    try:
+        experiment_obj_check = LabExperiment.objects.get(slug=slug)
+        student = get_object_or_404(Student, admin=request.user)
+        modules = LessonModule.objects.filter(experiment=experiment_obj_check, subject__course=student.course)
+        for module in modules:
+            progress, _ = StudentProgress.objects.get_or_create(student=student, lesson_module=module)
+            if module.quiz and not progress.quiz_passed:
+                messages.error(request, f"You must pass the quiz for '{module.title}' before accessing the virtual lab simulation.")
+                return redirect(reverse('student_home'))
+    except LabExperiment.DoesNotExist:
+        pass  # Let fallback logic below handle it
+
     # 1. ALWAYS FETCH CATALOGS (For both DB models and hardcoded fallback)
     chemicals_list = [
         {
@@ -1041,7 +1092,7 @@ def lab_experiment_simulation(request, slug):
             
             
         initial_state = []
-        if experiment_obj.initial_state_json:
+        if hasattr(experiment_obj, 'initial_state_json') and experiment_obj.initial_state_json:
             try:
                 initial_state = json.loads(experiment_obj.initial_state_json)
             except Exception:
@@ -1153,15 +1204,26 @@ def download_unified_report(request, module_id):
         if submission:
             elements.append(Paragraph("Virtual Lab Submission Log", styles['Heading3']))
             elements.append(Spacer(1, 0.2 * inch))
-            sub_data = [
-                ['Observed V1', str(submission.v1_observed)],
-                ['Observed V2', str(submission.v2_observed)],
-                ['Calculated Na2CO3', str(submission.calc_na2co3)],
-                ['Calculated NaHCO3', str(submission.calc_nahco3)],
-                ['Penalty Log', submission.penalty_log or "None"],
-            ]
+            sub_data = [['Metric', 'Value']]
+            
+            # Dynamic observations
+            if submission.observations:
+                for key, val in submission.observations.items():
+                    sub_data.append([f"Observation: {key}", str(val)])
+            
+            # Dynamic calculations
+            if submission.calculations:
+                for key, val in submission.calculations.items():
+                    sub_data.append([f"Calculation: {key}", str(val)])
+            
+            sub_data.append(['Total Score', str(submission.total_score)])
+            sub_data.append(['Penalty Log', submission.penalty_log or "No penalties"])
+            
             t_sub = Table(sub_data, colWidths=[200, 250])
             t_sub.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), HexColor('#1e3a8a')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('PADDING', (0, 0), (-1, -1), 8),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
             ]))

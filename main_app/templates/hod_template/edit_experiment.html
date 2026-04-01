@@ -41,19 +41,12 @@
                             </div>
                             <div class="form-group">
                                 <label>Experiment Type</label>
-                                <!-- prettier-ignore -->
-                                <!-- djlint:off -->
                                 <select class="form-control" name="type" required>
-                                    <option value="simple_titration" {% if experiment.type=='simple_titration'
-                                        %}selected{% endif %}>Simple Titration</option>
-                                    <option value="double_indicator" {% if experiment.type=='double_indicator'
-                                        %}selected{% endif %}>Double Indicator Titration</option>
-                                    <option value="rast" {% if experiment.type=='rast' %}selected{% endif %}>Rast Method
-                                    </option>
-                                    <option value="placeholder" {% if experiment.type=='placeholder' %}selected{% endif
-                                        %}>Placeholder</option>
+                                    <option value="simple_titration" {% if experiment.type == 'simple_titration' %}selected{% endif %}>Simple Titration</option>
+                                    <option value="double_indicator" {% if experiment.type == 'double_indicator' %}selected{% endif %}>Double Indicator Titration</option>
+                                    <option value="rast" {% if experiment.type == 'rast' %}selected{% endif %}>Rast Method</option>
+                                    <option value="placeholder" {% if experiment.type == 'placeholder' %}selected{% endif %}>Placeholder</option>
                                 </select>
-                                <!-- djlint:on -->
                                 <small class="text-muted">Choose the simulation template to be used.</small>
                             </div>
 
