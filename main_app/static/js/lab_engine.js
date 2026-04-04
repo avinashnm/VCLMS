@@ -42,6 +42,11 @@ const experimentData = typeof EXPERIMENT_CONFIG !== 'undefined' ? EXPERIMENT_CON
 const TARGET_V1 = experimentData?.targets?.v1 || 10.0;
 const TARGET_V2 = experimentData?.targets?.v2 || 25.0;
 
+// Wire up the dynamic catalogs so getApparatusProps() works
+window.APPARATUS_CATALOG = experimentData?.catalogs?.apparatus || [];
+window.CHEMICAL_CATALOG  = experimentData?.catalogs?.chemicals || [];
+window.REACTION_CATALOG  = experimentData?.catalogs?.reactions || [];
+
 let currentStepIndex = 0; // Tracks which milestone we are on
 let penalties = [];       // List of strings explaining point losses
 let sessionMarks = 0;     // Current score
@@ -802,6 +807,9 @@ function getTitrationColor(v) {
 // DYNAMIC PROPERTIES HELPER
 // ======================================================
 function getApparatusProps(typeStr) {
+    if (typeStr === 'chemical_bottle') {
+        return { can_pour: true, can_measure_vol: false };
+    }
     if (window.APPARATUS_CATALOG) {
         return window.APPARATUS_CATALOG.find(a => a.type === typeStr) || {};
     }
@@ -817,22 +825,23 @@ function proximityCheck() {
     v.hint = '';
 
     if (v.type === 'pipette') {
-      const bottle = Object.values(vessels).find(b => getApparatusProps(b.type).can_pour);
-      // Fix: Find any receiver (beaker OR conical flask)
-      const receiver = Object.values(vessels).find(r => getApparatusProps(r.type).can_measure_vol && near(v, r, 60));
+      // A source is something that brings chemicals (can_pour = true, can_measure_vol = false)
+      const bottle = Object.values(vessels).find(b => getApparatusProps(b.type).can_pour && !getApparatusProps(b.type).can_measure_vol && b.id !== v.id && near(v, b, 50));
+      // A receiver is something that accepts liquid (can_measure_vol = true)
+      const receiver = Object.values(vessels).find(r => getApparatusProps(r.type).can_measure_vol && r.id !== v.id && near(v, r, 60));
 
-      if (bottle && near(v, bottle, 50)) {
+      if (bottle) {
         v.glow = 1;
         v.hint = 'SHIFT = Suck';
       } else if (receiver) {
         v.glow = 1;
-        v.hint = 'SHIFT = Pour'; // This now works for conical flasks too
+        v.hint = 'SHIFT = Pour'; 
       }
     }
 
     if (v.type === 'pH_meter') {
-      const beaker = Object.values(vessels).find(b => b.type === 'beaker');
-      if (beaker && near(v, beaker, 50)) {
+      const beaker = Object.values(vessels).find(b => getApparatusProps(b.type).can_measure_vol && b.id !== v.id && near(v, b, 50));
+      if (beaker) {
         v.glow = 1;
         v.hint = 'Hover to read pH';
       }
@@ -2375,7 +2384,7 @@ function keyPressed() {
 
 //Burette filling logic
 function handleBuretteFilling() {
-  if (!isDragging || !getApparatusProps(isDragging.type).can_pour) return;
+  if (!isDragging || !getApparatusProps(isDragging.type).can_pour || getApparatusProps(isDragging.type).can_measure_vol) return;
 
   const burette = Object.values(vessels).find(v => (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)));
   if (!burette) return;
