@@ -280,13 +280,37 @@
 
                             <!-- Scene Builder (Initial State) -->
                             <h4 class="text-primary mt-4 mb-3">Initial Scene Configuration</h4>
-                            <p class="text-muted small mb-3">Define the apparatus and chemicals that spawn on the lab
-                                bench or shelf when the experiment begins.</p>
-                            <div id="scene-builder-container" class="row">
-                                <!-- Scene items go here -->
+                            <p class="text-muted small mb-3">Drag apparatus from the library into the canvas zones (Top Shelf, Bottom Shelf, Lab Bench). Click items on the canvas to remove them.</p>
+                            
+                            <div class="row mb-4">
+                                <div class="col-md-8">
+                                    <div id="visual-canvas" style="position:relative; height: 400px; background: #e9ecef; border: 2px dashed #adb5bd; border-radius: 8px; overflow: hidden;" ondrop="dropContainer(event)" ondragover="allowDrop(event)">
+                                        <!-- Top Shelf -->
+                                        <div id="drop-shelfTop" style="position:absolute; top: 20%; left:5%; width:90%; height:8px; background:#495057; box-shadow: 0 4px 6px rgba(0,0,0,0.3); pointer-events:none;">
+                                            <span style="position:absolute; top:-20px; color:#6c757d; font-size:12px; font-weight:bold;">Top Shelf</span>
+                                        </div>
+                                        <!-- Bottom Shelf -->
+                                        <div id="drop-shelfBottom" style="position:absolute; top: 50%; left:5%; width:90%; height:8px; background:#495057; box-shadow: 0 4px 6px rgba(0,0,0,0.3); pointer-events:none;">
+                                            <span style="position:absolute; top:-20px; color:#6c757d; font-size:12px; font-weight:bold;">Bottom Shelf</span>
+                                        </div>
+                                        <!-- Lab Table -->
+                                        <div id="drop-table" style="position:absolute; top: 80%; left:0; width:100%; height:20%; background:#ced4da; border-top: 6px solid #6c757d; pointer-events:none;">
+                                            <span style="position:absolute; top:4px; left:5px; color:#6c757d; font-size:12px; font-weight:bold;">Lab Bench</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card">
+                                        <div class="card-header bg-secondary text-white font-weight-bold">Apparatus Library</div>
+                                        <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                                            <p class="small text-muted mb-2"><i class="fas fa-arrows-alt"></i> Drag items onto the canvas</p>
+                                            <div id="library-items" class="d-flex flex-wrap">
+                                                <!-- Populated by JS -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2 mb-4"
-                                onclick="addSceneItem()">+ Add Apparatus</button>
                             <!-- Hidden input to store JSON array for backend -->
                             <input type="hidden" name="initial_state_json" id="initial_state_json_input"
                                 value="{{ initial_state_json_str }}">
@@ -506,10 +530,7 @@
         countInput.value = ruleIndex + 1;
     }
 
-    // --- Scene Builder Logic ---
-    let sceneItemCount = 0;
-
-    // Inject catalog data from Django context securely
+    // --- Visual Drag-and-Drop Canvas Logic ---
     const apparatusList = [];
     {% for app in apparatus_list %}
         apparatusList.push({ id: {{ app.id|default:0 }}, name: "{{ app.name|escapejs }}", type: "{{ app.type|escapejs }}" });
@@ -520,97 +541,122 @@
         chemicalList.push({ id: {{ chem.id|default:0 }}, name: "{{ chem.name|escapejs }}" });
     {% endfor %}
 
-    function addSceneItem(existingData = null) {
-        const container = document.getElementById('scene-builder-container');
-        const idx = sceneItemCount++;
+    document.addEventListener("DOMContentLoaded", () => {
+        initLibrary();
+        loadExistingState();
+    });
 
-        // Setup initial selections if editing
-        let exType = existingData ? existingData.type : '';
-        let exLoc = existingData ? existingData.location : 'table';
-        let exChem = (existingData && existingData.initialContents) ? existingData.initialContents.type : '';
-        let exVol = (existingData && existingData.initialContents) ? existingData.initialContents.volume : '';
-
-        let appOptions = apparatusList.map(a => `<option value="${a.type}" ${a.type === exType ? 'selected' : ''}>${a.name}</option>`).join('');
-        let chemOptions = `<option value="">-- Empty --</option>` + chemicalList.map(c => `<option value="${c.name}" ${c.name === exChem ? 'selected' : ''}>${c.name}</option>`).join('');
-
-        let locOptions = `
-            <option value="table" ${exLoc === 'table' ? 'selected' : ''}>Lab Bench (Table)</option>
-            <option value="shelfTop" ${exLoc === 'shelfTop' ? 'selected' : ''}>Top Shelf</option>
-            <option value="shelfBottom" ${exLoc === 'shelfBottom' ? 'selected' : ''}>Bottom Shelf</option>
-        `;
-
-        const html = `
-        <div class="col-md-6 mb-3 scene-item-card" id="scene-item-${idx}">
-            <div class="card bg-light border-secondary">
-                <div class="card-header py-2 d-flex justify-content-between align-items-center bg-secondary text-white">
-                    <span class="font-weight-bold">Apparatus ${idx + 1}</span>
-                    <button type="button" class="btn btn-sm btn-danger py-0 px-2" onclick="document.getElementById('scene-item-${idx}').remove()">X</button>
-                </div>
-                <div class="card-body p-2">
-                    <div class="form-group mb-2">
-                        <label class="small mb-1 font-weight-bold">Select Apparatus</label>
-                        <select class="form-control form-control-sm scene-app-type">
-                            ${appOptions}
-                        </select>
-                    </div>
-                    <div class="form-group mb-2">
-                        <label class="small mb-1 font-weight-bold">Initial Location</label>
-                        <select class="form-control form-control-sm scene-location">
-                            ${locOptions}
-                        </select>
-                    </div>
-                    <hr class="my-2 border-secondary">
-                    <div class="form-group mb-2">
-                        <label class="small mb-1 font-weight-bold">Contains Chemical (Optional)</label>
-                        <select class="form-control form-control-sm scene-chem">
-                            ${chemOptions}
-                        </select>
-                    </div>
-                    <div class="form-group mb-0">
-                        <label class="small mb-1 font-weight-bold">Volume (mL)</label>
-                        <input type="number" class="form-control form-control-sm scene-vol" placeholder="e.g. 50" min="0" step="0.1" value="${exVol}">
-                    </div>
-                </div>
-            </div>
-        </div>
-        `;
-        container.insertAdjacentHTML('beforeend', html);
+    function initLibrary() {
+        const lib = document.getElementById('library-items');
+        apparatusList.forEach(a => {
+            let div = document.createElement('div');
+            div.draggable = true;
+            div.className = "btn btn-outline-info m-1 btn-sm font-weight-bold shadow-sm";
+            div.innerText = a.name;
+            div.dataset.type = a.type;
+            div.dataset.name = a.name;
+            div.ondragstart = (e) => {
+                e.dataTransfer.setData("text/plain", JSON.stringify({ type: a.type, name: a.name, source: 'library' }));
+            };
+            lib.appendChild(div);
+        });
     }
 
-    // Pre-populate data on page load
-    document.addEventListener("DOMContentLoaded", function () {
+    function renderCanvasNode(type, loc, chemName, vol, mouseXOffset) {
+        let appData = apparatusList.find(a => a.type === type) || { name: type, type: type };
+        let node = document.createElement('div');
+        node.className = "badge badge-primary p-2 position-absolute shadow-sm text-center";
+        node.style.cursor = "pointer";
+        node.style.minWidth = "60px";
+        node.innerHTML = `<b>${appData.name}</b>${chemName ? '<br><span class="badge badge-light text-dark mt-1">'+vol+'mL '+chemName+'</span>' : ''}`;
+        
+        let rect = document.getElementById('visual-canvas').getBoundingClientRect();
+        let randX = 30 + Math.random() * (rect.width - 100);
+        let leftPx = typeof mouseXOffset === 'number' ? mouseXOffset : randX;
+        
+        node.style.left = leftPx + "px";
+        
+        if (loc === 'shelfTop') node.style.top = "9%";
+        else if (loc === 'shelfBottom') node.style.top = "39%";
+        else node.style.top = "70%";
+        
+        node.dataset.loc = loc;
+        node.dataset.type = type;
+        node.dataset.chem = chemName;
+        node.dataset.vol = vol;
+        
+        node.title = "Click to remove";
+        node.onclick = () => {
+            if(confirm("Remove this " + appData.name + "?")) node.remove();
+        };
+        
+        document.getElementById('visual-canvas').appendChild(node);
+    }
+
+    function allowDrop(e) {
+        e.preventDefault();
+    }
+
+    function dropContainer(e) {
+        e.preventDefault();
+        const raw = e.dataTransfer.getData("text/plain");
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        
+        let rect = document.getElementById('visual-canvas').getBoundingClientRect();
+        let yPos = e.clientY - rect.top;
+        let canvasHeight = rect.height;
+        
+        let loc = 'table';
+        if (yPos < canvasHeight * 0.35) loc = 'shelfTop';
+        else if (yPos < canvasHeight * 0.65) loc = 'shelfBottom';
+        
+        let chemName = "";
+        let vol = 0;
+        if (confirm("Does this " + data.name + " contain a chemical initially?")) {
+            let options = chemicalList.map((c, i) => `${i + 1}: ${c.name}`).join("\\n");
+            let chemIdxRaw = prompt("Enter the number of the chemical:\\n\\n" + options);
+            if (chemIdxRaw !== null) {
+                let chemIdx = parseInt(chemIdxRaw) - 1;
+                if (chemicalList[chemIdx]) {
+                    chemName = chemicalList[chemIdx].name;
+                    let v = prompt(\`Enter volume of \${chemName} in mL:\`, "50");
+                    vol = parseFloat(v) || 0;
+                }
+            }
+        }
+        
+        let clampedX = Math.max(0, Math.min(e.clientX - rect.left - 40, rect.width - 80));
+        renderCanvasNode(data.type, loc, chemName, vol, clampedX);
+    }
+
+    function loadExistingState() {
         try {
             const rawJson = document.getElementById('initial_state_json_input').value;
             if (rawJson && rawJson !== 'None' && rawJson.trim() !== '') {
-                // Safely handle HTML-escaped quotes (e.g. &#x27; or &quot;) if any crept in
-                // Django template injects raw string, so it should be valid JSON as long as it isn't tampered with
                 const parsedState = JSON.parse(rawJson);
                 parsedState.forEach(item => {
-                    addSceneItem(item);
+                    let cName = item.initialContents ? item.initialContents.type : "";
+                    let cVol = item.initialContents ? item.initialContents.volume : 0;
+                    renderCanvasNode(item.type, item.location, cName, cVol);
                 });
             }
         } catch (e) {
             console.error("Error parsing initial scene JSON:", e);
         }
-    });
+    }
 
-    // Hook form submission to build the JSON array from the cards
+    // Hook form submission to build the JSON array from the canvas
     document.querySelector('form').addEventListener('submit', function (e) {
-        const items = document.querySelectorAll('.scene-item-card');
+        const items = document.querySelectorAll('#visual-canvas .badge.position-absolute');
         let stateArray = [];
-        items.forEach(card => {
-            const type = card.querySelector('.scene-app-type').value;
-            const loc = card.querySelector('.scene-location').value;
-            const chem = card.querySelector('.scene-chem').value;
-            const vol = card.querySelector('.scene-vol').value;
-
-            let itemData = { type: type, location: loc };
-            if (chem) {
-                let volumeParsed = parseFloat(vol);
-                if (isNaN(volumeParsed)) volumeParsed = 0;
+        items.forEach(node => {
+            let itemData = { type: node.dataset.type, location: node.dataset.loc };
+            if (node.dataset.chem) {
+                let volumeParsed = parseFloat(node.dataset.vol);
                 itemData.initialContents = {
-                    type: chem,
-                    volume: volumeParsed
+                    type: node.dataset.chem,
+                    volume: isNaN(volumeParsed) ? 0 : volumeParsed
                 };
             }
             stateArray.push(itemData);

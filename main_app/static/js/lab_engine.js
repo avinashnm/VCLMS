@@ -250,19 +250,7 @@ class MarkingManager {
   }
 }
 
- else if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
-      drawButton(x, y, w, 40, "ENTER V2 READING", [255, 160, 0]);
-    } else if (idIsDone("reach_v2") && !idIsDone("submit_calc")) {
-      drawButton(x, y, w, 40, "SUBMIT CALCULATIONS", [0, 200, 100]);
-    }
-  } else if (manager.config?.type === 'simple_titration') {
-    if (idIsDone("add_indicator") && !idIsDone("reach_v1")) {
-      drawButton(x, y, w, 40, "ENTER V1 READING", [255, 105, 180]);
-    } else if (idIsDone("reach_v1") && !idIsDone("submit_calc")) {
-      drawButton(x, y, w, 40, "SUBMIT CALCULATIONS", [0, 200, 100]);
-    }
-  }
-}
+
 
 // --- FIX 2: Initialize only ONE manager ---
 const manager = new MarkingManager(experimentData);
@@ -811,6 +799,16 @@ function getTitrationColor(v) {
 
 
 // ======================================================
+// DYNAMIC PROPERTIES HELPER
+// ======================================================
+function getApparatusProps(typeStr) {
+    if (window.APPARATUS_CATALOG) {
+        return window.APPARATUS_CATALOG.find(a => a.type === typeStr) || {};
+    }
+    return {};
+}
+
+// ======================================================
 // PROXIMITY & GLOW SYSTEM
 // ======================================================
 function proximityCheck() {
@@ -819,11 +817,9 @@ function proximityCheck() {
     v.hint = '';
 
     if (v.type === 'pipette') {
-      const bottle = Object.values(vessels).find(b => b.type === 'bottle' || b.type === 'chemical_bottle');
+      const bottle = Object.values(vessels).find(b => getApparatusProps(b.type).can_pour);
       // Fix: Find any receiver (beaker OR conical flask)
-      const receiver = Object.values(vessels).find(r =>
-        (r.type === 'beaker' || r.type === 'conical_flask') && near(v, r, 60)
-      );
+      const receiver = Object.values(vessels).find(r => getApparatusProps(r.type).can_measure_vol && near(v, r, 60));
 
       if (bottle && near(v, bottle, 50)) {
         v.glow = 1;
@@ -1900,14 +1896,7 @@ function drawDataPanel() {
 }
 
 
-  else if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
-    drawButton(x, y, w, 45, "ENTER V2 READING", [255, 160, 0]);
-  }
-  else if (idIsDone("reach_v2") && !idIsDone("submit_calc")) {
-    // Vibrant green to ensure it's noticed
-    drawButton(x, y, w, 45, "SUBMIT CALCULATIONS", [0, 200, 100]);
-  }
-}
+
 
 function drawButton(x, y, w, h, label, col) {
   fill(...col); rect(x, y, w, h, 8);
@@ -2325,7 +2314,7 @@ function keyPressed() {
   // Inside keyPressed()
   if (keyL === 'd' && isDragging) {
     const target = Object.values(vessels).find(v =>
-      (v.type === 'conical_flask' || v.type === 'beaker') && dist(isDragging.x, isDragging.y, v.x, v.y) < 120
+      getApparatusProps(v.type).can_measure_vol && dist(isDragging.x, isDragging.y, v.x, v.y) < 120
     );
 
     if (target) {
@@ -2386,7 +2375,7 @@ function keyPressed() {
 
 //Burette filling logic
 function handleBuretteFilling() {
-  if (!isDragging || isDragging.type !== 'bottle') return;
+  if (!isDragging || !getApparatusProps(isDragging.type).can_pour) return;
 
   const burette = Object.values(vessels).find(v => (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)));
   if (!burette) return;
@@ -2848,24 +2837,59 @@ function transferLiquid(source, target, transferVol) {
 }
 
 function computeReaction(vessel) {
-  // PHASE 5.A: Pure volumetric color averaging based on dictionary contents
-  // Overrides hardcoded titration colors
   let r=0, g=0, b=0, total=0;
+  
+  if (typeof window.CHEMICAL_REACTIONS !== 'undefined' && window.CHEMICAL_REACTIONS.length > 0 && experimentData && experimentData.catalogs) {
+     let allChems = experimentData.catalogs.chemicals;
+     let getChemName = (id) => {
+         let f = allChems.find(c => c.id === id);
+         return f ? f.name : null;
+     };
+
+     let reacted = false;
+     let safetyCounter = 0;
+     do {
+       reacted = false;
+       for (let rxn of window.CHEMICAL_REACTIONS) {
+          let nameA = getChemName(rxn.chemical_a);
+          let nameB = getChemName(rxn.chemical_b);
+          let nameProd = getChemName(rxn.product);
+
+          let volA = vessel.contents.chemicals[nameA] ? vessel.contents.chemicals[nameA].volume : 0;
+          let volB = vessel.contents.chemicals[nameB] ? vessel.contents.chemicals[nameB].volume : 0;
+
+          if (volA > 0.01 && volB > 0.01) {
+             let limitingVol = Math.min(volA, volB);
+             vessel.contents.chemicals[nameA].volume -= limitingVol;
+             vessel.contents.chemicals[nameB].volume -= limitingVol;
+             
+             if (nameProd) {
+                if (!vessel.contents.chemicals[nameProd]) {
+                   let hex = rxn.reaction_color_hex || "#FFFFFF";
+                   let rc = [parseInt(hex.substr(1,2),16)||255, parseInt(hex.substr(3,2),16)||255, parseInt(hex.substr(5,2),16)||255, 180];
+                   vessel.contents.chemicals[nameProd] = { volume: 0, color: rc };
+                }
+                vessel.contents.chemicals[nameProd].volume += limitingVol * 2.0; 
+             }
+             reacted = true;
+          }
+       }
+       safetyCounter++;
+     } while(reacted && safetyCounter < 100);
+  }
+
+  r=0; g=0; b=0; total=0;
   for (let c in vessel.contents.chemicals) {
     let chem = vessel.contents.chemicals[c];
-    if (chem.volume > 0) {
+    if (chem.volume > 0.01) {
       r += chem.color[0] * chem.volume;
       g += chem.color[1] * chem.volume;
       b += chem.color[2] * chem.volume;
       total += chem.volume;
     }
   }
-  
-  if (total > 0 && typeof CHEMICAL_REACTIONS !== 'undefined' && CHEMICAL_REACTIONS.length > 0) {
-     // Active Stoichiometry Matrix checking
-     // TODO: Implement ReactionCatalog cross-referencing for Phase 5.B
-     vessel.color = [r/total, g/total, b/total, 180];
-  } else if (total > 0) {
+
+  if (total > 0) {
      vessel.color = [r/total, g/total, b/total, 180];
   }
 }
