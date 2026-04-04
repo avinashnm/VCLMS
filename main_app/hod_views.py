@@ -28,6 +28,35 @@ from .models import *
 from textblob import TextBlob
 from django.core.mail import EmailMessage
 
+
+def _parse_initial_state_json_from_post(request):
+    raw = request.POST.get("initial_state_json", "[]") or "[]"
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, list) else []
+    except json.JSONDecodeError:
+        return []
+
+
+def _parse_target_config_from_post(request):
+    def _float_or(name, default):
+        v = (request.POST.get(name) or "").strip()
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return default
+
+    v1_min = _float_or("target_v1_min", 9.5)
+    v1_max = _float_or("target_v1_max", 11.5)
+    v2_min = _float_or("target_v2_min", 23.0)
+    v2_max = _float_or("target_v2_max", 27.0)
+    if v1_min > v1_max:
+        v1_min, v1_max = v1_max, v1_min
+    if v2_min > v2_max:
+        v2_min, v2_max = v2_max, v2_min
+    return v1_min, v1_max, v2_min, v2_max
+
+
 def admin_home(request):
     total_staff = Staff.objects.all().count()
     total_students = Student.objects.all().count()
@@ -1306,8 +1335,8 @@ def add_experiment(request):
     if request.method == "POST":
         form = LabExperimentForm(request.POST)
         if form.is_valid():
-            experiment = form.save()
-            experiment.initial_state_json = request.POST.get("initial_state_json", "[]")
+            experiment = form.save(commit=False)
+            experiment.initial_state_json = _parse_initial_state_json_from_post(request)
             experiment.save()
             
             # 1. Process Materials
@@ -1410,14 +1439,28 @@ def add_experiment(request):
                             )
                 k += 1
                 
-            # 4. Save Target Config (Default values for now, can be expanded in UI later)
-            ExperimentTargetConfig.objects.create(experiment=experiment)
+            v1_min, v1_max, v2_min, v2_max = _parse_target_config_from_post(request)
+            ExperimentTargetConfig.objects.create(
+                experiment=experiment,
+                v1_min=v1_min,
+                v1_max=v1_max,
+                v2_min=v2_min,
+                v2_max=v2_max,
+            )
             
             messages.success(request, "Experiment created successfully!")
             return redirect(reverse("manage_experiments"))
         else:
             messages.error(request, "Failed to create experiment. Please check the form data.")
-            return render(request, "hod_template/add_experiment.html", {"form": form})
+            return render(
+                request,
+                "hod_template/add_experiment.html",
+                {
+                    "form": form,
+                    "apparatus_list": ApparatusCatalog.objects.all(),
+                    "chemicals_list": ChemicalCatalog.objects.all(),
+                },
+            )
             
     else:
         form = LabExperimentForm()
@@ -1446,8 +1489,19 @@ def edit_experiment(request, experiment_id):
         experiment.objective = request.POST.get('objective')
         experiment.principle = request.POST.get('principle')
         experiment.type = request.POST.get('type')
-        experiment.initial_state_json = request.POST.get('initial_state_json', '[]')
+        experiment.initial_state_json = _parse_initial_state_json_from_post(request)
         experiment.save()
+
+        v1_min, v1_max, v2_min, v2_max = _parse_target_config_from_post(request)
+        ExperimentTargetConfig.objects.update_or_create(
+            experiment=experiment,
+            defaults={
+                "v1_min": v1_min,
+                "v1_max": v1_max,
+                "v2_min": v2_min,
+                "v2_max": v2_max,
+            },
+        )
         
         # Clear existing related data
         experiment.materials.all().delete()
@@ -1568,6 +1622,7 @@ def edit_experiment(request, experiment_id):
         context = {
             'experiment': experiment,
             'target_config': target_config,
+            'initial_state_json_str': json.dumps(experiment.initial_state_json or []),
             'materials': experiment.materials.all(),
             'steps': experiment.steps.all().order_by('step_number'),
             'milestones': experiment.milestones.all(),

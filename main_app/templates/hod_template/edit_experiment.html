@@ -41,13 +41,47 @@
                             </div>
                             <div class="form-group">
                                 <label>Experiment Type</label>
+                                {% if experiment.type != 'double_indicator' and experiment.type != 'simple_titration' %}
+                                <div class="alert alert-warning py-2 small mb-2">Stored type
+                                    <code>{{ experiment.type }}</code> is not supported by the simulator. Pick a
+                                    template below before saving.</div>
+                                {% endif %}
+                                <!-- prettier-ignore -->
+                                <!-- djlint:off -->
                                 <select class="form-control" name="type" required>
+                                    <option value="double_indicator" {% if experiment.type == 'double_indicator' or experiment.type != 'simple_titration' %}selected{% endif %}>Double Indicator Titration</option>
                                     <option value="simple_titration" {% if experiment.type == 'simple_titration' %}selected{% endif %}>Simple Titration</option>
-                                    <option value="double_indicator" {% if experiment.type == 'double_indicator' %}selected{% endif %}>Double Indicator Titration</option>
-                                    <option value="rast" {% if experiment.type == 'rast' %}selected{% endif %}>Rast Method</option>
-                                    <option value="placeholder" {% if experiment.type == 'placeholder' %}selected{% endif %}>Placeholder</option>
                                 </select>
-                                <small class="text-muted">Choose the simulation template to be used.</small>
+                                <!-- djlint:on -->
+                                <small class="text-muted">Only these types are implemented in the virtual lab
+                                    simulation.</small>
+                            </div>
+
+                            <h4 class="text-info mt-4 mb-3"><i class="fas fa-bullseye"></i> Randomized titration
+                                targets (mL)</h4>
+                            <p class="text-muted small mb-2">V₁ and V₂ are sampled per session between min and max.
+                            </p>
+                            <div class="form-row">
+                                <div class="col-md-3">
+                                    <label class="small">V₁ min</label>
+                                    <input type="number" step="0.01" class="form-control" name="target_v1_min"
+                                        value="{% if target_config %}{{ target_config.v1_min }}{% else %}9.5{% endif %}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="small">V₁ max</label>
+                                    <input type="number" step="0.01" class="form-control" name="target_v1_max"
+                                        value="{% if target_config %}{{ target_config.v1_max }}{% else %}11.5{% endif %}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="small">V₂ min</label>
+                                    <input type="number" step="0.01" class="form-control" name="target_v2_min"
+                                        value="{% if target_config %}{{ target_config.v2_min }}{% else %}23.0{% endif %}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="small">V₂ max</label>
+                                    <input type="number" step="0.01" class="form-control" name="target_v2_max"
+                                        value="{% if target_config %}{{ target_config.v2_max }}{% else %}27.0{% endif %}">
+                                </div>
                             </div>
 
                             <hr>
@@ -255,7 +289,7 @@
                                 onclick="addSceneItem()">+ Add Apparatus</button>
                             <!-- Hidden input to store JSON array for backend -->
                             <input type="hidden" name="initial_state_json" id="initial_state_json_input"
-                                value="{{ experiment.initial_state_json }}">
+                                value="{{ initial_state_json_str }}">
 
                             <div class="form-group mt-4">
                                 {% if messages %}

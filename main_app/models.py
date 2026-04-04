@@ -417,11 +417,24 @@ class VirtualLabSubmission(models.Model):
 # Dynamic Virtual Lab Models
 
 class LabExperiment(models.Model):
+    TYPE_DOUBLE_INDICATOR = "double_indicator"
+    TYPE_SIMPLE_TITRATION = "simple_titration"
+    EXPERIMENT_TYPE_CHOICES = [
+        (TYPE_DOUBLE_INDICATOR, "Double Indicator Titration"),
+        (TYPE_SIMPLE_TITRATION, "Simple Titration"),
+    ]
+
     title = models.CharField(max_length=200)
     slug = models.SlugField(unique=True)
     objective = models.TextField()
     principle = models.TextField(blank=True, null=True)
-    type = models.CharField(max_length=50, default='double_indicator')
+    # Values enforced in LabExperimentForm / HOD UI; engine supports double_indicator & simple_titration.
+    type = models.CharField(max_length=50, default=TYPE_DOUBLE_INDICATOR)
+    initial_state_json = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Scene items (apparatus, locations, optional contents) for the simulation.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -421,6 +421,10 @@ class RatingQuestionForm(forms.ModelForm):
 class LabExperimentForm(FormSettings):
     def __init__(self, *args, **kwargs):
         super(LabExperimentForm, self).__init__(*args, **kwargs)
+        self.fields["type"].widget = forms.Select(
+            attrs={"class": "form-control"},
+            choices=LabExperiment.EXPERIMENT_TYPE_CHOICES,
+        )
 
     class Meta:
         model = LabExperiment

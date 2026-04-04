@@ -1091,12 +1091,17 @@ def lab_experiment_simulation(request, slug):
             }
             
             
+        raw_initial = experiment_obj.initial_state_json
         initial_state = []
-        if hasattr(experiment_obj, 'initial_state_json') and experiment_obj.initial_state_json:
-            try:
-                initial_state = json.loads(experiment_obj.initial_state_json)
-            except Exception:
-                pass
+        if raw_initial is not None:
+            if isinstance(raw_initial, list):
+                initial_state = raw_initial
+            elif isinstance(raw_initial, str):
+                try:
+                    parsed = json.loads(raw_initial)
+                    initial_state = parsed if isinstance(parsed, list) else []
+                except (json.JSONDecodeError, TypeError):
+                    initial_state = []
                 
         experiment_data = {
             "name": experiment_obj.title,
