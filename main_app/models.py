@@ -494,6 +494,11 @@ class ChemicalCatalog(models.Model):
     default_color_hex = models.CharField(max_length=9, default="#FFFFFF80", help_text="Format: #RRGGBBAA")
     is_indicator = models.BooleanField(default=False)
     
+    # NEW: Data-Driven Indicator Properties
+    low_ph_color = models.CharField(max_length=9, default="#FFFF00A0", help_text="#RRGGBBAA for acidic color (e.g. Yellow for Methyl Orange)")
+    high_ph_color = models.CharField(max_length=9, default="#FF00FFA0", help_text="#RRGGBBAA for basic color (e.g. Pink for Phenolphthalein)")
+    transition_ph_range = models.CharField(max_length=20, default="8.2-10.0", help_text="Lower and Upper pH bound, e.g. '8.2-10.0'")
+    
     def __str__(self):
         return f"{self.name} ({self.formula})"
 

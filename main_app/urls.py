@@ -124,6 +124,7 @@ path('student/module/<int:module_id>/mark_watched/', student_views.module_mark_w
     path('experiment/manage/', hod_views.manage_experiments, name='manage_experiments'),
     path('experiment/edit/<int:experiment_id>/', hod_views.edit_experiment, name='edit_experiment'),
     path('experiment/delete/<int:experiment_id>/', hod_views.delete_experiment, name='delete_experiment'),
+    path('hod/test_experiment_view/', hod_views.test_experiment_view, name='test_experiment_view'),
     
     # Catalogs UI
     path('catalogs/manage/', hod_views.manage_catalogs, name='manage_catalogs'),

@@ -1002,7 +1002,9 @@ def lab_experiment_simulation(request, slug):
         {
             "id": c.id, "name": c.name, "formula": c.formula,
             "molarity": c.molarity, "density": c.density,
-            "color": c.default_color_hex, "is_indicator": c.is_indicator
+            "color": c.default_color_hex, "is_indicator": c.is_indicator,
+            "low_ph_color": c.low_ph_color, "high_ph_color": c.high_ph_color,
+            "transition_ph_range": c.transition_ph_range
         } for c in ChemicalCatalog.objects.all()
     ]
     

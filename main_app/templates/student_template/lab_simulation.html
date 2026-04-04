@@ -91,9 +91,15 @@
       <button class="btn-lab-toggle" onclick="toggleCatalog()">📦 Apparatus Catalog</button>
       <button class="btn-lab-toggle" onclick="toggleControls()">⌨️ Controls Guide</button>
       <button class="btn-lab-toggle" onclick="toggleAssistant()">🧪 Lab Assistant</button>
+      {% if is_test_mode %}
+      <a href="{% url 'manage_experiments' %}" class="btn btn-secondary btn-sm" style="font-weight: bold;">
+        Close Preview
+      </a>
+      {% else %}
       <a href="{% url 'lab_experiment' slug %}" class="btn btn-danger btn-sm" style="font-weight: bold;">
         Exit Lab
       </a>
+      {% endif %}
     </div>
   </div>
 

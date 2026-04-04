@@ -112,10 +112,10 @@ class MarkingManager {
       }
     }
 
-    // EVALUATE DYNAMIC RULES PER MILESTONE
-    for (let m of this.milestones) {
-      if (this.completedIds.has(m.id)) continue; // Already achieved
-
+    // EVALUATE DYNAMIC RULES - SEQUENTIAL LOCK
+    // PHASE 6 FIX: Only evaluate the current step!
+    let m = this.milestones[currentStepIndex];
+    if (m && !this.completedIds.has(m.id)) {
       let allRulesPassed = true;
       if (m.rules && m.rules.length > 0) {
         for (let rule of m.rules) {
@@ -152,6 +152,7 @@ class MarkingManager {
           }
 
           if (!rulePassed) {
+            console.log(`Rule FAILED: Vessel ${rule.target_vessel} ${rule.target_property} (${propValue}) ${rule.operator} ${rule.value}`);
             allRulesPassed = false;
             break;
           }
@@ -431,7 +432,10 @@ function setup() {
         name: c.name,
         formula: c.formula,
         conc: c.molarity ? c.molarity + 'M' : '',
-        color: [r, g, b]
+        color: [r, g, b],
+        low_ph_color: c.low_ph_color,
+        high_ph_color: c.high_ph_color,
+        transition_ph_range: c.transition_ph_range
       };
     });
   } else {
@@ -575,6 +579,22 @@ function spawnFromInitialState() {
 
     vessels[v.id] = v;
     console.log(`Auto-spawned: ${v.title} at (${Math.round(pos.x)}, ${Math.round(pos.y)}) on ${item.location || 'table'}`);
+  });
+
+  // NEW: Auto-Mount Sweep - Link tubes to stands if they are near each other on spawn
+  const stands = Object.values(vessels).filter(v => v.type === 'common_stand');
+  const tubes = Object.values(vessels).filter(v => v.type === 'burette_tube');
+
+  tubes.forEach(tube => {
+    // Find a stand that is horizontally aligned (within 40px)
+    const matchingStand = stands.find(s => Math.abs(s.x - tube.x) < 40);
+    if (matchingStand) {
+      tube.mountedTo = matchingStand.id;
+      // Snap tube to stand position
+      tube.x = matchingStand.x; 
+      tube.y = matchingStand.y - (matchingStand.h * 0.1); 
+      console.log(`Auto-mounted ${tube.id} to stand ${matchingStand.id}`);
+    }
   });
 }
 
@@ -777,48 +797,57 @@ function makeResponsiveVessel(id, type) {
 
 function getTitrationColor(v) {
   const c = v.contents;
-  // Use randomized targets from experimentData if available
+  if (!c || c.mixture_vol < 0.1) return v.color || [200, 220, 255, 100];
+
   const targetV1 = experimentData?.targets?.v1 || 10.0;
   const targetV2 = experimentData?.targets?.v2 || 25.0;
-  
-  // Use custom colors from experimentData if available
-  const colV1 = hexToRgba(experimentData?.targets?.v1_color || "#FF69B4A0");
-  const colV2 = hexToRgba(experimentData?.targets?.v2_color || "#FFD700B4");
+  const isDouble = experimentData?.type === 'double_indicator' || (c.indicatorsAdded && c.indicatorsAdded.length > 1);
 
-  if (c.mixture_vol < 0.5) return [200, 220, 255, 100];
-
-  const type = experimentData?.type || 'simple_titration';
-
-  if (type === 'double_indicator') {
-    // Indicator-agnostic logic: relies on the order added
-    const ind1Name = c.indicatorsAdded[0];
-    const ind2Name = c.indicatorsAdded[1];
-    
-    const ind1Count = ind1Name ? (c.indicators[ind1Name] || 0) : 0;
-    const ind2Count = ind2Name ? (c.indicators[ind2Name] || 0) : 0;
-
-    if (ind1Count > 0 && ind2Count === 0) {
-      if (c.titrant_vol < targetV1) {
-        // Transition to colV1
-        let intensity = map(c.titrant_vol, targetV1 - 1.5, targetV1, colV1[3], 30, true);
-        return [colV1[0], colV1[1], colV1[2], intensity];
-      } else {
-        return [245, 245, 255, 100]; // Colorless at first endpoint
-      }
-    }
-    if (ind2Count > 0) {
-      if (c.titrant_vol < targetV2) return colV2; // Color of second indicator before endpoint
-      else return [255, 80, 0, 220]; // Changed color after second endpoint (Red/Orange)
-    }
+  // --- 1. DYNAMIC pH APPROXIMATION ---
+  // We simulate a titration curve: Base (12) -> V1 (8.3) -> V1.1 (7) -> V2 (4) -> Excess (2)
+  let currentPH = 12.0;
+  if (c.titrant_vol < targetV1) {
+    currentPH = map(c.titrant_vol, 0, targetV1, 12, 8.3);
+  } else if (!isDouble) {
+    currentPH = map(c.titrant_vol, targetV1, targetV1 + 2.0, 7.0, 2.0, true);
+  } else if (c.titrant_vol < targetV2) {
+    currentPH = map(c.titrant_vol, targetV1, targetV2, 8.0, 4.0);
   } else {
-    // Basic Acid-Base for other titrations
-    if (c.indicatorsAdded.length > 0) {
-      if (c.titrant_vol < targetV1) return colV1; // Before endpoint
-      else return [200, 255, 200, 180]; // At passed endpoint (Green)
-    }
+    currentPH = map(c.titrant_vol, targetV2, targetV2 + 2.0, 3.8, 1.5, true);
   }
 
-  return [235, 215, 160, 160];
+  // --- 2. INDICATOR COLOR BLENDING ---
+  let r=230, g=230, b=250, a=100; // Base background liquid (faint)
+  
+  if (c.indicatorsAdded && c.indicatorsAdded.length > 0) {
+    c.indicatorsAdded.forEach(indName => {
+      // Look up indicator metadata from catalog
+      const chem = chemicalCatalog.chemicals.find(ch => ch.name === indName || ch.id === indName);
+      if (!chem || !chem.low_ph_color || !chem.high_ph_color) return;
+
+      const lowCol = hexToRgba(chem.low_ph_color);
+      const highCol = hexToRgba(chem.high_ph_color);
+      
+      // Parse transition range (e.g., "8.3-10.0")
+      let [rangeLow, rangeHigh] = [8.3, 10.0];
+      if (chem.transition_ph_range) {
+        let parts = chem.transition_ph_range.split('-');
+        rangeLow = parseFloat(parts[0]);
+        rangeHigh = parseFloat(parts[1]);
+      }
+
+      // Calculate interpolation factor (0 = low pH color, 1 = high pH color)
+      let factor = map(currentPH, rangeLow, rangeHigh, 0, 1, true);
+      
+      // Layer this indicator color on top
+      r = lerp(lowCol[0], highCol[0], factor);
+      g = lerp(lowCol[1], highCol[1], factor);
+      b = lerp(lowCol[2], highCol[2], factor);
+      a = lerp(lowCol[3], highCol[3], factor);
+    });
+  }
+
+  return [r, g, b, a];
 }
 
 function hexToRgba(hex) {
@@ -2945,4 +2974,27 @@ function computeReaction(vessel) {
   if (total > 0) {
      vessel.color = [r/total, g/total, b/total, 180];
   }
+}
+function hexToRgba(hex) {
+  if (!hex) return [255, 255, 255, 255];
+  hex = hex.replace('#', '');
+  if (hex.length === 3) {
+    hex = hex.split('').map(x => x + x).join('');
+  }
+  if (hex.length === 6) {
+    return [
+      parseInt(hex.substring(0, 2), 16),
+      parseInt(hex.substring(2, 4), 16),
+      parseInt(hex.substring(4, 6), 16),
+      255
+    ];
+  } else if (hex.length === 8) {
+    return [
+      parseInt(hex.substring(0, 2), 16),
+      parseInt(hex.substring(2, 4), 16),
+      parseInt(hex.substring(4, 6), 16),
+      parseInt(hex.substring(6, 8), 16)
+    ];
+  }
+  return [255, 255, 255, 255];
 }

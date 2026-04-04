@@ -38,6 +38,16 @@ def _parse_initial_state_json_from_post(request):
         return []
 
 
+def _get_indices(post_data, pattern):
+    import re
+    indices = set()
+    for key in post_data.keys():
+        match = re.match(pattern, key)
+        if match:
+            indices.add(int(match.group(1)))
+    return sorted(list(indices))
+
+
 def _parse_target_config_from_post(request):
     def _float_or(name, default):
         v = (request.POST.get(name) or "").strip()
@@ -1342,51 +1352,29 @@ def add_experiment(request):
             experiment.save()
             
             # 1. Process Materials
-            # Expecting fields like material-0, material-1...
-            i = 0
-            while True:
-                mat_name = request.POST.get(f"material-{i}")
-                if mat_name is None:
-                    # check a few more in case of gaps (deleted rows in UI)
-                    if not any(request.POST.get(f"material-{k}") for k in range(i, i+10)):
-                        break
-                    i += 1
-                    continue
-                if mat_name.strip():
+            mat_indices = _get_indices(request.POST, r"material-(\d+)")
+            for idx in mat_indices:
+                mat_name = request.POST.get(f"material-{idx}")
+                if mat_name and mat_name.strip():
                     ExperimentMaterial.objects.create(experiment=experiment, name=mat_name.strip())
-                i += 1
                 
             # 2. Process Procedure Steps
-            # Expecting fields like step-0, step-1...
-            j = 0
-            step_num = 1
-            while True:
-                step_desc = request.POST.get(f"step-{j}")
-                if step_desc is None:
-                    if not any(request.POST.get(f"step-{k}") for k in range(j, j+10)):
-                        break
-                    j += 1
-                    continue
-                if step_desc.strip():
+            step_indices = _get_indices(request.POST, r"step-(\d+)")
+            for step_num, idx in enumerate(step_indices, 1):
+                step_desc = request.POST.get(f"step-{idx}")
+                if step_desc and step_desc.strip():
                     ExperimentStep.objects.create(experiment=experiment, step_number=step_num, description=step_desc.strip())
-                    step_num += 1
-                j += 1
                 
             # 3. Process Milestones and Rules
-            k = 0
-            while True:
-                m_id = request.POST.get(f"milestone-id-{k}")
-                m_desc = request.POST.get(f"milestone-desc-{k}")
-                m_pts = request.POST.get(f"milestone-pts-{k}")
+            m_indices = _get_indices(request.POST, r"milestone-id-(\d+)")
+            for m_idx in m_indices:
+                m_id = request.POST.get(f"milestone-id-{m_idx}")
+                m_desc = request.POST.get(f"milestone-desc-{m_idx}")
+                m_pts = request.POST.get(f"milestone-pts-{m_idx}")
                 
-                if m_id is None:
-                    if not any(request.POST.get(f"milestone-id-{l}") for l in range(k, k+10)):
-                        break
-                    k += 1
-                    continue
-                if m_id.strip() and m_desc.strip():
+                if m_id and m_id.strip() and m_desc and m_desc.strip():
                     pts = int(m_pts) if m_pts and str(m_pts).strip().isdigit() else 10
-                    m_instruction = request.POST.get(f"milestone-instruction-{k}", "").strip()
+                    m_instruction = request.POST.get(f"milestone-instruction-{m_idx}", "").strip()
                     milestone = ExperimentMilestone.objects.create(
                         experiment=experiment, 
                         milestone_id=m_id.strip(), 
@@ -1396,14 +1384,12 @@ def add_experiment(request):
                     )
                     
                     # Process Rules for this specific milestone
-                    rule_count_str = request.POST.get(f"rule-count-{k}", "0")
-                    rule_count = int(rule_count_str) if rule_count_str.isdigit() else 0
-                    
-                    for r in range(rule_count):
-                        target_vessel = request.POST.get(f"rule-vessel-{k}-{r}")
-                        target_prop = request.POST.get(f"rule-prop-{k}-{r}")
-                        operator = request.POST.get(f"rule-op-{k}-{r}")
-                        val_str = request.POST.get(f"rule-val-{k}-{r}")
+                    r_indices = _get_indices(request.POST, rf"rule-vessel-{m_idx}-(\d+)")
+                    for r_idx in r_indices:
+                        target_vessel = request.POST.get(f"rule-vessel-{m_idx}-{r_idx}")
+                        target_prop = request.POST.get(f"rule-prop-{m_idx}-{r_idx}")
+                        operator = request.POST.get(f"rule-op-{m_idx}-{r_idx}")
+                        val_str = request.POST.get(f"rule-val-{m_idx}-{r_idx}")
                         
                         if target_vessel and target_prop and operator and val_str:
                             try:
@@ -1416,41 +1402,58 @@ def add_experiment(request):
                                     value=val
                                 )
                             except ValueError:
-                                pass # ignore rules with invalid float values
+                                pass
                     
                     # Process Observation Prompts
-                    obs_count_str = request.POST.get(f"obs-count-{k}", "0")
-                    obs_count = int(obs_count_str) if obs_count_str.isdigit() else 0
-                    for o in range(obs_count):
-                        obs_title = request.POST.get(f"obs-title-{k}-{o}")
-                        obs_desc = request.POST.get(f"obs-desc-{k}-{o}")
-                        obs_vessel = request.POST.get(f"obs-vessel-{k}-{o}", "burette")
-                        obs_prop = request.POST.get(f"obs-prop-{k}-{o}", "reading")
+                    o_indices = _get_indices(request.POST, rf"obs-title-{m_idx}-(\d+)")
+                    for o_idx in o_indices:
+                        obs_title = request.POST.get(f"obs-title-{m_idx}-{o_idx}")
+                        obs_desc = request.POST.get(f"obs-desc-{m_idx}-{o_idx}")
+                        obs_vessel = request.POST.get(f"obs-vessel-{m_idx}-{o_idx}", "burette")
+                        obs_prop = request.POST.get(f"obs-prop-{m_idx}-{o_idx}", "reading")
+                        obs_tol = request.POST.get(f"obs-tol-{m_idx}-{o_idx}", "0.2")
+                        obs_penalty = request.POST.get(f"obs-penalty-{m_idx}-{o_idx}", "10")
+                        
                         if obs_title and obs_title.strip() and obs_desc and obs_desc.strip():
-                            ObservationPrompt.objects.create(
-                                milestone=milestone,
-                                title=obs_title.strip(),
-                                description=obs_desc.strip(),
-                                target_vessel=obs_vessel.strip() if obs_vessel.strip() else 'burette',
-                                target_property=obs_prop.strip() if obs_prop.strip() else 'reading'
-                            )
+                            try:
+                                tol = float(obs_tol)
+                                penalty = int(obs_penalty)
+                                ObservationPrompt.objects.create(
+                                    milestone=milestone,
+                                    title=obs_title.strip(),
+                                    description=obs_desc.strip(),
+                                    target_vessel=obs_vessel.strip() if obs_vessel.strip() else 'burette',
+                                    target_property=obs_prop.strip() if obs_prop.strip() else 'reading',
+                                    tolerance=tol,
+                                    penalty_points=penalty
+                                )
+                            except ValueError:
+                                pass
                             
                     # Process Calculation Prompts
-                    calc_count_str = request.POST.get(f"calc-count-{k}", "0")
-                    calc_count = int(calc_count_str) if calc_count_str.isdigit() else 0
-                    for c in range(calc_count):
-                        calc_title = request.POST.get(f"calc-title-{k}-{c}")
-                        calc_desc = request.POST.get(f"calc-desc-{k}-{c}")
-                        calc_form = request.POST.get(f"calc-form-{k}-{c}")
+                    c_indices = _get_indices(request.POST, rf"calc-title-{m_idx}-(\d+)")
+                    for c_idx in c_indices:
+                        calc_title = request.POST.get(f"calc-title-{m_idx}-{c_idx}")
+                        calc_desc = request.POST.get(f"calc-desc-{m_idx}-{c_idx}")
+                        calc_form = request.POST.get(f"calc-form-{m_idx}-{c_idx}")
+                        calc_tol = request.POST.get(f"calc-tol-{m_idx}-{c_idx}", "0.05")
+                        calc_pts = request.POST.get(f"calc-pts-{m_idx}-{c_idx}", "15")
+                        
                         if calc_title and calc_title.strip() and calc_form and calc_form.strip():
-                            CalculationPrompt.objects.create(
-                                milestone=milestone,
-                                title=calc_title.strip(),
-                                description=calc_desc.strip() if calc_desc else "",
-                                formula=calc_form.strip()
-                            )
-                k += 1
-                
+                            try:
+                                tol = float(calc_tol)
+                                pts = int(calc_pts)
+                                CalculationPrompt.objects.create(
+                                    milestone=milestone,
+                                    title=calc_title.strip(),
+                                    description=calc_desc.strip() if calc_desc else "",
+                                    formula=calc_form.strip(),
+                                    tolerance=tol,
+                                    points=pts
+                                )
+                            except ValueError:
+                                pass
+
             v1_min, v1_max, v1_color, v2_min, v2_max, v2_color = _parse_target_config_from_post(request)
             ExperimentTargetConfig.objects.create(
                 experiment=experiment,
@@ -1471,8 +1474,8 @@ def add_experiment(request):
                 "hod_template/add_experiment.html",
                 {
                     "form": form,
-                    "apparatus_list": ApparatusCatalog.objects.all(),
-                    "chemicals_list": ChemicalCatalog.objects.all(),
+                    "apparatus_list": list(ApparatusCatalog.objects.all().values('id', 'name', 'type')),
+                    "chemicals_list": list(ChemicalCatalog.objects.all().values('id', 'name')),
                 },
             )
             
@@ -1480,8 +1483,8 @@ def add_experiment(request):
         form = LabExperimentForm()
         context = {
             "form": form,
-            "apparatus_list": ApparatusCatalog.objects.all(),
-            "chemicals_list": ChemicalCatalog.objects.all()
+            "apparatus_list": list(ApparatusCatalog.objects.all().values('id', 'name', 'type')),
+            "chemicals_list": list(ChemicalCatalog.objects.all().values('id', 'name'))
         }
         return render(request, "hod_template/add_experiment.html", context)
 
@@ -1521,43 +1524,29 @@ def edit_experiment(request, experiment_id):
         experiment.milestones.all().delete()
         
         # 1. Process Materials
-        i = 0
-        while True:
-            mat_name = request.POST.get(f"material-{i}")
-            if mat_name is None:
-                # check a few more in case of gaps (deleted rows in UI)
-                if not any(request.POST.get(f"material-{k}") for k in range(i, i+10)):
-                    break
+        mat_indices = _get_indices(request.POST, r"material-(\d+)")
+        for idx in mat_indices:
+            mat_name = request.POST.get(f"material-{idx}")
             if mat_name and mat_name.strip():
                 ExperimentMaterial.objects.create(experiment=experiment, name=mat_name.strip())
-            i += 1
             
         # 2. Process Procedure Steps
-        j = 0
-        step_num = 1
-        while True:
-            step_desc = request.POST.get(f"step-{j}")
-            if step_desc is None:
-                if not any(request.POST.get(f"step-{k}") for k in range(j, j+10)):
-                    break
+        step_indices = _get_indices(request.POST, r"step-(\d+)")
+        for step_num, idx in enumerate(step_indices, 1):
+            step_desc = request.POST.get(f"step-{idx}")
             if step_desc and step_desc.strip():
                 ExperimentStep.objects.create(experiment=experiment, step_number=step_num, description=step_desc.strip())
-                step_num += 1
-            j += 1
             
         # 3. Process Milestones and Rules
-        k = 0
-        while True:
-            m_id = request.POST.get(f"milestone-id-{k}")
-            m_desc = request.POST.get(f"milestone-desc-{k}")
-            m_pts = request.POST.get(f"milestone-pts-{k}")
+        m_indices = _get_indices(request.POST, r"milestone-id-(\d+)")
+        for m_idx in m_indices:
+            m_id = request.POST.get(f"milestone-id-{m_idx}")
+            m_desc = request.POST.get(f"milestone-desc-{m_idx}")
+            m_pts = request.POST.get(f"milestone-pts-{m_idx}")
             
-            if m_id is None:
-                if not any(request.POST.get(f"milestone-id-{l}") for l in range(k, k+10)):
-                    break
-            if m_id and m_desc and m_id.strip() and m_desc.strip():
+            if m_id and m_id.strip() and m_desc and m_desc.strip():
                 pts = int(m_pts) if m_pts and str(m_pts).strip().isdigit() else 10
-                m_instruction = request.POST.get(f"milestone-instruction-{k}", "").strip()
+                m_instruction = request.POST.get(f"milestone-instruction-{m_idx}", "").strip()
                 milestone = ExperimentMilestone.objects.create(
                     experiment=experiment, 
                     milestone_id=m_id.strip(), 
@@ -1567,14 +1556,12 @@ def edit_experiment(request, experiment_id):
                 )
                 
                 # Process Rules for this specific milestone
-                rule_count_str = request.POST.get(f"rule-count-{k}", "0")
-                rule_count = int(rule_count_str) if rule_count_str.isdigit() else 0
-                
-                for r in range(rule_count):
-                    target_vessel = request.POST.get(f"rule-vessel-{k}-{r}")
-                    target_prop = request.POST.get(f"rule-prop-{k}-{r}")
-                    operator = request.POST.get(f"rule-op-{k}-{r}")
-                    val_str = request.POST.get(f"rule-val-{k}-{r}")
+                r_indices = _get_indices(request.POST, rf"rule-vessel-{m_idx}-(\d+)")
+                for r_idx in r_indices:
+                    target_vessel = request.POST.get(f"rule-vessel-{m_idx}-{r_idx}")
+                    target_prop = request.POST.get(f"rule-prop-{m_idx}-{r_idx}")
+                    operator = request.POST.get(f"rule-op-{m_idx}-{r_idx}")
+                    val_str = request.POST.get(f"rule-val-{m_idx}-{r_idx}")
                     
                     if target_vessel and target_prop and operator and val_str:
                         try:
@@ -1587,39 +1574,57 @@ def edit_experiment(request, experiment_id):
                                 value=val
                             )
                         except ValueError:
-                            pass # ignore rules with invalid float values
-                                
-                    # Process Observation Prompts
-                    obs_count_str = request.POST.get(f"obs-count-{k}", "0")
-                    obs_count = int(obs_count_str) if obs_count_str.isdigit() else 0
-                    for o in range(obs_count):
-                        obs_title = request.POST.get(f"obs-title-{k}-{o}")
-                        obs_desc = request.POST.get(f"obs-desc-{k}-{o}")
-                        obs_vessel = request.POST.get(f"obs-vessel-{k}-{o}", "burette")
-                        obs_prop = request.POST.get(f"obs-prop-{k}-{o}", "reading")
-                        if obs_title and obs_title.strip() and obs_desc and obs_desc.strip():
+                            pass
+                
+                # Process Observation Prompts
+                o_indices = _get_indices(request.POST, rf"obs-title-{m_idx}-(\d+)")
+                for o_idx in o_indices:
+                    obs_title = request.POST.get(f"obs-title-{m_idx}-{o_idx}")
+                    obs_desc = request.POST.get(f"obs-desc-{m_idx}-{o_idx}")
+                    obs_vessel = request.POST.get(f"obs-vessel-{m_idx}-{o_idx}", "burette")
+                    obs_prop = request.POST.get(f"obs-prop-{m_idx}-{o_idx}", "reading")
+                    obs_tol = request.POST.get(f"obs-tol-{m_idx}-{o_idx}", "0.2")
+                    obs_penalty = request.POST.get(f"obs-penalty-{m_idx}-{o_idx}", "10")
+                    
+                    if obs_title and obs_title.strip() and obs_desc and obs_desc.strip():
+                        try:
+                            tol = float(obs_tol)
+                            penalty = int(obs_penalty)
                             ObservationPrompt.objects.create(
                                 milestone=milestone,
                                 title=obs_title.strip(),
                                 description=obs_desc.strip(),
                                 target_vessel=obs_vessel.strip() if obs_vessel.strip() else 'burette',
-                                target_property=obs_prop.strip() if obs_prop.strip() else 'reading'
+                                target_property=obs_prop.strip() if obs_prop.strip() else 'reading',
+                                tolerance=tol,
+                                penalty_points=penalty
                             )
-                            
-                    # Process Calculation Prompts
-                    calc_count_str = request.POST.get(f"calc-count-{k}", "0")
-                    calc_count = int(calc_count_str) if calc_count_str.isdigit() else 0
-                    for c in range(calc_count):
-                        calc_title = request.POST.get(f"calc-title-{k}-{c}")
-                        calc_desc = request.POST.get(f"calc-desc-{k}-{c}")
-                        calc_form = request.POST.get(f"calc-form-{k}-{c}")
-                        if calc_title and calc_title.strip() and calc_form and calc_form.strip():
+                        except ValueError:
+                            pass
+                        
+                # Process Calculation Prompts
+                c_indices = _get_indices(request.POST, rf"calc-title-{m_idx}-(\d+)")
+                for c_idx in c_indices:
+                    calc_title = request.POST.get(f"calc-title-{m_idx}-{c_idx}")
+                    calc_desc = request.POST.get(f"calc-desc-{m_idx}-{c_idx}")
+                    calc_form = request.POST.get(f"calc-form-{m_idx}-{c_idx}")
+                    calc_tol = request.POST.get(f"calc-tol-{m_idx}-{c_idx}", "0.05")
+                    calc_pts = request.POST.get(f"calc-pts-{m_idx}-{c_idx}", "15")
+                    
+                    if calc_title and calc_title.strip() and calc_form and calc_form.strip():
+                        try:
+                            tol = float(calc_tol)
+                            pts = int(calc_pts)
                             CalculationPrompt.objects.create(
                                 milestone=milestone,
                                 title=calc_title.strip(),
                                 description=calc_desc.strip() if calc_desc else "",
-                                formula=calc_form.strip()
+                                formula=calc_form.strip(),
+                                tolerance=tol,
+                                points=pts
                             )
+                        except ValueError:
+                            pass
             k += 1
             
         messages.success(request, "Experiment updated successfully!")
@@ -1638,8 +1643,8 @@ def edit_experiment(request, experiment_id):
             'materials': experiment.materials.all(),
             'steps': experiment.steps.all().order_by('step_number'),
             'milestones': experiment.milestones.all(),
-            'apparatus_list': ApparatusCatalog.objects.all(),
-            'chemicals_list': ChemicalCatalog.objects.all()
+            'apparatus_list': list(ApparatusCatalog.objects.all().values('id', 'name', 'type')),
+            'chemicals_list': list(ChemicalCatalog.objects.all().values('id', 'name'))
         }
         return render(request, "hod_template/edit_experiment.html", context)
 
@@ -1806,3 +1811,80 @@ def delete_module(request, module_id):
     except Exception as e:
         messages.error(request, f"Failed to delete Lesson Module: {e}")
     return redirect(reverse('manage_modules'))
+
+@csrf_exempt
+def test_experiment_view(request):
+    """
+    Handles POSTed JSON from HOD add/edit experiment forms and renders the simulation 
+    engine in 'Test Mode' without requiring a database record.
+    """
+    if request.method != "POST":
+        return HttpResponse("This view only accepts POST requests from the experiment builder.")
+    
+    config_json = request.POST.get("config_json")
+    if not config_json:
+        return HttpResponse("No experiment configuration received.")
+    
+    try:
+        config = json.loads(config_json)
+    except json.JSONDecodeError:
+        return HttpResponse("Invalid JSON configuration.")
+
+    # 1. Prepare Catalogs (Parity with lab_experiment_simulation in student_views.py)
+    chemicals_list = [
+        {
+            "id": c.id, "name": c.name, "formula": c.formula,
+            "molarity": c.molarity, "density": c.density,
+            "color": c.default_color_hex, "is_indicator": c.is_indicator,
+            "low_ph_color": c.low_ph_color, "high_ph_color": c.high_ph_color,
+            "transition_ph_range": c.transition_ph_range
+        } for c in ChemicalCatalog.objects.all()
+    ]
+    
+    apparatus_list = [
+        {
+            "id": a.id, "name": a.name, "type": a.type,
+            "max_capacity": a.max_capacity, "sprite": a.svg_sprite_url,
+            "is_heatable": a.is_heatable, "can_measure_vol": a.can_measure_vol, "can_pour": a.can_pour
+        } for a in ApparatusCatalog.objects.all()
+    ]
+    
+    reactions_list = [
+        {
+            "id": r.id, "chemical_a": r.chemical_a.id, "chemical_b": r.chemical_b.id,
+            "product": r.product.id if r.product else None,
+            "reaction_color_hex": r.reaction_color_hex, "ph_change": r.ph_change
+        } for r in ChemicalReaction.objects.all()
+    ]
+    
+    catalogs_dict = {
+        "chemicals": chemicals_list,
+        "apparatus": apparatus_list,
+        "reactions": reactions_list
+    }
+
+    # 2. Construct FULL experiment_data object for the simulation
+    # We must provide the same structure the simulation expects from its state JSON
+    experiment_data = {
+        "name": config.get("name", "Test Experiment"),
+        "type": config.get("type", "TITRATION_DOUBLE"),
+        "milestones": config.get("milestones", []),
+        "targets": {
+            "v1": config.get("targets", {}).get("v1", 12.0),
+            "v2": config.get("targets", {}).get("v2", 24.0),
+            "v1_color": config.get("targets", {}).get("v1_color", "#FF69B4"),
+            "v2_color": config.get("targets", {}).get("v2_color", "#FFD700"),
+        },
+        "catalogs": catalogs_dict,
+        "initial_state": config.get("initial_state", [])
+    }
+
+    context = {
+        "slug": "test-mode",
+        "experiment": experiment_data,
+        "config_json": json.dumps(experiment_data),
+        "page_title": f"TEST: {experiment_data['name']}",
+        "is_test_mode": True
+    }
+    
+    return render(request, "student_template/lab_simulation.html", context)

@@ -2,6 +2,41 @@
 {% load static %}
 
 {% block content %}
+<style>
+    .glass-button {
+        background: rgba(255, 255, 255, 0.05) !important;
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        transition: all 0.2s ease;
+        color: #333 !important;
+        font-weight: 600;
+        text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+    }
+    .glass-button:hover {
+        background: rgba(0, 123, 255, 0.1) !important;
+        border-color: #007bff !important;
+        color: #007bff !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .category-header {
+        font-size: 11px;
+        letter-spacing: 0.5px;
+        color: #666;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 4px;
+        margin-bottom: 8px;
+        width: 100%;
+    }
+    .app-node div {
+        transition: all 0.2s ease;
+    }
+    .app-node:hover div {
+        transform: scale(1.05);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.3) !important;
+        border-color: #007bff !important;
+    }
+</style>
 <section class="content">
     <div class="container-fluid">
         <div class="row">
@@ -11,8 +46,10 @@
                         <h3 class="card-title">Add Virtual Lab Experiment</h3>
                     </div>
 
-                    <form role="form" method="POST" action="{% url 'add_experiment' %}">
                         {% csrf_token %}
+                        <!-- DATA PASSED TO JS VIA JSON_SCRIPT -->
+                        {{ apparatus_list|json_script:"apparatus-data" }}
+                        {{ chemicals_list|json_script:"chemicals-data" }}
                         <div class="card-body">
                             <!-- Basic Info -->
                             <h4 class="text-primary mt-3 mb-3">Basic Information</h4>
@@ -78,7 +115,12 @@
                             <hr>
 
                             <!-- Materials -->
-                            <h4 class="text-primary mt-4 mb-3">Materials Required</h4>
+                            <div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+                                <h4 class="text-primary mb-0">Materials Required</h4>
+                                <button type="button" class="btn btn-xs btn-outline-primary" onclick="syncMaterialsFromScene()">
+                                    <i class="fas fa-sync"></i> Sync from Scene Builder
+                                </button>
+                            </div>
                             <div id="materials-container">
                                 <div class="material-row form-inline mb-2">
                                     <input type="text" class="form-control mr-2" style="width: 80%;" name="material-0"
@@ -110,8 +152,24 @@
 
                             <!-- Assessment Milestones -->
                             <h4 class="text-primary mt-4 mb-3">Assessment Milestones</h4>
-                            <p class="text-muted small mb-3">Define the actions a student must take in the simulation to
-                                score points.</p>
+                            <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-light border rounded">
+                                <div>
+                                    <span class="font-weight-bold text-info mr-2">🚀 SMART BLUEPRINTS:</span>
+                                    <select id="preset-selector" class="form-control d-inline-block w-auto mr-2">
+                                        <option value="">-- Choose Template --</option>
+                                        <option value="simple">Simple Titration Blueprint</option>
+                                        <option value="double">Double Titration Blueprint</option>
+                                    </select>
+                                    <button type="button" class="btn btn-info btn-sm mr-1" onclick="applyPreset()">Apply Blueprint</button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearForm()">Clear All</button>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <button type="button" class="btn btn-warning btn-sm font-weight-bold shadow-sm" onclick="testExperiment()">
+                                        <i class="fas fa-flask"></i> Test Experiment (Preview)
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="text-muted small mb-3">Define the actions a student must take in the simulation to score points.</p>
 
                             <div id="milestones-container">
                                 <div class="milestone-row card mb-3">
@@ -174,18 +232,18 @@
                             
                             <div class="row mb-4">
                                 <div class="col-md-8">
-                                    <div id="visual-canvas" style="position:relative; height: 400px; background: #e9ecef; border: 2px dashed #adb5bd; border-radius: 8px; overflow: hidden;" ondrop="dropContainer(event)" ondragover="allowDrop(event)">
+                                    <div id="visual-canvas" style="position:relative; height: 400px; background: url('/static/images/new-lab-bg-1.png') no-repeat center center; background-size: cover; border: 2px solid #2c3e50; border-radius: 8px; overflow: hidden; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);" ondrop="dropContainer(event)" ondragover="allowDrop(event)">
                                         <!-- Top Shelf -->
-                                        <div id="drop-shelfTop" style="position:absolute; top: 20%; left:5%; width:90%; height:8px; background:#495057; box-shadow: 0 4px 6px rgba(0,0,0,0.3); pointer-events:none;">
-                                            <span style="position:absolute; top:-20px; color:#6c757d; font-size:12px; font-weight:bold;">Top Shelf</span>
+                                        <div id="drop-shelfTop" style="position:absolute; top: 22%; left:5%; width:90%; height:12px; background:rgba(30,30,30,0.85); border-bottom: 3px solid #000; box-shadow: 0 8px 15px rgba(0,0,0,0.6); pointer-events:none; border-radius: 2px;">
+                                            <span style="position:absolute; top:-22px; left:10px; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; letter-spacing:1px; text-shadow: 1px 1px 2px #000;">Top Shelf</span>
                                         </div>
                                         <!-- Bottom Shelf -->
-                                        <div id="drop-shelfBottom" style="position:absolute; top: 50%; left:5%; width:90%; height:8px; background:#495057; box-shadow: 0 4px 6px rgba(0,0,0,0.3); pointer-events:none;">
-                                            <span style="position:absolute; top:-20px; color:#6c757d; font-size:12px; font-weight:bold;">Bottom Shelf</span>
+                                        <div id="drop-shelfBottom" style="position:absolute; top: 48%; left:5%; width:90%; height:12px; background:rgba(30,30,30,0.85); border-bottom: 3px solid #000; box-shadow: 0 8px 15px rgba(0,0,0,0.6); pointer-events:none; border-radius: 2px;">
+                                            <span style="position:absolute; top:-22px; left:10px; color:#fff; font-size:11px; font-weight:bold; text-transform:uppercase; letter-spacing:1px; text-shadow: 1px 1px 2px #000;">Bottom Shelf</span>
                                         </div>
                                         <!-- Lab Table -->
-                                        <div id="drop-table" style="position:absolute; top: 80%; left:0; width:100%; height:20%; background:#ced4da; border-top: 6px solid #6c757d; pointer-events:none;">
-                                            <span style="position:absolute; top:4px; left:5px; color:#6c757d; font-size:12px; font-weight:bold;">Lab Bench</span>
+                                        <div id="drop-table" style="position:absolute; bottom: 0; left:0; width:100%; height:25%; background: linear-gradient(to bottom, #5d4037, #3e2723); border-top: 8px solid #2c1b0e; box-shadow: 0 -10px 20px rgba(0,0,0,0.4); pointer-events:none;">
+                                            <span style="position:absolute; top:8px; left:15px; color:#efd; font-size:12px; font-weight:bold; text-transform:uppercase; letter-spacing:1px; text-shadow: 1px 1px 2px #000;">Lab Workbench</span>
                                         </div>
                                     </div>
                                 </div>
@@ -232,6 +290,7 @@
 
 <script>
     let materialCount = 1;
+
     function addMaterial() {
         const container = document.getElementById('materials-container');
         const count = materialCount++;
@@ -245,6 +304,7 @@
     }
 
     let stepCount = 1;
+
     function addStep() {
         const container = document.getElementById('steps-container');
         const count = stepCount++;
@@ -273,6 +333,7 @@
     }
 
     let milestoneCount = 1;
+
     function addMilestone() {
         const container = document.getElementById('milestones-container');
         const count = milestoneCount++;
@@ -296,16 +357,11 @@
                     <div class="form-group mb-2">
                         <textarea class="form-control form-control-sm bg-light" rows="2"
                             name="milestone-instruction-${count}"
-                            placeholder="💡 Lab Assistant instruction (optional) — tell the student what to do for this step"></textarea>
-                        <small class="text-muted">Displayed as the step-by-step hint in the Lab Assistant panel during simulation.</small>
+                            placeholder="💡 Lab Assistant instruction (optional)"></textarea>
                     </div>
                     
-                    <!-- Rules Section -->
                     <div class="rules-container bg-light p-2 rounded" id="rules-container-${count}">
                         <h6 class="text-secondary mb-2"><i class="fas fa-code-branch"></i> Validation Rules (Optional)</h6>
-                        <p class="small text-muted mb-2">Automate milestone completion by checking apparatus state.<br>
-                        <b>Vessel</b>: "burette", "conical_flask", "beaker"<br>
-                        <b>Property</b>: "reading" (burette), "volume" (total), or chemical name (e.g. "Hydrochloric Acid")</p>
                     </div>
                     <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="addRule(${count})">+ Add Rule</button>
                     <input type="hidden" name="rule-count-${count}" id="rule-count-${count}" value="0">
@@ -313,7 +369,6 @@
                     <hr class="my-3 border-secondary">
                     <div class="prompts-container bg-light p-2 rounded" id="prompts-container-${count}">
                         <h6 class="text-info mb-2"><i class="fas fa-question-circle"></i> Assessment Prompts (Optional)</h6>
-                        <small class="text-muted d-block mb-2">Configure dynamic popups asking students for math/values.</small>
                     </div>
                     <div class="d-flex mt-1">
                         <button type="button" class="btn btn-xs btn-outline-info mr-2" onclick="addObservationPrompt(${count})">+ Add Observation</button>
@@ -327,87 +382,27 @@
         container.insertAdjacentHTML('beforeend', html);
     }
 
-    function addObservationPrompt(milestoneIndex) {
-        const container = document.getElementById(`prompts-container-${milestoneIndex}`);
-        const countInput = document.getElementById(`obs-count-${milestoneIndex}`);
-        const obsIndex = parseInt(countInput.value);
-
-        const html = `
-            <div class="obs-row card border-info mb-2 p-2 shadow-sm">
-                <div class="d-flex justify-content-between">
-                    <b class="text-info small">Observation Prompt</b>
-                    <button type="button" class="btn btn-sm text-danger py-0" onclick="this.parentElement.parentElement.remove()">X</button>
-                </div>
-                <div class="form-row mt-1">
-                    <div class="col-md-3">
-                        <input type="text" class="form-control form-control-sm" name="obs-title-${milestoneIndex}-${obsIndex}" placeholder="Var Name (e.g. v1)">
-                    </div>
-                    <div class="col-md-4">
-                        <input type="text" class="form-control form-control-sm" name="obs-desc-${milestoneIndex}-${obsIndex}" placeholder="Question text">
-                    </div>
-                    <div class="col-md-3">
-                        <input type="text" class="form-control form-control-sm" name="obs-vessel-${milestoneIndex}-${obsIndex}" placeholder="Target Vessel">
-                    </div>
-                    <div class="col-md-2">
-                        <input type="text" class="form-control form-control-sm" name="obs-prop-${milestoneIndex}-${obsIndex}" placeholder="Target Prop">
-                    </div>
-                </div>
-            </div>
-        `;
-        container.insertAdjacentHTML('beforeend', html);
-        countInput.value = obsIndex + 1;
-    }
-
-    function addCalculationPrompt(milestoneIndex) {
-        const container = document.getElementById(`prompts-container-${milestoneIndex}`);
-        const countInput = document.getElementById(`calc-count-${milestoneIndex}`);
-        const calcIndex = parseInt(countInput.value);
-
-        const html = `
-            <div class="calc-row card border-primary mb-2 p-2 shadow-sm">
-                <div class="d-flex justify-content-between">
-                    <b class="text-primary small">Calculation Prompt</b>
-                    <button type="button" class="btn btn-sm text-danger py-0" onclick="this.parentElement.parentElement.remove()">X</button>
-                </div>
-                <div class="form-row mt-1">
-                    <div class="col-md-3">
-                        <input type="text" class="form-control form-control-sm" name="calc-title-${milestoneIndex}-${calcIndex}" placeholder="Var Name (e.g. mass)">
-                    </div>
-                    <div class="col-md-5">
-                        <input type="text" class="form-control form-control-sm" name="calc-desc-${milestoneIndex}-${calcIndex}" placeholder="Question text">
-                    </div>
-                    <div class="col-md-4">
-                        <input type="text" class="form-control form-control-sm" name="calc-form-${milestoneIndex}-${calcIndex}" placeholder="Formula (e.g. v1 * 0.1)">
-                    </div>
-                </div>
-            </div>
-        `;
-        container.insertAdjacentHTML('beforeend', html);
-        countInput.value = calcIndex + 1;
-    }
-
     function addRule(milestoneIndex) {
         const container = document.getElementById(`rules-container-${milestoneIndex}`);
         const countInput = document.getElementById(`rule-count-${milestoneIndex}`);
         const ruleIndex = parseInt(countInput.value);
+        const options = getSceneApparatusOptions();
 
         const html = `
             <div class="rule-row form-row mb-1">
                 <div class="col-md-3">
-                    <input type="text" class="form-control form-control-sm" name="rule-vessel-${milestoneIndex}-${ruleIndex}" placeholder="Vessel (e.g. burette)">
+                    <select class="form-control form-control-sm" name="rule-vessel-${milestoneIndex}-${ruleIndex}">${options}</select>
                 </div>
                 <div class="col-md-3">
-                    <input type="text" class="form-control form-control-sm" name="rule-prop-${milestoneIndex}-${ruleIndex}" placeholder="Prop (e.g. reading)">
+                    <select class="form-control form-control-sm" name="rule-prop-${milestoneIndex}-${ruleIndex}">
+                        <option value="reading">Reading (Burette)</option>
+                        <option value="volume">Total Volume</option>
+                        <option value="pH">pH Level</option>
+                    </select>
                 </div>
                 <div class="col-md-2">
                     <select class="form-control form-control-sm" name="rule-op-${milestoneIndex}-${ruleIndex}">
-                        <option value=">=">>=</option>
-                        <option value=">">&gt;</option>
-                        <option value="<=">&lt;=</option>
-                        <option value="<">&lt;</option>
-                        <option value="==">==</option>
-                        <option value="!=">!=</option>
-                        <option value="CONTAINS">Contains</option>
+                        <option value=">=">>=</option><option value="<="><=</option><option value="==">==</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -422,112 +417,510 @@
         countInput.value = ruleIndex + 1;
     }
 
-    // --- Visual Drag-and-Drop Canvas Logic ---
-    const apparatusList = [];
-    {% for app in apparatus_list %}
-        apparatusList.push({ id: {{ app.id|default:0 }}, name: "{{ app.name|escapejs }}", type: "{{ app.type|escapejs }}" });
-    {% endfor %}
+    function addObservationPrompt(milestoneIndex) {
+        const container = document.getElementById(`prompts-container-${milestoneIndex}`);
+        const countInput = document.getElementById(`obs-count-${milestoneIndex}`);
+        const idx = parseInt(countInput.value);
+        const options = getSceneApparatusOptions();
 
-    const chemicalList = [];
-    {% for chem in chemicals_list %}
-        chemicalList.push({ id: {{ chem.id|default:0 }}, name: "{{ chem.name|escapejs }}" });
-    {% endfor %}
-
-    document.addEventListener("DOMContentLoaded", () => {
-        initLibrary();
-    });
-
-    function initLibrary() {
-        const lib = document.getElementById('library-items');
-        apparatusList.forEach(a => {
-            let div = document.createElement('div');
-            div.draggable = true;
-            div.className = "btn btn-outline-info m-1 btn-sm font-weight-bold shadow-sm";
-            div.innerText = a.name;
-            div.dataset.type = a.type;
-            div.dataset.name = a.name;
-            div.ondragstart = (e) => {
-                e.dataTransfer.setData("text/plain", JSON.stringify({ type: a.type, name: a.name, source: 'library' }));
-            };
-            lib.appendChild(div);
-        });
+        const html = `
+            <div class="obs-row card border-info mb-2 p-2 shadow-sm">
+                <div class="form-row mb-1">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control form-control-sm" name="obs-title-${milestoneIndex}-${idx}" placeholder="Variable Name (e.g. V1)">
+                    </div>
+                    <div class="col-md-8">
+                        <input type="text" class="form-control form-control-sm" name="obs-desc-${milestoneIndex}-${idx}" placeholder="Question (e.g. 'What is the burette reading?')">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="col-md-3">
+                        <select class="form-control form-control-sm" name="obs-vessel-${milestoneIndex}-${idx}">${options}</select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-control form-control-sm" name="obs-prop-${milestoneIndex}-${idx}">
+                            <option value="reading">Reading</option><option value="volume">Volume</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <input type="number" step="0.01" class="form-control form-control-sm" name="obs-tol-${milestoneIndex}-${idx}" value="0.2" title="Tolerance">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="number" class="form-control form-control-sm" name="obs-penalty-${milestoneIndex}-${idx}" value="10" title="Penalty Points">
+                    </div>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+        countInput.value = idx + 1;
     }
 
-    function allowDrop(e) {
-        e.preventDefault();
+    function addCalculationPrompt(milestoneIndex) {
+        const container = document.getElementById(`prompts-container-${milestoneIndex}`);
+        const countInput = document.getElementById(`calc-count-${milestoneIndex}`);
+        const idx = parseInt(countInput.value);
+
+        const html = `
+            <div class="calc-row card border-primary mb-2 p-2 shadow-sm">
+                <div class="form-row mb-1">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control form-control-sm" name="calc-title-${milestoneIndex}-${idx}" placeholder="Variable Name">
+                    </div>
+                    <div class="col-md-8">
+                        <input type="text" class="form-control form-control-sm" name="calc-desc-${milestoneIndex}-${idx}" placeholder="Description (Optional)">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control form-control-sm" name="calc-form-${milestoneIndex}-${idx}" placeholder="Formula (e.g. V1 * 0.1)">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="number" step="0.001" class="form-control form-control-sm" name="calc-tol-${milestoneIndex}-${idx}" value="0.05" title="Tolerance">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="number" class="form-control form-control-sm" name="calc-pts-${milestoneIndex}-${idx}" value="15" title="Points">
+                    </div>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+        countInput.value = idx + 1;
     }
 
-    function dropContainer(e) {
-        e.preventDefault();
-        const raw = e.dataTransfer.getData("text/plain");
-        if (!raw) return;
-        const data = JSON.parse(raw);
-        
-        let rect = document.getElementById('visual-canvas').getBoundingClientRect();
-        let yPos = e.clientY - rect.top;
-        let canvasHeight = rect.height;
-        
-        let loc = 'table';
-        if (yPos < canvasHeight * 0.35) loc = 'shelfTop';
-        else if (yPos < canvasHeight * 0.65) loc = 'shelfBottom';
-        
-        let chemName = "";
-        let vol = 0;
-        if (confirm("Does this " + data.name + " contain a chemical initially?")) {
-            let options = chemicalList.map((c, i) => `${i + 1}: ${c.name}`).join("\\n");
-            let chemIdxRaw = prompt("Enter the number of the chemical:\\n\\n" + options);
-            if (chemIdxRaw !== null) {
-                let chemIdx = parseInt(chemIdxRaw) - 1;
-                if (chemicalList[chemIdx]) {
-                    chemName = chemicalList[chemIdx].name;
-                    let v = prompt(`Enter volume of ${chemName} in mL:`, "50");
-                    vol = parseFloat(v) || 0;
-                }
+    function getSceneApparatusOptions() {
+        // Updated selector to match new glassy nodes
+        const items = document.querySelectorAll('#visual-canvas > div[data-type]');
+        let options = '<option value="">-- Choose Vessel --</option>';
+        options += '<option value="burette_tube">BURETTE (Default)</option><option value="conical_flask">CONICAL FLASK (Default)</option>';
+        const seen = new Set();
+        items.forEach(node => {
+            const type = node.dataset.type;
+            if (!seen.has(type)) {
+                options += `<option value="${type}">${type.replace(/_/g, ' ').toUpperCase()}</option>`;
+                seen.add(type);
             }
-        }
-        
-        let node = document.createElement('div');
-        node.className = "badge badge-primary p-2 position-absolute shadow-sm text-center";
-        node.style.cursor = "pointer";
-        node.style.minWidth = "60px";
-        node.innerHTML = `<b>${data.name}</b>${chemName ? '<br><span class="badge badge-light text-dark mt-1">'+vol+'mL '+chemName+'</span>' : ''}`;
-        
-        let clampedX = Math.max(0, Math.min(e.clientX - rect.left - 40, rect.width - 80));
-        node.style.left = clampedX + "px";
-        
-        if (loc === 'shelfTop') node.style.top = "9%";
-        else if (loc === 'shelfBottom') node.style.top = "39%";
-        else node.style.top = "70%";
-        
-        node.dataset.loc = loc;
-        node.dataset.type = data.type;
-        node.dataset.chem = chemName;
-        node.dataset.vol = vol;
-        
-        node.title = "Click to remove";
-        node.onclick = () => {
-            if(confirm("Remove this " + data.name + "?")) node.remove();
-        };
-        
-        document.getElementById('visual-canvas').appendChild(node);
+        });
+        return options;
     }
 
-    // Hook form submission to build the JSON array from the canvas
-    document.querySelector('form').addEventListener('submit', function (e) {
-        const items = document.querySelectorAll('#visual-canvas .badge.position-absolute');
+    const BLUEPRINTS = {
+        simple: {
+            title: "Standardization of NaOH with Oxalic Acid",
+            objective: "To determine the exact normality of the given NaOH solution using a standard 0.1N oxalic acid solution.",
+            type: "TITRATION_SIMPLE",
+            v1: 20.0, v2: 0, v1_color: "#FFC0CB", v2_color: "#FFFFFF",
+            initial_state: [
+                { type: 'common_stand', location: 'table', x: 400 },
+                { type: 'burette_tube', location: 'table', x: 400, chem: 'NaOH', vol: 0 },
+                { type: 'conical_flask', location: 'table', x: 600, chem: 'Empty', vol: 0 },
+                { type: 'bottle', location: 'shelfBottom', x: 300, chem: 'NaOH', vol: 250 },
+                { type: 'bottle', location: 'shelfBottom', x: 450, chem: 'Oxalic Acid', vol: 250 }
+            ],
+            milestones: [
+                { id: "fill_burette", desc: "Fill Burette (NaOH)", pts: 10, instr: "Fill the burette with NaOH solution and adjust it to zero reading. Use the 'Drain' button if you overfill.", rules: [{ vessel: "burette", prop: "reading", op: "<=", val: 0.1 }] },
+                { id: "pipette_analyte", desc: "Pipette Oxalic Acid", pts: 15, instr: "Pipette exactly 20.0 mL of Oxalic Acid into the conical flask.", rules: [{ vessel: "conical_flask", prop: "capacity", op: ">=", val: 19.8 }] },
+                { id: "add_indicator", desc: "Add Indicator", pts: 10, instr: "Add 1-2 drops of Phenolphthalein indicator to the conical flask.", rules: [{ vessel: "conical_flask", prop: "Phenolphthalein", op: "==", val: 1 }] },
+                { id: "reach_v1", desc: "Titrate until Endpoint (Pink)", pts: 40, instr: "Titrate until the colorless oxalic acid solution turns a permanent pale pink. Record the V1 reading.", rules: [{ vessel: "conical_flask", prop: "pH", op: ">=", val: 8.3 }], observation_prompts: [{ title: "V1", description: "Burette reading at endpoint (V1):", tolerance: 0.2, target_vessel: "burette", target_property: "reading" }] },
+                { id: "submit_calc", desc: "Normality Calculation", pts: 25, instr: "Calculate Normality (N) using N1V1 = N2V2. (N1 = 0.1N, V1 = 20ml)", calculations: [{ title: "Normality (NaOH)", desc: " Normality in N", form: "(0.1 * 20) / V1" }] }
+            ]
+        },
+        double: {
+            title: "Estimation of Na2CO3 and NaHCO3 (Double Titration)",
+            objective: "To estimate the amounts of Sodium Carbonate and Sodium Bicarbonate in a given alkali mixture using standard HCl.",
+            type: "TITRATION_DOUBLE",
+            v1: 12.0, v2: 24.0, v1_color: "#FFC0CB", v2_color: "#FF4500",
+            initial_state: [
+                { type: 'common_stand', location: 'table', x: 400 },
+                { type: 'burette_tube', location: 'table', x: 400, chem: 'HCl', vol: 0 },
+                { type: 'conical_flask', location: 'table', x: 600, chem: 'Empty', vol: 0 },
+                { type: 'bottle', location: 'shelfBottom', x: 300, chem: 'HCl', vol: 250 },
+                { type: 'bottle', location: 'shelfBottom', x: 420, chem: 'Alkali Mixture', vol: 250 },
+                { type: 'bottle', location: 'shelfBottom', x: 540, chem: 'Phenolphthalein', vol: 50 },
+                { type: 'bottle', location: 'shelfBottom', x: 660, chem: 'Methyl Orange', vol: 50 }
+            ],
+            milestones: [
+                { id: "prepare_burette", desc: "Fill Burette (HCl)", pts: 10, instr: "Fill burette with standard 0.1N HCl and ensure zero mark zero reading.", rules: [{ vessel: "burette", prop: "reading", op: "<=", val: 0.1 }] },
+                { id: "pipette_mixture", desc: "Pipette Alkali Mixture", pts: 10, instr: "Pipette 20mL of the Alkali Mixture into the conical flask.", rules: [{ vessel: "conical_flask", prop: "capacity", op: ">=", val: 19.8 }] },
+                { id: "setup_indicator_1", desc: "Setup Indicator (Phenolphthalein)", pts: 10, instr: "Add Phenolphthalein to the mixture. (Pink color indicates presence of CO3^2-)", rules: [{ vessel: "conical_flask", prop: "Phenolphthalein", op: "==", val: 1 }] },
+                { id: "endpoint_1", desc: "Phenolphthalein Endpoint (V1)", pts: 20, instr: "Titrate until pink disappears (CO3^2- to HCO3^-). Record V1.", rules: [{ vessel: "conical_flask", prop: "pH", op: "<=", val: 8.3 }], observation_prompts: [{ title: "V1", description: "Burette Reading 1 (V1):", tolerance: 0.2, target_vessel: "burette", target_property: "reading" }] },
+                { id: "setup_indicator_2", desc: "Methyl Orange Indicator", pts: 10, instr: "Add 1-2 drops of Methyl Orange into the same flask. (Color turns yellow)", rules: [{ vessel: "conical_flask", prop: "Methyl Orange", op: "==", val: 1 }] },
+                { id: "endpoint_2", desc: "Methyl Orange Endpoint (V2)", pts: 20, instr: "Continue titration until yellow turns orange/red (V2). Record total volume V2.", rules: [{ vessel: "conical_flask", prop: "pH", op: "<=", val: 4.0 }], observation_prompts: [{ title: "V2", description: "Total Burette Reading (V2):", tolerance: 0.2, target_vessel: "burette", target_property: "reading" }] },
+                { id: "calc_carbonate", desc: "Analyze Results", pts: 20, instr: "Calculate mass of Na2CO3 and NaHCO3. (V1 = half Na2CO3, V2-2V1 = NaHCO3)", calculations: [{ title: "Mass Na2CO3 (g)", desc: "Mass calc", form: "V1 * 2 * 0.053" }, { title: "Mass NaHCO3 (g)", desc: "Mass calc", form: "(V2 - (2 * V1)) * 0.084" }] }
+            ]
+        }
+    };
+
+    function applyPreset() {
+        const pKey = document.getElementById('preset-selector').value;
+        if (!pKey || !BLUEPRINTS[pKey]) return;
+        if (!confirm("Clear current progress and apply blueprint?")) return;
+
+        const bp = BLUEPRINTS[pKey];
+
+        // 1. Basic Info
+        document.querySelector('[name="title"]').value = bp.title;
+        document.querySelector('[name="objective"]').value = bp.objective;
+        document.querySelector('[name="type"]').value = bp.type;
+
+        // 2. Scene
+        document.getElementById('visual-canvas').innerHTML = '';
+        bp.initial_state.forEach(item => renderCanvasNode(item.type, item.location, item.chem, item.vol, item.x));
+
+        // 3. Targets
+        document.querySelector('[name="target_v1_min"]').value = bp.v1;
+        document.querySelector('[name="target_v2_min"]').value = bp.v2;
+        document.querySelector('[name="target_v1_color"]').value = bp.v1_color;
+        document.querySelector('[name="target_v2_color"]').value = bp.v2_color;
+
+        // 4. Milestones
+        const container = document.getElementById('milestones-container');
+        container.innerHTML = '';
+        milestoneCount = 0;
+
+        bp.milestones.forEach(ms => {
+            addMilestone();
+            const idx = milestoneCount - 1;
+            document.querySelector(`[name="milestone-id-${idx}"]`).value = ms.id;
+            document.querySelector(`[name="milestone-desc-${idx}"]`).value = ms.desc;
+            document.querySelector(`[name="milestone-pts-${idx}"]`).value = ms.pts;
+            document.querySelector(`[name="milestone-instruction-${idx}"]`).value = ms.instr;
+
+            // Injected Rules
+            if (ms.rules) ms.rules.forEach(r => addBlueprintRule(idx, r));
+            if (ms.observations) ms.observations.forEach(o => addBlueprintObs(idx, o));
+            if (ms.calculations) ms.calculations.forEach(c => addBlueprintCalc(idx, c));
+        });
+
+        // Trigger material sync
+        syncMaterialsFromScene();
+    }
+
+    function addBlueprintRule(mIdx, r) {
+        addRule(mIdx);
+        const rIdx = document.getElementById(`rule-count-${mIdx}`).value - 1;
+        document.querySelector(`[name="rule-vessel-${mIdx}-${rIdx}"]`).value = r.vessel;
+        document.querySelector(`[name="rule-prop-${mIdx}-${rIdx}"]`).value = r.prop;
+        document.querySelector(`[name="rule-op-${mIdx}-${rIdx}"]`).value = r.op;
+        document.querySelector(`[name="rule-val-${mIdx}-${rIdx}"]`).value = r.val;
+    }
+
+    function addBlueprintObs(mIdx, o) {
+        addObservationPrompt(mIdx);
+        const oIdx = document.getElementById(`obs-count-${mIdx}`).value - 1;
+        document.querySelector(`[name="obs-title-${mIdx}-${oIdx}"]`).value = o.title;
+        document.querySelector(`[name="obs-desc-${mIdx}-${oIdx}"]`).value = o.description;
+        document.querySelector(`[name="obs-vessel-${mIdx}-${oIdx}"]`).value = o.target_vessel;
+        document.querySelector(`[name="obs-prop-${mIdx}-${oIdx}"]`).value = o.target_property;
+    }
+
+    function addBlueprintCalc(mIdx, c) {
+        addCalculationPrompt(mIdx);
+        const cIdx = document.getElementById(`calc-count-${mIdx}`).value - 1;
+        document.querySelector(`[name="calc-title-${mIdx}-${cIdx}"]`).value = c.title;
+        document.querySelector(`[name="calc-desc-${mIdx}-${cIdx}"]`).value = c.desc || "";
+        document.querySelector(`[name="calc-form-${mIdx}-${cIdx}"]`).value = c.form;
+    }
+
+    function clearForm() {
+        if (!confirm("Are you sure you want to clear the entire form?")) return;
+        
+        // Clear inputs
+        document.querySelector('[name="title"]').value = '';
+        document.querySelector('[name="objective"]').value = '';
+        
+        // Clear Canvas
+        document.getElementById('visual-canvas').innerHTML = '';
+        
+        // Clear Materials
+        document.getElementById('materials-container').innerHTML = `
+            <div class="material-row form-inline mb-2">
+                <input type="text" class="form-control mr-2" style="width: 80%;" name="material-0" placeholder="e.g., 250ml Beaker">
+            </div>
+        `;
+        materialCount = 1;
+
+        // Clear Steps
+        document.getElementById('steps-container').innerHTML = `
+            <div class="step-row mb-2">
+                <div class="input-group">
+                    <div class="input-group-prepend"><span class="input-group-text step-label">Step 1</span></div>
+                    <input type="text" class="form-control" name="step-0" placeholder="Describe this step...">
+                </div>
+            </div>
+        `;
+        stepCount = 1;
+
+        // Clear Milestones
+        document.getElementById('milestones-container').innerHTML = '';
+        milestoneCount = 0;
+
+        // Reset Targets
+        document.querySelector('[name="target_v1_min"]').value = '10.0';
+        document.querySelector('[name="target_v2_min"]').value = '0.0';
+    }
+
+    function testExperiment() {
+        const items = document.querySelectorAll('#visual-canvas > div[data-type]');
         let stateArray = [];
         items.forEach(node => {
             let itemData = { type: node.dataset.type, location: node.dataset.loc };
             if (node.dataset.chem) {
-                let volumeParsed = parseFloat(node.dataset.vol);
-                itemData.initialContents = {
-                    type: node.dataset.chem,
-                    volume: isNaN(volumeParsed) ? 0 : volumeParsed
-                };
+                itemData.initialContents = { type: node.dataset.chem, volume: parseFloat(node.dataset.vol) || 0 };
             }
             stateArray.push(itemData);
         });
-        document.getElementById('initial_state_json_input').value = JSON.stringify(stateArray);
+
+        const milestones = [];
+        document.querySelectorAll('.milestone-row').forEach(row => {
+            const mIdx = row.querySelector('[name^="milestone-id-"]').name.split('-')[2];
+            
+            // Scrape Rules
+            const rules = [];
+            row.querySelectorAll('.rule-row').forEach(rRow => {
+                const rIdx = rRow.querySelector('[name^="rule-vessel-"]').name.split('-')[3];
+                rules.push({
+                    target_vessel: rRow.querySelector(`[name="rule-vessel-${mIdx}-${rIdx}"]`).value,
+                    target_property: rRow.querySelector(`[name="rule-prop-${mIdx}-${rIdx}"]`).value,
+                    operator: rRow.querySelector(`[name="rule-op-${mIdx}-${rIdx}"]`).value,
+                    value: parseFloat(rRow.querySelector(`[name="rule-val-${mIdx}-${rIdx}"]`).value) || 0
+                });
+            });
+
+            // Scrape Observations
+            const observations = [];
+            row.querySelectorAll('.obs-row').forEach(oRow => {
+                const oIdx = oRow.querySelector('[name^="obs-title-"]').name.split('-')[3];
+                observations.push({
+                    title: oRow.querySelector(`[name="obs-title-${mIdx}-${oIdx}"]`).value,
+                    description: oRow.querySelector(`[name="obs-desc-${mIdx}-${oIdx}"]`).value,
+                    target_vessel: oRow.querySelector(`[name="obs-vessel-${mIdx}-${oIdx}"]`).value,
+                    target_property: oRow.querySelector(`[name="obs-prop-${mIdx}-${oIdx}"]`).value,
+                    tolerance: parseFloat(oRow.querySelector(`[name="obs-tol-${mIdx}-${oIdx}"]`).value) || 0.2,
+                    penalty_points: parseFloat(oRow.querySelector(`[name="obs-penalty-${mIdx}-${oIdx}"]`).value) || 10
+                });
+            });
+
+            // Scrape Calculations
+            const calculations = [];
+            row.querySelectorAll('.calc-row').forEach(cRow => {
+                const cIdx = cRow.querySelector('[name^="calc-title-"]').name.split('-')[3];
+                calculations.push({
+                    title: cRow.querySelector(`[name="calc-title-${mIdx}-${cIdx}"]`).value,
+                    description: cRow.querySelector(`[name="calc-desc-${mIdx}-${cIdx}"]`).value || "",
+                    formula: cRow.querySelector(`[name="calc-form-${mIdx}-${cIdx}"]`).value,
+                    tolerance: parseFloat(cRow.querySelector(`[name="calc-tol-${mIdx}-${cIdx}"]`).value) || 0.05,
+                    points: parseFloat(cRow.querySelector(`[name="calc-pts-${mIdx}-${cIdx}"]`).value) || 15
+                });
+            });
+
+            milestones.push({
+                id: row.querySelector(`[name="milestone-id-${mIdx}"]`).value,
+                desc: row.querySelector(`[name="milestone-desc-${mIdx}"]`).value,
+                instruction: row.querySelector(`[name="milestone-instruction-${mIdx}"]`).value,
+                points: parseFloat(row.querySelector(`[name="milestone-pts-${mIdx}"]`).value) || 10,
+                rules: rules,
+                observation_prompts: observations,
+                calculation_prompts: calculations
+            });
+        });
+
+        const config = {
+            name: document.querySelector('[name="title"]').value || "Test Run",
+            initial_state: stateArray,
+            milestones: milestones,
+            targets: {
+                v1: parseFloat(document.querySelector('[name="target_v1_min"]').value) || 12.0,
+                v2: parseFloat(document.querySelector('[name="target_v2_min"]').value) || 24.0,
+                v1_color: document.querySelector('[name="target_v1_color"]').value,
+                v2_color: document.querySelector('[name="target_v2_color"]').value
+            },
+            type: document.querySelector('[name="type"]').value
+        };
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/hod/test_experiment_view/';
+        form.target = '_blank';
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'config_json';
+        input.value = JSON.stringify(config);
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+    }
+
+    const apparatusList = JSON.parse(document.getElementById('apparatus-data').textContent).map(app => ({
+        "id": app.id || 0,
+        "name": app.name,
+        "type": app.type
+    }));
+
+    const chemicalList = JSON.parse(document.getElementById('chemicals-data').textContent).map(chem => ({
+        "id": chem.id || 0,
+        "name": chem.name
+    }));
+
+    const categoryMap = {
+        "TITRATION": ["burette_tube", "common_stand", "conical_flask", "funnel"],
+        "VOLUMETRIC": ["beaker", "pipette", "volumetric_flask", "bottle", "wash_bottle"],
+        "HEATING & TOOLS": ["hotplate", "bunsen_burner", "condenser", "crucible"],
+        "INSTRUMENTS": ["analytical_balance", "pH_meter", "meltingpoint_apparatus"],
+        "OTHER": ["separatory_funnel", "TLC_plate"]
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const lib = document.getElementById('library-items');
+        lib.innerHTML = '';
+        
+        Object.entries(categoryMap).forEach(([cat, types]) => {
+            let catDiv = document.createElement('div');
+            catDiv.className = "mb-3";
+            catDiv.innerHTML = `<h6 class="text-uppercase small font-weight-bold text-muted border-bottom pb-1 mb-2"> <i class="fas fa-layer-group mr-1"></i> ${cat}</h6>`;
+            let grid = document.createElement('div');
+            grid.className = "d-flex flex-wrap";
+            
+            types.forEach(type => {
+                const a = apparatusList.find(i => i.type === type);
+                if (!a) return;
+                
+                let div = document.createElement('div');
+                div.draggable = true;
+                div.className = "btn btn-sm m-1 px-2 py-1 shadow-sm glass-button";
+                div.style.cssText = "background: rgba(255,255,255,0.1); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 11px; white-space: nowrap;";
+                div.innerHTML = `<i class="fas fa-flask mr-1" style="opacity: 0.7;"></i> ${a.name}`;
+                div.dataset.type = a.type;
+                div.ondragstart = (e) => e.dataTransfer.setData("text/plain", JSON.stringify({ type: a.type }));
+                grid.appendChild(div);
+            });
+            catDiv.appendChild(grid);
+            lib.appendChild(catDiv);
+        });
     });
+
+    function allowDrop(e) { e.preventDefault(); }
+
+    function dropContainer(e) {
+        e.preventDefault();
+        const canvas = document.getElementById('visual-canvas');
+        const rect = canvas.getBoundingClientRect();
+        const xPos = Math.max(0, e.clientX - rect.left - 40);
+        const yRatio = (e.clientY - rect.top) / rect.height;
+
+        // Better alignment with new-lab-bg-1.png
+        let loc = 'table';
+        if (yRatio < 0.25) loc = 'shelfTop';
+        else if (yRatio < 0.55) loc = 'shelfBottom';
+
+        const movedId = e.dataTransfer.getData("movedId");
+        if (movedId) {
+            const node = document.getElementById(movedId);
+            node.dataset.loc = loc;
+            node.style.left = xPos + "px";
+            node.style.top = (loc === 'shelfTop' ? "12%" : (loc === 'shelfBottom' ? "38%" : "72%"));
+            node.style.zIndex = (loc === 'table' ? 10 : 5);
+            // Re-render internal label for location sync if needed
+            const labelDiv = node.querySelector('div > div:first-child');
+            if (labelDiv) labelDiv.innerText = node.dataset.type;
+            return;
+        }
+
+        const dataStr = e.dataTransfer.getData("text/plain");
+        if (!dataStr) return;
+        const data = JSON.parse(dataStr);
+        window.pendingDrop = { type: data.type, loc: loc, x: xPos };
+        $('#chemModal').modal('show');
+    }
+
+    function confirmChemAdd() {
+        const chem = document.getElementById('modalChemSelect').value;
+        const vol = parseFloat(document.getElementById('modalChemVol').value) || 0;
+        renderCanvasNode(window.pendingDrop.type, window.pendingDrop.loc, chem, vol, window.pendingDrop.x);
+        $('#chemModal').modal('hide');
+    }
+
+    function skipChemAdd() {
+        renderCanvasNode(window.pendingDrop.type, window.pendingDrop.loc, "", 0, window.pendingDrop.x);
+        $('#chemModal').modal('hide');
+    }
+
+    function renderCanvasNode(type, loc, chem, vol, x) {
+        let node = document.createElement('div');
+        node.id = "node-" + Math.random().toString(36).substr(2, 9);
+        node.draggable = true;
+        node.className = "position-absolute text-center app-node";
+        node.style.left = (x || 50) + "px";
+        node.style.width = "80px";
+        node.style.top = (loc === 'shelfTop' ? "12%" : (loc === 'shelfBottom' ? "38%" : "72%"));
+        node.style.cursor = "move";
+        node.style.zIndex = (loc === 'table' ? 10 : 5);
+        
+        node.innerHTML = `
+            <div style="background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; padding: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); color: white; transition: transform 0.2s;">
+                <i class="fas fa-flask" style="font-size: 1.2rem; display: block; margin-bottom: 3px; color: #81d4fa;"></i>
+                <div style="font-size: 10px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${type}</div>
+                ${chem ? '<div style="font-size: 9px; opacity: 0.9;">'+vol+'ml '+chem+'</div>' : ''}
+            </div>
+            <div class="badge badge-danger p-0 rounded-circle position-absolute" style="top: -5px; right: -5px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer;" onclick="event.stopPropagation(); this.parentElement.remove();">&times;</div>
+        `;
+        
+        node.dataset.type = type; node.dataset.loc = loc; node.dataset.chem = chem; node.dataset.vol = vol;
+        node.ondragstart = (e) => {
+            e.dataTransfer.setData("movedId", node.id);
+            e.dataTransfer.effectAllowed = "move";
+        };
+        document.getElementById('visual-canvas').appendChild(node);
+    }
+
+    function syncMaterialsFromScene() {
+        const container = document.getElementById('materials-container');
+        container.innerHTML = '';
+        materialCount = 0;
+        const seen = new Set();
+        document.querySelectorAll('#visual-canvas > div[data-type]').forEach(n => {
+            [n.dataset.type, n.dataset.chem].forEach(v => {
+                if(v && !seen.has(v)) {
+                    seen.add(v);
+                    addMaterial();
+                    document.querySelector(`[name="material-${materialCount-1}"]`).value = v;
+                }
+            });
+        });
+    }
+
+    // Form submission sync: scrape canvas state into JSON
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', () => {
+            const state = [];
+            document.querySelectorAll('#visual-canvas > div[data-type]').forEach(n => {
+                state.push({ 
+                    type: n.dataset.type, 
+                    location: n.dataset.loc, 
+                    initialContents: n.dataset.chem ? { type: n.dataset.chem, volume: parseFloat(n.dataset.vol) || 0 } : null 
+                });
+            });
+            document.getElementById('initial_state_json_input').value = JSON.stringify(state);
+        });
+    }
 </script>
+
+<div class="modal fade" id="chemModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body">
+                <select id="modalChemSelect" class="form-control mb-2">
+                    <option value="">-- Empty --</option>
+                    {% for chem in chemicals_list %}<option value="{{ chem.name }}">{{ chem.name }}</option>{% endfor %}
+                </select>
+                <input type="number" id="modalChemVol" class="form-control" value="20">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="skipChemAdd()">Empty</button>
+                <button type="button" class="btn btn-primary" onclick="confirmChemAdd()">Add</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock content %}
