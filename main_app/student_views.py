@@ -1081,7 +1081,9 @@ def lab_experiment_simulation(request, slug):
             cfg = experiment_obj.target_config
             targets = {
                 "v1": round(random.uniform(cfg.v1_min, cfg.v1_max), 2),
-                "v2": round(random.uniform(cfg.v2_min, cfg.v2_max), 2)
+                "v1_color": cfg.v1_color,
+                "v2": round(random.uniform(cfg.v2_min, cfg.v2_max), 2),
+                "v2_color": cfg.v2_color,
             }
         else:
             # Fallback targets if no config is set

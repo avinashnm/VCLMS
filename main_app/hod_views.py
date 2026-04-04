@@ -48,13 +48,15 @@ def _parse_target_config_from_post(request):
 
     v1_min = _float_or("target_v1_min", 9.5)
     v1_max = _float_or("target_v1_max", 11.5)
+    v1_color = request.POST.get("target_v1_color", "#FF69B4A0")
     v2_min = _float_or("target_v2_min", 23.0)
     v2_max = _float_or("target_v2_max", 27.0)
+    v2_color = request.POST.get("target_v2_color", "#FFD700B4")
     if v1_min > v1_max:
         v1_min, v1_max = v1_max, v1_min
     if v2_min > v2_max:
         v2_min, v2_max = v2_max, v2_min
-    return v1_min, v1_max, v2_min, v2_max
+    return v1_min, v1_max, v1_color, v2_min, v2_max, v2_color
 
 
 def admin_home(request):
@@ -1449,13 +1451,15 @@ def add_experiment(request):
                             )
                 k += 1
                 
-            v1_min, v1_max, v2_min, v2_max = _parse_target_config_from_post(request)
+            v1_min, v1_max, v1_color, v2_min, v2_max, v2_color = _parse_target_config_from_post(request)
             ExperimentTargetConfig.objects.create(
                 experiment=experiment,
                 v1_min=v1_min,
                 v1_max=v1_max,
+                v1_color=v1_color,
                 v2_min=v2_min,
                 v2_max=v2_max,
+                v2_color=v2_color,
             )
             
             messages.success(request, "Experiment created successfully!")
@@ -1502,14 +1506,12 @@ def edit_experiment(request, experiment_id):
         experiment.initial_state_json = _parse_initial_state_json_from_post(request)
         experiment.save()
 
-        v1_min, v1_max, v2_min, v2_max = _parse_target_config_from_post(request)
+        v1_min, v1_max, v1_color, v2_min, v2_max, v2_color = _parse_target_config_from_post(request)
         ExperimentTargetConfig.objects.update_or_create(
             experiment=experiment,
             defaults={
-                "v1_min": v1_min,
-                "v1_max": v1_max,
-                "v2_min": v2_min,
-                "v2_max": v2_max,
+                "v1_min": v1_min, "v1_max": v1_max, "v1_color": v1_color,
+                "v2_min": v2_min, "v2_max": v2_max, "v2_color": v2_color
             },
         )
         

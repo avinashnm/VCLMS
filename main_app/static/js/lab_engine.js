@@ -179,12 +179,18 @@ class MarkingManager {
         if (val !== null && val.trim() !== "") {
           let userVal = parseFloat(val);
           let trueVal = 0;
-          let targetVessel = Object.values(vessels).find(v => v.type === p.target_vessel || (p.target_vessel === "burette" && (v.type === "burette" || (v.type === "burette_tube" && v.mountedTo))));
-          if (targetVessel) {
-             if (p.target_property === "reading") trueVal = targetVessel.capacity - targetVessel.targetVolume;
-             else if (p.target_property === "capacity") trueVal = targetVessel.targetVolume;
-             else if (targetVessel.contents && targetVessel.contents.chemicals && targetVessel.contents.chemicals[p.target_property]) {
-                trueVal = targetVessel.contents.chemicals[p.target_property].volume;
+          if (p.title.toLowerCase() === 'v1' && experimentData?.targets?.v1) {
+             trueVal = experimentData.targets.v1;
+          } else if (p.title.toLowerCase() === 'v2' && experimentData?.targets?.v2) {
+             trueVal = experimentData.targets.v2;
+          } else {
+             let targetVessel = Object.values(vessels).find(v => v.type === p.target_vessel || (p.target_vessel === "burette" && (v.type === "burette" || (v.type === "burette_tube" && v.mountedTo))));
+             if (targetVessel) {
+                if (p.target_property === "reading") trueVal = targetVessel.capacity - targetVessel.targetVolume;
+                else if (p.target_property === "capacity") trueVal = targetVessel.targetVolume;
+                else if (targetVessel.contents && targetVessel.contents.chemicals && targetVessel.contents.chemicals[p.target_property]) {
+                   trueVal = targetVessel.contents.chemicals[p.target_property].volume;
+                }
              }
           }
           if (abs(userVal - trueVal) > p.tolerance) {
@@ -749,8 +755,12 @@ function makeVessel(id, x, y, w, h, title, chem, vtype, vol, cap) {
     // ======================================================
     contents: {
       chemicals: {},       // e.g. {'HCl': { volume: 20.0, color: [255,0,0] } }
+      indicators: {},      // e.g. {'Phenolphthalein': 2} (drop count)
+      indicatorsAdded: [], // Sequence of unique indicators added [e.g. 'Phenolphthalein', 'Methyl Orange']
       isRinsed: false,
       isContaminated: false,
+      titrant_vol: 0,      // Tracking cumulative titrant added
+      mixture_vol: 0,      // Tracking initial analyte volume
       pH: 7.0,
       temperature: 25.0,
       solidMass: 0
@@ -767,39 +777,60 @@ function makeResponsiveVessel(id, type) {
 
 function getTitrationColor(v) {
   const c = v.contents;
-  const targetV1 = (typeof THEORETICAL_V1 !== 'undefined') ? THEORETICAL_V1 : 10.0;
-  const targetV2 = (typeof THEORETICAL_V2 !== 'undefined') ? THEORETICAL_V2 : 25.0;
+  // Use randomized targets from experimentData if available
+  const targetV1 = experimentData?.targets?.v1 || 10.0;
+  const targetV2 = experimentData?.targets?.v2 || 25.0;
+  
+  // Use custom colors from experimentData if available
+  const colV1 = hexToRgba(experimentData?.targets?.v1_color || "#FF69B4A0");
+  const colV2 = hexToRgba(experimentData?.targets?.v2_color || "#FFD700B4");
 
   if (c.mixture_vol < 0.5) return [200, 220, 255, 100];
 
   const type = experimentData?.type || 'simple_titration';
 
   if (type === 'double_indicator') {
-    const pp = c.indicators['Phenolphthalein'] || 0;
-    const mo = c.indicators['Methyl Orange'] || 0;
+    // Indicator-agnostic logic: relies on the order added
+    const ind1Name = c.indicatorsAdded[0];
+    const ind2Name = c.indicatorsAdded[1];
+    
+    const ind1Count = ind1Name ? (c.indicators[ind1Name] || 0) : 0;
+    const ind2Count = ind2Name ? (c.indicators[ind2Name] || 0) : 0;
 
-    if (pp > 0 && mo === 0) {
+    if (ind1Count > 0 && ind2Count === 0) {
       if (c.titrant_vol < targetV1) {
-        let intensity = map(c.titrant_vol, targetV1 - 1.5, targetV1, 220, 30, true);
-        return [255, 105, 180, intensity];
+        // Transition to colV1
+        let intensity = map(c.titrant_vol, targetV1 - 1.5, targetV1, colV1[3], 30, true);
+        return [colV1[0], colV1[1], colV1[2], intensity];
       } else {
-        return [245, 245, 255, 100];
+        return [245, 245, 255, 100]; // Colorless at first endpoint
       }
     }
-    if (mo > 0) {
-      if (c.titrant_vol < targetV2) return [255, 210, 0, 180];
-      else return [255, 80, 0, 220];
+    if (ind2Count > 0) {
+      if (c.titrant_vol < targetV2) return colV2; // Color of second indicator before endpoint
+      else return [255, 80, 0, 220]; // Changed color after second endpoint (Red/Orange)
     }
   } else {
     // Basic Acid-Base for other titrations
-    const indicator = Object.keys(c.indicators).find(k => c.indicators[k] > 0);
-    if (indicator) {
-      if (c.titrant_vol < targetV1) return [255, 200, 200, 180]; // Before endpoint
-      else return [200, 255, 200, 180]; // At passed endpoint
+    if (c.indicatorsAdded.length > 0) {
+      if (c.titrant_vol < targetV1) return colV1; // Before endpoint
+      else return [200, 255, 200, 180]; // At passed endpoint (Green)
     }
   }
 
   return [235, 215, 160, 160];
+}
+
+function hexToRgba(hex) {
+  hex = hex.replace('#', '');
+  let r = 255, g = 255, b = 255, a = 180;
+  if (hex.length >= 6) {
+    r = parseInt(hex.substring(0, 2), 16);
+    g = parseInt(hex.substring(2, 4), 16);
+    b = parseInt(hex.substring(4, 6), 16);
+    if (hex.length >= 8) a = parseInt(hex.substring(6, 8), 16);
+  }
+  return [r, g, b, a];
 }
 
 
@@ -2328,9 +2359,15 @@ function keyPressed() {
 
     if (target) {
       if (isDragging.isChemical) {
+        if (!target.contents.indicators) target.contents.indicators = {};
+        if (!target.contents.indicatorsAdded) target.contents.indicatorsAdded = [];
+        
         target.contents.indicators[isDragging.chemicalId] = (target.contents.indicators[isDragging.chemicalId] || 0) + 1;
+        if (!target.contents.indicatorsAdded.includes(isDragging.chemicalId)) {
+          target.contents.indicatorsAdded.push(isDragging.chemicalId);
+        }
         createParticles(isDragging.x, isDragging.y + 30, 2, 'drip');
-        console.log("SUCCESS: " + isDragging.chemicalId + " drops added to Brain. Count:", target.contents.indicators[isDragging.chemicalId]);
+        console.log("SUCCESS: " + isDragging.chemicalId + " drops added. Sequence:", target.contents.indicatorsAdded);
       }
     } else {
       console.log("HINT: Move bottle closer to the flask center to drop.");
@@ -2838,6 +2875,13 @@ function transferLiquid(source, target, transferVol) {
   
   source.targetVolume -= actualVol;
   target.targetVolume += actualVol;
+
+  // Titration Tracking Logic
+  if (source.type === 'burette' || (source.type === 'burette_tube' && source.mountedTo)) {
+    target.contents.titrant_vol = (target.contents.titrant_vol || 0) + actualVol;
+  } else if (source.type === 'pipette') {
+    target.contents.mixture_vol = (target.contents.mixture_vol || 0) + actualVol;
+  }
   
   // Mix visual identities
   if (!target.chemicalId) target.chemicalId = source.chemicalId || source.chem;

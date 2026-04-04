@@ -473,8 +473,10 @@ class ExperimentTargetConfig(models.Model):
     experiment = models.OneToOneField(LabExperiment, on_delete=models.CASCADE, related_name='target_config')
     v1_min = models.FloatField(default=9.5)
     v1_max = models.FloatField(default=11.5)
+    v1_color = models.CharField(max_length=9, default="#FF69B4A0", help_text="Flask color at V1")
     v2_min = models.FloatField(default=23.0)
     v2_max = models.FloatField(default=27.0)
+    v2_color = models.CharField(max_length=9, default="#FFD700B4", help_text="Flask color at V2")
 
     def __str__(self):
         return f"Targets for {self.experiment.title}"
