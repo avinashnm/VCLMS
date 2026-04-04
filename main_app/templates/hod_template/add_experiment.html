@@ -86,7 +86,7 @@
                                 <div class="step-row mb-2">
                                     <div class="input-group">
                                         <div class="input-group-prepend">
-                                            <span class="input-group-text">Step 1</span>
+                                            <span class="input-group-text step-label">Step 1</span>
                                         </div>
                                         <input type="text" class="form-control" name="step-0"
                                             placeholder="Describe this step...">
@@ -121,13 +121,34 @@
                                             </div>
                                             <div class="col-md-1"><span class="text-muted">pts</span></div>
                                         </div>
-                                        <div class="form-group mb-0">
+                                        <div class="form-group mb-2">
                                             <textarea class="form-control form-control-sm bg-light" rows="2"
                                                 name="milestone-instruction-0"
                                                 placeholder="💡 Lab Assistant instruction (optional) — e.g., 'From the catalog spawn the burette and HCl bottle. Drag HCl on top to fill, then use UP/DOWN arrow keys to pour.'"></textarea>
-                                            <small class="text-muted">Displayed as the step-by-step hint in the Lab
-                                                Assistant panel during simulation.</small>
+                                            <small class="text-muted">Displayed as the step-by-step hint in the Lab Assistant panel during simulation.</small>
                                         </div>
+
+                                        <!-- Rules Section -->
+                                        <div class="rules-container bg-light p-2 rounded" id="rules-container-0">
+                                            <h6 class="text-secondary mb-2"><i class="fas fa-code-branch"></i> Validation Rules (Optional)</h6>
+                                            <p class="small text-muted mb-2">Automate milestone completion by checking apparatus state.<br>
+                                            <b>Vessel</b>: "burette", "conical_flask", "beaker"<br>
+                                            <b>Property</b>: "reading" (burette), "volume" (total), or chemical name (e.g. "Hydrochloric Acid")</p>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="addRule(0)">+ Add Rule</button>
+                                        <input type="hidden" name="rule-count-0" id="rule-count-0" value="0">
+
+                                        <hr class="my-3 border-secondary">
+                                        <div class="prompts-container bg-light p-2 rounded" id="prompts-container-0">
+                                            <h6 class="text-info mb-2"><i class="fas fa-question-circle"></i> Assessment Prompts (Optional)</h6>
+                                            <small class="text-muted d-block mb-2">Configure dynamic popups asking students for math/values.</small>
+                                        </div>
+                                        <div class="d-flex mt-1">
+                                            <button type="button" class="btn btn-xs btn-outline-info mr-2" onclick="addObservationPrompt(0)">+ Add Observation</button>
+                                            <button type="button" class="btn btn-xs btn-outline-primary" onclick="addCalculationPrompt(0)">+ Add Calculation</button>
+                                        </div>
+                                        <input type="hidden" name="obs-count-0" id="obs-count-0" value="0">
+                                        <input type="hidden" name="calc-count-0" id="calc-count-0" value="0">
                                     </div>
                                 </div>
                             </div>
@@ -217,21 +238,28 @@
     function addStep() {
         const container = document.getElementById('steps-container');
         const count = stepCount++;
-        const displayNum = count + 1;
+        const displayNum = document.querySelectorAll('.step-row').length + 1;
         const html = `
             <div class="step-row mb-2">
                 <div class="input-group">
                     <div class="input-group-prepend">
-                        <span class="input-group-text">Step ${displayNum}</span>
+                        <span class="input-group-text step-label">Step ${displayNum}</span>
                     </div>
                     <input type="text" class="form-control" name="step-${count}" placeholder="Describe this step...">
                     <div class="input-group-append">
-                        <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.parentElement.parentElement.remove()">X</button>
+                        <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.parentElement.parentElement.remove(); updateStepLabels();">X</button>
                     </div>
                 </div>
             </div>
         `;
         container.insertAdjacentHTML('beforeend', html);
+    }
+
+    function updateStepLabels() {
+        const labels = document.querySelectorAll('.step-label');
+        labels.forEach((lbl, index) => {
+            lbl.innerText = `Step ${index + 1}`;
+        });
     }
 
     let milestoneCount = 1;
@@ -265,9 +293,11 @@
                     <!-- Rules Section -->
                     <div class="rules-container bg-light p-2 rounded" id="rules-container-${count}">
                         <h6 class="text-secondary mb-2"><i class="fas fa-code-branch"></i> Validation Rules (Optional)</h6>
-                        <!-- No default rules -->
+                        <p class="small text-muted mb-2">Automate milestone completion by checking apparatus state.<br>
+                        <b>Vessel</b>: "burette", "conical_flask", "beaker"<br>
+                        <b>Property</b>: "reading" (burette), "volume" (total), or chemical name (e.g. "Hydrochloric Acid")</p>
                     </div>
-                    <button type="button" class="btn btn-xs btn-outline-secondary mt-1" onclick="addRule(${count})">+ Add Rule</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="addRule(${count})">+ Add Rule</button>
                     <input type="hidden" name="rule-count-${count}" id="rule-count-${count}" value="0">
 
                     <hr class="my-3 border-secondary">
@@ -354,10 +384,10 @@
         const html = `
             <div class="rule-row form-row mb-1">
                 <div class="col-md-3">
-                    <input type="text" class="form-control form-control-sm" name="rule-vessel-${milestoneIndex}-${ruleIndex}" placeholder="Target Vessel">
+                    <input type="text" class="form-control form-control-sm" name="rule-vessel-${milestoneIndex}-${ruleIndex}" placeholder="Vessel (e.g. burette)">
                 </div>
                 <div class="col-md-3">
-                    <input type="text" class="form-control form-control-sm" name="rule-prop-${milestoneIndex}-${ruleIndex}" placeholder="Property">
+                    <input type="text" class="form-control form-control-sm" name="rule-prop-${milestoneIndex}-${ruleIndex}" placeholder="Prop (e.g. reading)">
                 </div>
                 <div class="col-md-2">
                     <select class="form-control form-control-sm" name="rule-op-${milestoneIndex}-${ruleIndex}">
@@ -440,7 +470,7 @@
                 let chemIdx = parseInt(chemIdxRaw) - 1;
                 if (chemicalList[chemIdx]) {
                     chemName = chemicalList[chemIdx].name;
-                    let v = prompt(\`Enter volume of \${chemName} in mL:\`, "50");
+                    let v = prompt(`Enter volume of ${chemName} in mL:`, "50");
                     vol = parseFloat(v) || 0;
                 }
             }

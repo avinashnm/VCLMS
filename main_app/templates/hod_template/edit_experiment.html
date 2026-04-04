@@ -180,12 +180,21 @@
                                             </div>
                                             {% endif %}
                                         </div>
+                                        <div class="form-group mb-2">
+                                            <textarea class="form-control form-control-sm bg-light" rows="2"
+                                                name="milestone-instruction-{{ forloop.counter0 }}"
+                                                placeholder="💡 Lab Assistant instruction (optional)">{{ ms.instruction|default:'' }}</textarea>
+                                            <small class="text-muted">Displayed as the step-by-step hint in the Lab Assistant panel during simulation.</small>
+                                        </div>
 
                                         <!-- Rules Section -->
                                         <div class="rules-container bg-light p-2 rounded"
                                             id="rules-container-{{ forloop.counter0 }}">
                                             <h6 class="text-secondary mb-2"><i class="fas fa-code-branch"></i>
                                                 Validation Rules (Optional)</h6>
+                                            <p class="small text-muted mb-2">Automate milestone completion by checking apparatus state.<br>
+                                            <b>Vessel</b>: "burette", "conical_flask", "beaker"<br>
+                                            <b>Property</b>: "reading" (burette), "volume" (total), or chemical name (e.g. "Hydrochloric Acid")</p>
 
                                             {% for rule in ms.rules.all %}
                                             <div class="rule-row form-row mb-1">
@@ -204,20 +213,13 @@
                                                     <!-- djlint:off -->
                                                     <select class="form-control form-control-sm"
                                                         name="rule-op-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}">
-                                                        <option value=">=" {% if rule.operator=='>=' %}selected{% endif
-                                                            %}>>=</option>
-                                                        <option value=">" {% if rule.operator=='>' %}selected{% endif
-                                                            %}>&gt;</option>
-                                                        <option value="<=" {% if rule.operator=='<=' %}selected{% endif
-                                                            %}>&lt;=</option>
-                                                        <option value="<" {% if rule.operator=='<' %}selected{% endif
-                                                            %}>&lt;</option>
-                                                        <option value="==" {% if rule.operator=='==' %}selected{% endif
-                                                            %}>==</option>
-                                                        <option value="!=" {% if rule.operator=='!=' %}selected{% endif
-                                                            %}>!=</option>
-                                                        <option value="CONTAINS" {% if rule.operator=='CONTAINS'
-                                                            %}selected{% endif %}>Contains</option>
+                                                        <option value=">=" {% if rule.operator == '>=' %}selected{% endif %}>>=</option>
+                                                        <option value=">" {% if rule.operator == '>' %}selected{% endif %}>&gt;</option>
+                                                        <option value="<=" {% if rule.operator == '<=' %}selected{% endif %}>&lt;=</option>
+                                                        <option value="<" {% if rule.operator == '<' %}selected{% endif %}>&lt;</option>
+                                                        <option value="==" {% if rule.operator == '==' %}selected{% endif %}>==</option>
+                                                        <option value="!=" {% if rule.operator == '!=' %}selected{% endif %}>!=</option>
+                                                        <option value="CONTAINS" {% if rule.operator == 'CONTAINS' %}selected{% endif %}>Contains</option>
                                                     </select>
                                                     <!-- djlint:on -->
                                                 </div>
@@ -234,10 +236,62 @@
                                             </div>
                                             {% endfor %}
                                         </div>
-                                        <button type="button" class="btn btn-xs btn-outline-secondary mt-1"
+                                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1 mb-2"
                                             onclick="addRule({{ forloop.counter0 }})">+ Add Rule</button>
                                         <input type="hidden" name="rule-count-{{ forloop.counter0 }}"
                                             id="rule-count-{{ forloop.counter0 }}" value="{{ ms.rules.count }}">
+
+                                        <hr class="my-3 border-secondary">
+                                        <div class="prompts-container bg-light p-2 rounded" id="prompts-container-{{ forloop.counter0 }}">
+                                            <h6 class="text-info mb-2"><i class="fas fa-question-circle"></i> Assessment Prompts (Optional)</h6>
+                                            {% for obs in ms.observation_prompts.all %}
+                                            <div class="obs-row card border-info mb-2 p-2 shadow-sm">
+                                                <div class="d-flex justify-content-between">
+                                                    <b class="text-info small">Observation Prompt</b>
+                                                    <button type="button" class="btn btn-sm text-danger py-0" onclick="this.parentElement.parentElement.remove()">X</button>
+                                                </div>
+                                                <div class="form-row mt-1">
+                                                    <div class="col-md-3">
+                                                        <input type="text" class="form-control form-control-sm" name="obs-title-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" value="{{ obs.title }}" placeholder="Var Name">
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <input type="text" class="form-control form-control-sm" name="obs-desc-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" value="{{ obs.description }}" placeholder="Question text">
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <input type="text" class="form-control form-control-sm" name="obs-vessel-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" value="{{ obs.target_vessel }}" placeholder="Target Vessel">
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <input type="text" class="form-control form-control-sm" name="obs-prop-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" value="{{ obs.target_property }}" placeholder="Prop">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                            {% for calc in ms.calculation_prompts.all %}
+                                            <div class="calc-row card border-primary mb-2 p-2 shadow-sm">
+                                                <div class="d-flex justify-content-between">
+                                                    <b class="text-primary small">Calculation Prompt</b>
+                                                    <button type="button" class="btn btn-sm text-danger py-0" onclick="this.parentElement.parentElement.remove()">X</button>
+                                                </div>
+                                                <div class="form-row mt-1">
+                                                    <div class="col-md-3">
+                                                        <input type="text" class="form-control form-control-sm" name="calc-title-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" value="{{ calc.title }}" placeholder="Var Name">
+                                                    </div>
+                                                    <div class="col-md-5">
+                                                        <input type="text" class="form-control form-control-sm" name="calc-desc-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" value="{{ calc.description }}" placeholder="Question text">
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <input type="text" class="form-control form-control-sm" name="calc-form-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" value="{{ calc.formula }}" placeholder="Formula">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="d-flex mt-1">
+                                            <button type="button" class="btn btn-xs btn-outline-info mr-2" onclick="addObservationPrompt({{ forloop.counter0 }})">+ Add Observation</button>
+                                            <button type="button" class="btn btn-xs btn-outline-primary" onclick="addCalculationPrompt({{ forloop.counter0 }})">+ Add Calculation</button>
+                                        </div>
+                                        <input type="hidden" name="obs-count-{{ forloop.counter0 }}" id="obs-count-{{ forloop.counter0 }}" value="{{ ms.observation_prompts.count }}">
+                                        <input type="hidden" name="calc-count-{{ forloop.counter0 }}" id="calc-count-{{ forloop.counter0 }}" value="{{ ms.calculation_prompts.count }}">
                                     </div>
                                 </div>
                                 {% empty %}
@@ -265,9 +319,21 @@
                                                 Validation Rules (Optional)</h6>
                                             <!-- No default rules -->
                                         </div>
-                                        <button type="button" class="btn btn-xs btn-outline-secondary mt-1"
+                                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1"
                                             onclick="addRule(0)">+ Add Rule</button>
                                         <input type="hidden" name="rule-count-0" id="rule-count-0" value="0">
+
+                                        <hr class="my-3 border-secondary">
+                                        <div class="prompts-container bg-light p-2 rounded" id="prompts-container-0">
+                                            <h6 class="text-info mb-2"><i class="fas fa-question-circle"></i> Assessment Prompts (Optional)</h6>
+                                            <small class="text-muted d-block mb-2">Configure dynamic popups asking students for math/values.</small>
+                                        </div>
+                                        <div class="d-flex mt-1">
+                                            <button type="button" class="btn btn-xs btn-outline-info mr-2" onclick="addObservationPrompt(0)">+ Add Observation</button>
+                                            <button type="button" class="btn btn-xs btn-outline-primary" onclick="addCalculationPrompt(0)">+ Add Calculation</button>
+                                        </div>
+                                        <input type="hidden" name="obs-count-0" id="obs-count-0" value="0">
+                                        <input type="hidden" name="calc-count-0" id="calc-count-0" value="0">
                                     </div>
                                 </div>
                                 {% endfor %}
@@ -406,13 +472,19 @@
                             <button type="button" class="btn btn-sm btn-outline-danger btn-block" onclick="this.parentElement.parentElement.parentElement.parentElement.remove()">X</button>
                         </div>
                     </div>
+                    <div class="form-group mb-2">
+                        <textarea class="form-control form-control-sm bg-light" rows="2"
+                            name="milestone-instruction-${count}"
+                            placeholder="💡 Lab Assistant instruction (optional)"></textarea>
+                        <small class="text-muted">Displayed as the step-by-step hint in the Lab Assistant panel during simulation.</small>
+                    </div>
                     
                     <!-- Rules Section -->
                     <div class="rules-container bg-light p-2 rounded" id="rules-container-${count}">
                         <h6 class="text-secondary mb-2"><i class="fas fa-code-branch"></i> Validation Rules (Optional)</h6>
                         <!-- No default rules -->
                     </div>
-                    <button type="button" class="btn btn-xs btn-outline-secondary mt-1" onclick="addRule(${count})">+ Add Rule</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="addRule(${count})">+ Add Rule</button>
                     <!-- Hidden input to track rule count for this milestone -->
                     <input type="hidden" name="rule-count-${count}" id="rule-count-${count}" value="0">
 
@@ -620,7 +692,7 @@
                 let chemIdx = parseInt(chemIdxRaw) - 1;
                 if (chemicalList[chemIdx]) {
                     chemName = chemicalList[chemIdx].name;
-                    let v = prompt(\`Enter volume of \${chemName} in mL:\`, "50");
+                    let v = prompt(`Enter volume of ${chemName} in mL:`, "50");
                     vol = parseFloat(v) || 0;
                 }
             }

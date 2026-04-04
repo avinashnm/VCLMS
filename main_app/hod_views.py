@@ -1345,7 +1345,11 @@ def add_experiment(request):
             while True:
                 mat_name = request.POST.get(f"material-{i}")
                 if mat_name is None:
-                    break
+                    # check a few more in case of gaps (deleted rows in UI)
+                    if not any(request.POST.get(f"material-{k}") for k in range(i, i+10)):
+                        break
+                    i += 1
+                    continue
                 if mat_name.strip():
                     ExperimentMaterial.objects.create(experiment=experiment, name=mat_name.strip())
                 i += 1
@@ -1357,7 +1361,10 @@ def add_experiment(request):
             while True:
                 step_desc = request.POST.get(f"step-{j}")
                 if step_desc is None:
-                    break
+                    if not any(request.POST.get(f"step-{k}") for k in range(j, j+10)):
+                        break
+                    j += 1
+                    continue
                 if step_desc.strip():
                     ExperimentStep.objects.create(experiment=experiment, step_number=step_num, description=step_desc.strip())
                     step_num += 1
@@ -1371,9 +1378,12 @@ def add_experiment(request):
                 m_pts = request.POST.get(f"milestone-pts-{k}")
                 
                 if m_id is None:
-                    break
+                    if not any(request.POST.get(f"milestone-id-{l}") for l in range(k, k+10)):
+                        break
+                    k += 1
+                    continue
                 if m_id.strip() and m_desc.strip():
-                    pts = int(m_pts) if m_pts and m_pts.isdigit() else 10
+                    pts = int(m_pts) if m_pts and str(m_pts).strip().isdigit() else 10
                     m_instruction = request.POST.get(f"milestone-instruction-{k}", "").strip()
                     milestone = ExperimentMilestone.objects.create(
                         experiment=experiment, 

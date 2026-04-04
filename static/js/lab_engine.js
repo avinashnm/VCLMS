@@ -124,12 +124,21 @@ class MarkingManager {
           let propValue = null;
           if (rule.target_property === "reading") { // Special case for burette reading
             propValue = targetVessel.capacity - targetVessel.targetVolume;
-          } else if (rule.target_property === "capacity") {
+          } else if (rule.target_property === "capacity" || rule.target_property === "volume") {
             propValue = targetVessel.targetVolume; // How much total liquid is inside
           } else if (targetVessel.contents && targetVessel.contents.chemicals) {
             // Universal Phase 5 Check: Search the liquid contents dictionary
-            let chemReference = targetVessel.contents.chemicals[rule.target_property];
-            propValue = chemReference ? chemReference.volume : 0;
+            // Improved: Check exact match then case-insensitive substring
+            let chemKey = Object.keys(targetVessel.contents.chemicals).find(k => 
+              k.toLowerCase() === rule.target_property.toLowerCase()
+            );
+            if (!chemKey) {
+                // Fallback: search if the rule property is contained in any chemical name
+                chemKey = Object.keys(targetVessel.contents.chemicals).find(k => 
+                  k.toLowerCase().includes(rule.target_property.toLowerCase())
+                );
+            }
+            propValue = chemKey ? targetVessel.contents.chemicals[chemKey].volume : 0;
           } else {
             propValue = 0;
           }
@@ -226,6 +235,14 @@ class MarkingManager {
       alert("All milestones complete! Committing final experiment results.");
       this.saveResults(); // Autonomous generic dispatch
     }
+  }
+
+  addPenalty(id, pts, msg) {
+    if (this.mistakesMade.has(id)) return; // Only penalize once for the same mistake type
+    this.mistakesMade.add(id);
+    sessionMarks = Math.max(0, sessionMarks - pts);
+    penalties.push(`-${pts} pts: ${msg}`);
+    console.warn("Penalty applied:", msg);
   }
 
   saveResults() {
