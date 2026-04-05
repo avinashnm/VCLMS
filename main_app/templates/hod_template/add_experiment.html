@@ -503,59 +503,119 @@
         return options;
     }
 
-    const BLUEPRINTS = {
-        simple: {
-            title: "Standardization of NaOH with Oxalic Acid",
-            objective: "To determine the exact normality of the given NaOH solution using a standard 0.1N oxalic acid solution.",
-            type: "TITRATION_SIMPLE",
-            v1: 20.0, v2: 0, v1_color: "#FFC0CB", v2_color: "#FFFFFF",
-            initial_state: [
-                { type: 'common_stand', location: 'table', x: 400 },
-                { type: 'burette_tube', location: 'table', x: 400, chem: 'NaOH', vol: 0 },
-                { type: 'conical_flask', location: 'table', x: 600, chem: 'Empty', vol: 0 },
-                { type: 'bottle', location: 'shelfBottom', x: 300, chem: 'NaOH', vol: 250 },
-                { type: 'bottle', location: 'shelfBottom', x: 450, chem: 'Oxalic Acid', vol: 250 }
-            ],
-            milestones: [
-                { id: "fill_burette", desc: "Fill Burette (NaOH)", pts: 10, instr: "Fill the burette with NaOH solution and adjust it to zero reading. Use the 'Drain' button if you overfill.", rules: [{ vessel: "burette", prop: "reading", op: "<=", val: 0.1 }] },
-                { id: "pipette_analyte", desc: "Pipette Oxalic Acid", pts: 15, instr: "Pipette exactly 20.0 mL of Oxalic Acid into the conical flask.", rules: [{ vessel: "conical_flask", prop: "capacity", op: ">=", val: 19.8 }] },
-                { id: "add_indicator", desc: "Add Indicator", pts: 10, instr: "Add 1-2 drops of Phenolphthalein indicator to the conical flask.", rules: [{ vessel: "conical_flask", prop: "Phenolphthalein", op: "==", val: 1 }] },
-                { id: "reach_v1", desc: "Titrate until Endpoint (Pink)", pts: 40, instr: "Titrate until the colorless oxalic acid solution turns a permanent pale pink. Record the V1 reading.", rules: [{ vessel: "conical_flask", prop: "pH", op: ">=", val: 8.3 }], observation_prompts: [{ title: "V1", description: "Burette reading at endpoint (V1):", tolerance: 0.2, target_vessel: "burette", target_property: "reading" }] },
-                { id: "submit_calc", desc: "Normality Calculation", pts: 25, instr: "Calculate Normality (N) using N1V1 = N2V2. (N1 = 0.1N, V1 = 20ml)", calculations: [{ title: "Normality (NaOH)", desc: " Normality in N", form: "(0.1 * 20) / V1" }] }
-            ]
-        },
-        double: {
-            title: "Estimation of Na2CO3 and NaHCO3 (Double Titration)",
-            objective: "To estimate the amounts of Sodium Carbonate and Sodium Bicarbonate in a given alkali mixture using standard HCl.",
-            type: "TITRATION_DOUBLE",
-            v1: 12.0, v2: 24.0, v1_color: "#FFC0CB", v2_color: "#FF4500",
-            initial_state: [
-                { type: 'common_stand', location: 'table', x: 400 },
-                { type: 'burette_tube', location: 'table', x: 400, chem: 'HCl', vol: 0 },
-                { type: 'conical_flask', location: 'table', x: 600, chem: 'Empty', vol: 0 },
-                { type: 'bottle', location: 'shelfBottom', x: 300, chem: 'HCl', vol: 250 },
-                { type: 'bottle', location: 'shelfBottom', x: 420, chem: 'Alkali Mixture', vol: 250 },
-                { type: 'bottle', location: 'shelfBottom', x: 540, chem: 'Phenolphthalein', vol: 50 },
-                { type: 'bottle', location: 'shelfBottom', x: 660, chem: 'Methyl Orange', vol: 50 }
-            ],
-            milestones: [
-                { id: "prepare_burette", desc: "Fill Burette (HCl)", pts: 10, instr: "Fill burette with standard 0.1N HCl and ensure zero mark zero reading.", rules: [{ vessel: "burette", prop: "reading", op: "<=", val: 0.1 }] },
-                { id: "pipette_mixture", desc: "Pipette Alkali Mixture", pts: 10, instr: "Pipette 20mL of the Alkali Mixture into the conical flask.", rules: [{ vessel: "conical_flask", prop: "capacity", op: ">=", val: 19.8 }] },
-                { id: "setup_indicator_1", desc: "Setup Indicator (Phenolphthalein)", pts: 10, instr: "Add Phenolphthalein to the mixture. (Pink color indicates presence of CO3^2-)", rules: [{ vessel: "conical_flask", prop: "Phenolphthalein", op: "==", val: 1 }] },
-                { id: "endpoint_1", desc: "Phenolphthalein Endpoint (V1)", pts: 20, instr: "Titrate until pink disappears (CO3^2- to HCO3^-). Record V1.", rules: [{ vessel: "conical_flask", prop: "pH", op: "<=", val: 8.3 }], observation_prompts: [{ title: "V1", description: "Burette Reading 1 (V1):", tolerance: 0.2, target_vessel: "burette", target_property: "reading" }] },
-                { id: "setup_indicator_2", desc: "Methyl Orange Indicator", pts: 10, instr: "Add 1-2 drops of Methyl Orange into the same flask. (Color turns yellow)", rules: [{ vessel: "conical_flask", prop: "Methyl Orange", op: "==", val: 1 }] },
-                { id: "endpoint_2", desc: "Methyl Orange Endpoint (V2)", pts: 20, instr: "Continue titration until yellow turns orange/red (V2). Record total volume V2.", rules: [{ vessel: "conical_flask", prop: "pH", op: "<=", val: 4.0 }], observation_prompts: [{ title: "V2", description: "Total Burette Reading (V2):", tolerance: 0.2, target_vessel: "burette", target_property: "reading" }] },
-                { id: "calc_carbonate", desc: "Analyze Results", pts: 20, instr: "Calculate mass of Na2CO3 and NaHCO3. (V1 = half Na2CO3, V2-2V1 = NaHCO3)", calculations: [{ title: "Mass Na2CO3 (g)", desc: "Mass calc", form: "V1 * 2 * 0.053" }, { title: "Mass NaHCO3 (g)", desc: "Mass calc", form: "(V2 - (2 * V1)) * 0.084" }] }
-            ]
+    function generateBlueprint(pKey, config) {
+        if (pKey === 'simple') {
+            return {
+                title: `Standardization of ${config.titrant} with ${config.analyte}`,
+                objective: `To determine the exact normality of the given ${config.titrant} solution using a standard 0.1N ${config.analyte} solution.`,
+                type: "simple_titration",
+                v1: 20.0, v2: 0, v1_color: "#FFC0CB", v2_color: "#FFFFFF",
+                initial_state: [
+                    { type: 'common_stand', location: 'table', x: 400 },
+                    { type: 'burette_tube', location: 'table', x: 400, chem: 'Empty', vol: 0 },
+                    { type: 'conical_flask', location: 'table', x: 600, chem: 'Empty', vol: 0 },
+                    { type: 'bottle', location: 'shelfBottom', x: 300, chem: config.titrant, vol: 250 },
+                    { type: 'bottle', location: 'shelfBottom', x: 450, chem: config.analyte, vol: 250 },
+                    { type: 'bottle', location: 'shelfBottom', x: 600, chem: config.ind1, vol: 50 },
+                    { type: 'funnel', location: 'shelfTop', x: 400 }
+                ],
+                milestones: [
+                    { id: "fill_burette", desc: `Fill Burette (${config.titrant})`, pts: 5, instr: `Fill the burette with ${config.titrant} solution using a funnel.`, rules: [{ vessel: "burette", prop: config.titrant, op: ">=", val: 45.0 }] },
+                    { id: "zero_burette", desc: "Zero the Burette", pts: 5, instr: "Adjust the stopcock (Press 'S') until the reading is exactly 0.00 mL.", rules: [{ vessel: "burette", prop: "reading", op: "<=", val: 0.05 }] },
+                    { id: "pipette_analyte", desc: `Pipette ${config.analyte}`, pts: 10, instr: `Pipette exactly 20.0 mL of ${config.analyte} into the conical flask.`, rules: [{ vessel: "conical_flask", prop: config.analyte, op: "==", val: 20.0 }] },
+                    { id: "add_indicator", desc: `Add Indicator (${config.ind1})`, pts: 10, instr: `Add 1-2 drops of ${config.ind1} to the flask.`, rules: [{ vessel: "conical_flask", prop: config.ind1, op: ">=", val: 1.0 }] },
+                    { id: "reach_v1", desc: "Titrate until Endpoint", pts: 40, instr: "Titrate cautiously until the color change is permanent. Record the reading.", rules: [{ vessel: "conical_flask", prop: "pH", op: ">=", val: 8.3 }], observations: [{ title: "V1", description: "Burette reading (V1):", target_vessel: "burette", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
+                    { id: "submit_calc", desc: "Calculate Normality", pts: 30, instr: "Use N1V1 = N2V2 to calculate the normality of the titrant.", calculations: [{ title: "Normality", desc: "Enter calculated normality:", form: "(0.1 * 20) / V1", tolerance: 0.01, points: 30 }] }
+                ]
+            };
+        } else if (pKey === 'double') {
+            return {
+                title: `Estimation of Carbonates (Warder's Method) using ${config.titrant}`,
+                objective: `To estimate the amounts of Sodium Carbonate and Sodium Bicarbonate in the given mixture using standard ${config.titrant}.`,
+                type: "double_indicator",
+                v1: 12.0, v2: 24.0, v1_color: "#FFC0CB", v2_color: "#FF4500",
+                initial_state: [
+                    { type: 'common_stand', location: 'table', x: 400 },
+                    { type: 'burette_tube', location: 'table', x: 400, chem: 'Empty', vol: 0 },
+                    { type: 'conical_flask', location: 'table', x: 600, chem: 'Empty', vol: 0 },
+                    { type: 'bottle', location: 'shelfBottom', x: 300, chem: config.titrant, vol: 250 },
+                    { type: 'bottle', location: 'shelfBottom', x: 420, chem: config.analyte, vol: 250 },
+                    { type: 'bottle', location: 'shelfBottom', x: 540, chem: config.ind1, vol: 50 },
+                    { type: 'bottle', location: 'shelfBottom', x: 660, chem: config.ind2, vol: 50 },
+                    { type: 'funnel', location: 'shelfTop', x: 400 }
+                ],
+                milestones: [
+                    { id: "fill_burette", desc: `Fill Burette (${config.titrant})`, pts: 5, instr: `Fill the burette with standard ${config.titrant} solution.`, rules: [{ vessel: "burette", prop: config.titrant, op: ">=", val: 45.0 }] },
+                    { id: "zero_burette", desc: "Zero the Burette", pts: 5, instr: "Carefully adjust the liquid level to the 0.00 mL mark.", rules: [{ vessel: "burette", prop: "reading", op: "<=", val: 0.05 }] },
+                    { id: "pipette_mixture", desc: `Pipette ${config.analyte}`, pts: 10, instr: `Pipette 20.0 mL of the ${config.analyte} mixture into the conical flask.`, rules: [{ vessel: "conical_flask", prop: config.analyte, op: "==", val: 20.0 }] },
+                    { id: "add_ind1", desc: `Add ${config.ind1}`, pts: 10, instr: `Add 1-2 drops of ${config.ind1} indicator to the flask.`, rules: [{ vessel: "conical_flask", prop: config.ind1, op: ">=", val: 1.0 }] },
+                    { id: "endpoint_1", desc: "Titrate to 1st Endpoint (V1)", pts: 20, instr: `Titrate until the pink color just disappears. Record V1.`, rules: [{ vessel: "conical_flask", prop: "pH", op: "<=", val: 8.3 }], observations: [{ title: "V1", description: "Burette Reading 1 (V1):", target_vessel: "burette", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
+                    { id: "add_ind2", desc: `Add ${config.ind2}`, pts: 10, instr: `Add 1-2 drops of ${config.ind2} to the same flask.`, rules: [{ vessel: "conical_flask", prop: config.ind2, op: ">=", val: 1.0 }] },
+                    { id: "endpoint_2", desc: "Titrate to 2nd Endpoint (V2)", pts: 20, instr: `Continue titration until the solution turns pale pink/orange. Record V2.`, rules: [{ vessel: "conical_flask", prop: "pH", op: "<=", val: 4.0 }], observations: [{ title: "V2", description: "Total Burette Reading (V2):", target_vessel: "burette", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
+                    { id: "calc_mass", desc: "Mass Calculation", pts: 20, instr: "Calculate the mass of carbonates in grams/liter.", calculations: [
+                        { title: "Na2CO3 Mass", desc: "Mass of Na2CO3 (g):", form: "V1 * 2 * 0.053 * 50", tolerance: 0.05, points: 10 },
+                        { title: "NaHCO3 Mass", desc: "Mass of NaHCO3 (g):", form: "(V2 - (2 * V1)) * 0.084 * 50", tolerance: 0.05, points: 10 }
+                    ]}
+                ]
+            };
         }
-    };
+        return null;
+    }
+
+
+    let pendingBlueprintKey = "";
+    
+    // Inject catalog data for dynamic indicator lookups
+    const chemicalsData = [
+        {% for chem in chemicals_list %}
+        { 
+          name: "{{ chem.name|escapejs }}", 
+          is_indicator: {{ chem.is_indicator|lower }}, 
+          low_ph_color: "{{ chem.low_ph_color|default:'#FFFFFF00' }}", 
+          high_ph_color: "{{ chem.high_ph_color|default:'#FFFFFF00' }}" 
+        },{% endfor %}
+    ];
 
     function applyPreset() {
         const pKey = document.getElementById('preset-selector').value;
-        if (!pKey || !BLUEPRINTS[pKey]) return;
-        if (!confirm("Clear current progress and apply blueprint?")) return;
+        if (!pKey) return;
+        pendingBlueprintKey = pKey;
+        $('#blueprintConfigModal').modal('show');
+    }
 
-        const bp = BLUEPRINTS[pKey];
+    function confirmBlueprintGenerate() {
+        const pKey = pendingBlueprintKey;
+        const config = {
+            titrant:     document.getElementById('bpTitrant').value,
+            analyte:     document.getElementById('bpAnalyte').value,
+            ind1:        document.getElementById('bpInd1').value,
+            ind2:        document.getElementById('bpInd2').value
+        };
+
+        if (!config.titrant || !config.analyte || !config.ind1) {
+            alert("Please select Titrant, Analyte, and at least Indicator 1.");
+            return;
+        }
+
+        $('#blueprintConfigModal').modal('hide');
+        if (!confirm("Clear current progress and explicitly apply this blueprint config?")) return;
+
+        const bp = generateBlueprint(pKey, config);
+        if (!bp) return;
+
+        // NEW: Dynamic Color Lookups
+        const chem1 = chemicalsData.find(c => c.name === config.ind1);
+        const chem2 = chemicalsData.find(c => c.name === config.ind2);
+        
+        if (chem1) {
+            // For simple/double titration, Ind 1 transition is the first milestone.
+            // Usually pink for PP (high_ph_color)
+            bp.v1_color = chem1.high_ph_color || bp.v1_color; 
+        }
+        if (chem2) {
+            // Ind 2 (MO) usually turns yellow->orange at V2 (low_ph_color)
+            bp.v2_color = chem2.low_ph_color || bp.v2_color;
+        }
 
         // 1. Basic Info
         document.querySelector('[name="title"]').value = bp.title;
@@ -585,7 +645,7 @@
             document.querySelector(`[name="milestone-pts-${idx}"]`).value = ms.pts;
             document.querySelector(`[name="milestone-instruction-${idx}"]`).value = ms.instr;
 
-            // Injected Rules
+            // Injected Rules - ensuring they use the selected chemicals as targets
             if (ms.rules) ms.rules.forEach(r => addBlueprintRule(idx, r));
             if (ms.observations) ms.observations.forEach(o => addBlueprintObs(idx, o));
             if (ms.calculations) ms.calculations.forEach(c => addBlueprintCalc(idx, c));
@@ -663,9 +723,16 @@
         const items = document.querySelectorAll('#visual-canvas > div[data-type]');
         let stateArray = [];
         items.forEach(node => {
-            let itemData = { type: node.dataset.type, location: node.dataset.loc };
+            let itemData = { 
+                type: node.dataset.type, 
+                location: node.dataset.loc,
+                x: parseInt(node.style.left) || 0
+            };
             if (node.dataset.chem) {
-                itemData.initialContents = { type: node.dataset.chem, volume: parseFloat(node.dataset.vol) || 0 };
+                itemData.initialContents = { 
+                    type: node.dataset.chem, 
+                    volume: parseFloat(node.dataset.vol) || 0 
+                };
             }
             stateArray.push(itemData);
         });
@@ -923,4 +990,51 @@
         </div>
     </div>
 </div>
+
+<!-- Blueprint Selection Modal -->
+<div class="modal fade" id="blueprintConfigModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">Configure Blueprint Chemicals</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Select the chemicals for this blueprint. The engine will dynamically generate all simulation verification rules locking students to these choices.</p>
+                
+                <div class="form-group">
+                    <label>Titrant (in Burette)</label>
+                    <select id="bpTitrant" class="form-control mb-2">
+                        {% for chem in chemicals_list %}<option value="{{ chem.name }}" {% if chem.name == 'Hydrochloric Acid (0.1N)' %}selected{% endif %}>{{ chem.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Analyte (in Flask)</label>
+                    <select id="bpAnalyte" class="form-control mb-2">
+                        {% for chem in chemicals_list %}<option value="{{ chem.name }}" {% if chem.name == 'Sodium Carbonate Mixture' %}selected{% endif %}>{{ chem.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Indicator 1 (V1 Endpoint)</label>
+                    <select id="bpInd1" class="form-control mb-2">
+                        <option value="">-- None --</option>
+                        {% for chem in chemicals_list %}{% if chem.is_indicator %}<option value="{{ chem.name }}" {% if 'Phenolphthalein' in chem.name %}selected{% endif %}>{{ chem.name }}</option>{% endif %}{% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Indicator 2 (V2 Endpoint)</label>
+                    <select id="bpInd2" class="form-control mb-2">
+                        <option value="">-- None (Simple Titration expects none) --</option>
+                        {% for chem in chemicals_list %}{% if chem.is_indicator %}<option value="{{ chem.name }}" {% if 'Methyl Orange' in chem.name %}selected{% endif %}>{{ chem.name }}</option>{% endif %}{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info font-weight-bold" onclick="confirmBlueprintGenerate()">Generate Template</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock content %}

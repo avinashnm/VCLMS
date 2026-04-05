@@ -82,6 +82,8 @@
   }
 </style>
 
+{{ config|json_script:"experiment-config-data" }}
+
 <div class="lab-root">
   <div class="lab-header">
     <h2 class="lab-title">🧪 {{ experiment.name }}</h2>
@@ -130,12 +132,12 @@
 
 <script>
 
-  // 1. Capture the rules from Django
-  const EXPERIMENT_CONFIG = JSON.parse('{{ config_json|safe }}');
+  // 1. Capture the rules from Django securely via the json_script tag
+  const EXPERIMENT_CONFIG = JSON.parse(document.getElementById('experiment-config-data').textContent);
 
   // 2. Set the theoretical targets in the global scope for the engine
-  const THEORETICAL_V1 = EXPERIMENT_CONFIG.targets.v1;
-  const THEORETICAL_V2 = EXPERIMENT_CONFIG.targets.v2;
+  const THEORETICAL_V1 = EXPERIMENT_CONFIG.targets?.v1 || 10.0;
+  const THEORETICAL_V2 = EXPERIMENT_CONFIG.targets?.v2 || 25.0;
 
   console.log("Lab Config Loaded. Target V1:", THEORETICAL_V1);
 </script>

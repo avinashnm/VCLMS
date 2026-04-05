@@ -1475,7 +1475,7 @@ def add_experiment(request):
                 {
                     "form": form,
                     "apparatus_list": list(ApparatusCatalog.objects.all().values('id', 'name', 'type')),
-                    "chemicals_list": list(ChemicalCatalog.objects.all().values('id', 'name')),
+                    "chemicals_list": list(ChemicalCatalog.objects.all().values('id', 'name', 'is_indicator', 'low_ph_color', 'high_ph_color')),
                 },
             )
             
@@ -1484,7 +1484,7 @@ def add_experiment(request):
         context = {
             "form": form,
             "apparatus_list": list(ApparatusCatalog.objects.all().values('id', 'name', 'type')),
-            "chemicals_list": list(ChemicalCatalog.objects.all().values('id', 'name'))
+            "chemicals_list": list(ChemicalCatalog.objects.all().values('id', 'name', 'is_indicator', 'low_ph_color', 'high_ph_color'))
         }
         return render(request, "hod_template/add_experiment.html", context)
 
@@ -1644,7 +1644,7 @@ def edit_experiment(request, experiment_id):
             'steps': experiment.steps.all().order_by('step_number'),
             'milestones': experiment.milestones.all(),
             'apparatus_list': list(ApparatusCatalog.objects.all().values('id', 'name', 'type')),
-            'chemicals_list': list(ChemicalCatalog.objects.all().values('id', 'name'))
+            'chemicals_list': list(ChemicalCatalog.objects.all().values('id', 'name', 'is_indicator', 'low_ph_color', 'high_ph_color'))
         }
         return render(request, "hod_template/edit_experiment.html", context)
 
@@ -1882,7 +1882,7 @@ def test_experiment_view(request):
     context = {
         "slug": "test-mode",
         "experiment": experiment_data,
-        "config_json": json.dumps(experiment_data),
+        "config": experiment_data,
         "page_title": f"TEST: {experiment_data['name']}",
         "is_test_mode": True
     }

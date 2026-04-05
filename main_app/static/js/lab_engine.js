@@ -38,7 +38,20 @@ const sizeMultiplier = 0.45; // Slightly reduced for better fit on shelves
 let labSurfaces = null;
 const BURETTE_GLASS_X_OFFSET = -8;
 // Initialize from Django (passed via template)
-const experimentData = typeof EXPERIMENT_CONFIG !== 'undefined' ? EXPERIMENT_CONFIG : null;
+// Try finding the global variable first, then fallback to the script tag (json_script)
+let experimentData = typeof EXPERIMENT_CONFIG !== 'undefined' ? EXPERIMENT_CONFIG : null;
+if (!experimentData) {
+  const configEl = document.getElementById('experiment-config-data');
+  if (configEl) {
+    try {
+      experimentData = JSON.parse(configEl.textContent);
+      console.log("Config loaded from script element.");
+    } catch (e) {
+      console.error("Failed to parse experiment-config-data element:", e);
+    }
+  }
+}
+
 const TARGET_V1 = experimentData?.targets?.v1 || 10.0;
 const TARGET_V2 = experimentData?.targets?.v2 || 25.0;
 
@@ -68,6 +81,7 @@ class MarkingManager {
     this.milestones = config?.milestones || [];
     this.completedIds = new Set();
     this.mistakesMade = new Set();
+    this.buretteProperlyZeroed = false;
 
     // Stored observations for the calculation phase
     this.recordedV1 = 0;
@@ -84,13 +98,17 @@ class MarkingManager {
     if (burette && (this.config?.type === 'double_indicator' || this.config?.type === 'simple_titration')) {
       let reading = abs(burette.capacity - burette.targetVolume);
 
+      if (reading <= 0.3) {
+        this.buretteProperlyZeroed = true;
+      }
+
       // Penalty: Titrating without Zeroing
       if (keyIsDown(32) && flask) {
         const snapX = burette.type === 'burette' ? (burette.x + BURETTE_GLASS_X_OFFSET) : burette.x;
         const dripTipY = burette.type === 'burette' ? (burette.y + 120) : (burette.y + burette.h * 0.4);
 
         if (dist(flask.x, flask.y, snapX, dripTipY) < 100) {
-          if (!this.completedIds.has("zero_burette") && reading > 0.3) {
+          if (!this.buretteProperlyZeroed && reading > 0.3) {
             this.addPenalty("no_zeroing", 15, "Titrating without zeroing the burette first.");
           }
         }
@@ -113,28 +131,37 @@ class MarkingManager {
     }
 
     // EVALUATE DYNAMIC RULES - SEQUENTIAL LOCK
-    // PHASE 6 FIX: Only evaluate the current step!
     let m = this.milestones[currentStepIndex];
     if (m && !this.completedIds.has(m.id)) {
       let allRulesPassed = true;
+      this.currentStepHint = ""; // Reset hint for current frame
+
       if (m.rules && m.rules.length > 0) {
         for (let rule of m.rules) {
-          let targetVessel = Object.values(vessels).find(v => v.type === rule.target_vessel || (rule.target_vessel === "burette" && (v.type === "burette" || (v.type === "burette_tube" && v.mountedTo))));
+          let targetVessel = Object.values(vessels).find(v => (v.type === rule.target_vessel || v.chem === rule.target_vessel) || (rule.target_vessel === "burette" && (v.type === "burette" || (v.type === "burette_tube" && v.mountedTo))));
           if (!targetVessel) {
             allRulesPassed = false;
+            this.currentStepHint = `Required apparatus (${rule.target_vessel}) not found.`;
             break;
           }
 
           // Extract the property value to check generically
           let propValue = null;
-          if (rule.target_property === "reading") { // Special case for burette reading
+          if (rule.target_property === "reading") { 
             propValue = targetVessel.capacity - targetVessel.targetVolume;
           } else if (rule.target_property === "capacity") {
-            propValue = targetVessel.targetVolume; // How much total liquid is inside
-          } else if (targetVessel.contents && targetVessel.contents.chemicals) {
-            // Universal Phase 5 Check: Search the liquid contents dictionary
-            let chemReference = targetVessel.contents.chemicals[rule.target_property];
-            propValue = chemReference ? chemReference.volume : 0;
+            propValue = targetVessel.targetVolume; 
+          } else if (rule.target_property === "pH") {
+            propValue = targetVessel.contents ? (targetVessel.contents.pH || 7.0) : 7.0;
+          } else if (targetVessel.contents) {
+            let chemReference = targetVessel.contents.chemicals ? targetVessel.contents.chemicals[rule.target_property] : null;
+            if (chemReference) {
+              propValue = chemReference.volume;
+            } else if (targetVessel.contents.indicators && targetVessel.contents.indicators[rule.target_property] !== undefined) {
+              propValue = targetVessel.contents.indicators[rule.target_property];
+            } else {
+              propValue = 0;
+            }
           } else {
             propValue = 0;
           }
@@ -146,23 +173,28 @@ class MarkingManager {
             case ">": rulePassed = (propValue > rule.value); break;
             case "<=": rulePassed = (propValue <= rule.value); break;
             case "<": rulePassed = (propValue < rule.value); break;
-            case "==": rulePassed = (propValue === rule.value); break;
-            case "!=": rulePassed = (propValue !== rule.value); break;
-            case "CONTAINS": rulePassed = (propValue > 0); break; // Contains any amount
+            case "==": rulePassed = (abs(propValue - rule.value) < 0.05); break;
+            case "!=": rulePassed = (abs(propValue - rule.value) > 0.05); break;
+            case "CONTAINS": rulePassed = (propValue > 0); break;
           }
 
           if (!rulePassed) {
-            console.log(`Rule FAILED: Vessel ${rule.target_vessel} ${rule.target_property} (${propValue}) ${rule.operator} ${rule.value}`);
             allRulesPassed = false;
+            if (propValue === 0 && (rule.operator === ">=" || rule.operator === "==" || rule.operator === "CONTAINS")) {
+                this.currentStepHint = `Missing chemical: ${rule.target_property} in ${rule.target_vessel}.`;
+            } else {
+                let opLabel = rule.operator === "==" ? "exactly" : (rule.operator === ">=" ? "at least" : rule.operator);
+                this.currentStepHint = `${rule.target_property} should be ${opLabel} ${rule.value}.`;
+            }
             break;
           }
         }
       } else {
-        // Milestone has no rules, meaning it relies on a specific manual interaction hook
-        allRulesPassed = false;
+        allRulesPassed = true;
       }
 
       if (allRulesPassed) {
+        this.currentStepHint = "";
         this.completeMilestone(m.id);
       }
     }
@@ -217,9 +249,12 @@ class MarkingManager {
                 parsedFormula = parsedFormula.replace(re, this.studentObservations[key]);
              }
           }
-          let trueVal = 0;
-          try { trueVal = eval(parsedFormula); } catch(e) { console.error("Formula eval failed:", e); }
-          if (abs(userVal - trueVal) > c.tolerance) {
+          let trueVal = NaN;
+          try { trueVal = eval(parsedFormula); } catch(e) { console.error("Formula eval failed due to missing/invalid variables:", e); }
+          
+          if (isNaN(trueVal)) {
+             console.error("Formula misconfigured by instructor. Skipping penalty for " + c.title);
+          } else if (abs(userVal - trueVal) > c.tolerance) {
              this.addPenalty(`calc_${c.title}`, c.points, `Incorrect calculation for ${c.title}. The correct derived value was roughly ${trueVal.toFixed(3)}.`);
           }
           this.studentCalculations = this.studentCalculations || {};
@@ -478,10 +513,17 @@ function spawnFromInitialState() {
     if (item.location === 'shelfTop') spawnSurface = labSurfaces.shelfTop;
     else if (item.location === 'shelfBottom') spawnSurface = labSurfaces.shelfBottom;
 
-    // 2. Calculate position on the chosen surface
-    const surfaceWidth = spawnSurface.maxX - spawnSurface.minX;
-    const spacing = surfaceWidth / (experimentData.initial_state.length + 1);
-    const targetX = spawnSurface.minX + spacing * (index + 1);
+    // 2. Calculate position
+    // NEW: Prioritize item.x if provided by the builder, otherwise auto-arrange
+    let targetX;
+    if (item.x !== undefined && item.x !== null) {
+      targetX = item.x;
+    } else {
+      const surfaceWidth = spawnSurface.maxX - spawnSurface.minX;
+      const spacing = surfaceWidth / (experimentData.initial_state.length + 1);
+      targetX = spawnSurface.minX + spacing * (index + 1);
+    }
+
     const size = currentPositions.sizes[type] || currentPositions.sizes.beaker;
     const targetY = spawnSurface.y - (size.h / 2) - 5;
     const pos = findCollisionFreePosition(targetX, targetY, type);
@@ -547,11 +589,20 @@ function spawnFromInitialState() {
       v.title = type.replace(/_/g, ' ');
     }
 
-    // 5. Fill with chemical if defined in initialContents
-    if (item.initialContents && item.initialContents.type) {
-      const chemName = item.initialContents.type;
-      const chemVol = item.initialContents.volume || 0;
+    // 5. Fill with chemical - Support both new nested (initialContents) and old flat (chem/vol) structure
+    let chemName = null;
+    let chemVol = 0;
 
+    if (item.initialContents && item.initialContents.type) {
+      chemName = item.initialContents.type;
+      chemVol = item.initialContents.volume || 0;
+    } else if (item.chem) {
+      // Fallback for flat structure
+      chemName = item.chem;
+      chemVol = item.vol || 0;
+    }
+
+    if (chemName) {
       // Look up color from the chemical catalog
       let chemColor = [200, 220, 255];
       if (chemicalCatalog && chemicalCatalog.chemicals) {
@@ -1920,7 +1971,9 @@ function drawDataPanel() {
   let currentTask = manager.milestones[currentStepIndex];
   if (currentTask) {
     fill(255, 230, 100); textSize(13);
-    text("CURRENT TASK:", panelX + 20, 115);
+    let totalSteps = manager.milestones.length;
+    let stepNum = currentStepIndex + 1;
+    text(`Step ${stepNum}/${totalSteps}: CURRENT TASK`, panelX + 20, 115);
 
     fill(255); textStyle(NORMAL);
     rect(panelX + 20, 125, panelW - 40, 60, 8);
@@ -1932,19 +1985,20 @@ function drawDataPanel() {
     rect(panelX + 20, 185, panelW - 40, 100, 8);
     fill(140, 220, 255); textAlign(LEFT, TOP); textSize(11);
 
-    let hints = {
-      "fill_burette": "From the catalog spawn the burette, funnel and the HCl. Fill the burette by dragging the HCl bottle on top of the burette and use UP/DOWN arrow keys to pour.",
-      "zero_burette": "Excess HCl is in the burette. Hold the 'S' key to open the stopcock and drain the liquid until the meniscus is exactly at 0.00.",
-      "pipette_mixture": "Spawn the Pipette and the 25% Mixture bottle. Suck 20mL from the amber bottle (SHIFT) and pour into the Conical Flask.",
-      "add_pp": "Spawn Phenolphthalein. Drag it over your flask and press the 'D' key twice to add 2 drops.",
-      "reach_v1": "Titrate until the pink color disappears. Then click the PINK button below to enter your reading.",
-      "add_mo": "Now add Methyl Orange indicator (D key). The solution will turn Yellow.",
-      "reach_v2": "Titrate until the yellow turns Red. Click the ORANGE button to enter your final reading.",
-      "submit_calc": "Titration complete! Click the GREEN button below. You must calculate the mass of Carbonate/Bicarbonate using your readings."
-    };
-    // Prefer DB-stored instruction, fallback to hardcoded hints, then generic
-    let hintText = currentTask.instruction || hints[currentTask.id] || "Follow the laboratory manual steps.";
+    // Completely dynamic UI relies only on admin configured instruction
+    let hintText = currentTask.instruction || "Follow the laboratory manual steps to complete this step.";
+    
+    // NEW: Inject rule failure hints if they exist
+    if (manager.currentStepHint) {
+        fill(255, 120, 120);
+        text("❌ " + manager.currentStepHint, panelX + 30, 245, panelW - 60);
+        fill(140, 220, 255);
+    }
+    
     text("💡 INSTRUCTION:\n" + hintText, panelX + 30, 195, panelW - 60);
+  } else if (manager.milestones.length > 0 && currentStepIndex >= manager.milestones.length) {
+    fill(100, 255, 100); textSize(13);
+    text("🎉 ALL STEPS COMPLETE", panelX + 20, 115);
   }
 
   // 5. Mistakes Log (Moved lower and limited to avoid overlap)
@@ -1959,10 +2013,8 @@ function drawDataPanel() {
       text(p, panelX + 20, 335 + (i * 18), panelW - 40);
     });
   }
-
-  // 6. Action Buttons are drawn by drawEndpointButtons at Y=500
-  
 }
+
 
 
 
@@ -2177,26 +2229,7 @@ function mousePressed() {
       }
     }
   }
-  const panelW = 280, margin = 20, btnX = width - panelW - margin + 20;
-  // We check Y=510 to 560 now to match the new DataPanel layout
-  if (mouseX > btnX && mouseX < btnX + (panelW - 40) && mouseY > 510 && mouseY < 560) {
-    if (manager.config?.type === 'double_indicator') {
-      if (idIsDone("add_pp") && !idIsDone("reach_v1")) {
-        manager.openV1Input();
-      } else if (idIsDone("add_mo") && !idIsDone("reach_v2")) {
-        manager.openV2Input();
-      } else if (idIsDone("reach_v2") && !idIsDone("submit_calc")) {
-        manager.openCalculationModal();
-      }
-    } else if (manager.config?.type === 'simple_titration') {
-      if (idIsDone("add_indicator") && !idIsDone("reach_v1")) {
-        manager.openV1Input();
-      } else if (idIsDone("reach_v1") && !idIsDone("submit_calc")) {
-        manager.openCalculationModal();
-      }
-    }
-    return;
-  }
+
   Object.values(vessels).forEach(v => {
     if (v.type === 'balance') {
       // Check if mouse is over the "TARE" button area (bottom right of the control panel)

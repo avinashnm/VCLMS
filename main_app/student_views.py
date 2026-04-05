@@ -1150,7 +1150,7 @@ def lab_experiment_simulation(request, slug):
     context = {
         "slug": slug,
         "experiment": experiment_data,
-        "config_json": json.dumps(experiment_data),
+        "config": experiment_data,
         "page_title": "Simulation: " + experiment_data['name']
     }
     return render(request, "student_template/lab_simulation.html", context)
