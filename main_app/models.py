@@ -465,6 +465,9 @@ class ExperimentMilestone(models.Model):
     description = models.CharField(max_length=200)
     instruction = models.TextField(blank=True, null=True, help_text="Shown in the Lab Assistant panel as guidance to the student for completing this step.")
     points = models.IntegerField(default=10)
+    
+    # NEW: Link to Reaction Builder for automated color triggers
+    linked_reaction = models.ForeignKey('ChemicalReaction', on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
         return f"{self.milestone_id} ({self.experiment.title})"

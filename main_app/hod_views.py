@@ -1484,7 +1484,8 @@ def add_experiment(request):
         context = {
             "form": form,
             "apparatus_list": list(ApparatusCatalog.objects.all().values('id', 'name', 'type')),
-            "chemicals_list": list(ChemicalCatalog.objects.all().values('id', 'name', 'is_indicator', 'low_ph_color', 'high_ph_color'))
+            "chemicals_list": list(ChemicalCatalog.objects.all().values('id', 'name', 'is_indicator', 'low_ph_color', 'high_ph_color')),
+            "reaction_list": list(ChemicalReaction.objects.all().values('id', 'chemical_a__name', 'chemical_b__name', 'product__name'))
         }
         return render(request, "hod_template/add_experiment.html", context)
 
@@ -1545,14 +1546,24 @@ def edit_experiment(request, experiment_id):
             m_pts = request.POST.get(f"milestone-pts-{m_idx}")
             
             if m_id and m_id.strip() and m_desc and m_desc.strip():
+                m_reaction_id = request.POST.get(f"milestone-reaction-{m_idx}")
                 pts = int(m_pts) if m_pts and str(m_pts).strip().isdigit() else 10
                 m_instruction = request.POST.get(f"milestone-instruction-{m_idx}", "").strip()
+                
+                linked_rxn = None
+                if m_reaction_id:
+                    try:
+                        linked_rxn = ChemicalReaction.objects.get(id=m_reaction_id)
+                    except ChemicalReaction.DoesNotExist:
+                        pass
+
                 milestone = ExperimentMilestone.objects.create(
                     experiment=experiment, 
                     milestone_id=m_id.strip(), 
                     description=m_desc.strip(),
                     instruction=m_instruction or None,
-                    points=pts
+                    points=pts,
+                    linked_reaction=linked_rxn
                 )
                 
                 # Process Rules for this specific milestone
@@ -1644,7 +1655,8 @@ def edit_experiment(request, experiment_id):
             'steps': experiment.steps.all().order_by('step_number'),
             'milestones': experiment.milestones.all(),
             'apparatus_list': list(ApparatusCatalog.objects.all().values('id', 'name', 'type')),
-            'chemicals_list': list(ChemicalCatalog.objects.all().values('id', 'name', 'is_indicator', 'low_ph_color', 'high_ph_color'))
+            'chemicals_list': list(ChemicalCatalog.objects.all().values('id', 'name', 'is_indicator', 'low_ph_color', 'high_ph_color')),
+            'reaction_list': list(ChemicalReaction.objects.all().values('id', 'chemical_a__name', 'chemical_b__name', 'product__name'))
         }
         return render(request, "hod_template/edit_experiment.html", context)
 
@@ -1851,9 +1863,15 @@ def test_experiment_view(request):
     
     reactions_list = [
         {
-            "id": r.id, "chemical_a": r.chemical_a.id, "chemical_b": r.chemical_b.id,
+            "id": r.id, 
+            "chemical_a": r.chemical_a.id, 
+            "chemical_a_label": r.chemical_a.name,
+            "chemical_b": r.chemical_b.id,
+            "chemical_b_label": r.chemical_b.name,
             "product": r.product.id if r.product else None,
-            "reaction_color_hex": r.reaction_color_hex, "ph_change": r.ph_change
+            "product_label": r.product.name if r.product else None,
+            "reaction_color_hex": r.reaction_color_hex, 
+            "ph_change": r.ph_change
         } for r in ChemicalReaction.objects.all()
     ]
     

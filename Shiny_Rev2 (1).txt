@@ -1,0 +1,775 @@
+1 INTRODUCTION
+1.1 Project Overview
+		Brain tumor diagnosis is a critical and time-sensitive task in the medical field, where early detection plays a vital role in improving patient survival and treatment outcomes. Magnetic Resonance Imaging (MRI) is widely used for brain imaging due to its high contrast and detailed visualization of brain tissues. However, analyzing MRI scans manually requires expert radiologists and is often time-consuming, subjective, and prone to human error, especially when identifying small tumor regions such as Enhancing Tumor (ET).
+In addition, brain tumor detection requires precise identification of different tumor regions such as Edema, Tumor Core, and Enhancing Tumor. These regions vary in size, shape, and intensity, making manual detection difficult. Advanced AI-based segmentation techniques help improve accuracy and consistency.
+Brain tumors are among the most complex and life-threatening diseases affecting the human brain. The detection of tumor regions at an early stage is crucial for improving treatment planning and patient survival rates. However, due to the irregular structure of tumors and variations in MRI intensity levels, manual detection becomes highly challenging.
+Artificial Intelligence (AI) plays a major role in transforming healthcare by enabling automated diagnosis and reducing human dependency. Deep learning models can learn complex patterns from MRI images and provide highly accurate segmentation results. This project utilizes such advanced techniques to enhance medical imaging analysis.
+The integration of artificial intelligence with healthcare systems enhances diagnostic accuracy and enables faster decision-making. This project bridges the gap between medical imaging and digital healthcare management.
+1.2 Existing System
+		In the existing healthcare environment, brain tumor diagnosis is primarily performed through manual analysis of MRI scans by radiologists. This process relies heavily on the experience and expertise of medical professionals and often requires significant time for careful examination of each scan. Due to the complexity of brain structures, small tumor regions—especially Enhancing Tumor (ET)—can be overlooked or misclassified.
+Most Manual analysis is also subject to variability, where different radiologists may interpret the same MRI scan differently, leading to inconsistencies in diagnosis. The process becomes even more challenging when dealing with large volumes of MRI data, increasing the chances of fatigue-related errors and delayed reporting. As a result, timely diagnosis and treatment planning may be affected.
+Most hospitals operate using separate systems for diagnosis, appointment scheduling, and report management. There is no automated segmentation or objective accuracy measurement, such as Dice Score, to validate tumor detection results. Reports are often generated manually, increasing the chances of inconsistency, duplication, and delay in delivering results to patients.
+		
+       
+      Furthermore, patients do not have direct access to tumor reports or real-time appointment updates, and doctors must manage records across multiple platforms. This lack of integration results in reduced efficiency, delayed diagnosis, and increased workload for medical staff. Communication gaps between patients and doctors further reduce the effectiveness of healthcare services.
+     Another major limitation of the existing system is the absence of advanced technologies such as artificial intelligence and deep learning for automated tumor detection. Without these technologies, identifying complex tumor patterns and subtle variations in MRI images becomes extremely difficult. The lack of centralized data storage also makes it difficult to maintain patient history and track treatment progress over time.
+     Overall, the existing system is time-consuming, error-prone, and lacks automation and integration, highlighting the need for an intelligent, automated, and centralized solution for brain tumor detection and healthcare management.
+
+1.3 Proposed System
+		 The proposed system introduces an automated and intelligent brain tumor detection framework integrated within a Doctor–Patient–Admin portal. The portal allows patients to upload MRI scans, book appointments, view tumor detection results, and download detailed medical reports. Doctors can review segmentation outputs, manage appointments, and provide health recommendations, while administrators oversee users, data, and system operations.
+         The system is designed to provide a user-friendly interface that enables easy interaction for patients, doctors, and administrators. Patients can access their medical reports and track their health status in real time, while doctors can efficiently analyze tumor detection results and provide appropriate treatment suggestions. The admin module ensures proper management of system data, user accounts, and overall workflow.
+        The tumor detection module employs deep learning techniques, including CNN for feature extraction, U-Net for segmentation, and Attention U-Net for improved focus on critical tumor regions such as Enhancing Tumor (ET). The system performs pixel-wise multiclass segmentation, identifying Edema, Tumor Core, and Enhancing Tumor accurately.
+        Advanced preprocessing techniques such as normalization, resizing, and slice selection are applied to MRI images before feeding them into the model. These steps improve the quality of input data and enhance the accuracy of predictions. The Attention U-Net model further improves performance by concentrating on relevant tumor regions and reducing background noise, making it highly effective for detecting small and complex tumor structures.
+      By combining AI-driven diagnosis with a centralized medical portal, the system ensures faster diagnosis, improved accuracy, reduced manual workload, and an efficient healthcare workflow. The system also enables automatic report generation, real-time data access, and seamless communication between patients and doctors.
+      Furthermore, the proposed system is scalable and can be extended to support cloud-based deployment, mobile applications, and integration with hospital management systems. This makes it a flexible and future-ready solution for modern healthcare environments. Overall, the system provides a reliable, efficient, and intelligent approach to brain tumor detection, significantly improving diagnostic accuracy and patient care.
+1.4 System Configuration
+1.4.1 Hardware Configuration
+ * RAM: Minimum 8 GB 
+ * Storage: 256 GB
+ * Processor: Intel i3 or above
+ * Hard Disk: 512 GB or above
+ * System Type: 64-bit architecture
+1.4.2 Software Configuration
+* Front-End: HTML, CSS, JavaScript
+* Back-End: PHP
+* Database: MySQL
+* Web Framework:WAMP Server
+* OpenCV, MediaPipe, MobileNetV2 CNN Model
+* Tools Used: Visual Studio Code
+     
+     
+
+2 BACKGROUND STUDY
+2.1 Brain Tumor Diagnosis and Hospital Management Systems
+      Brain tumor diagnosis is a complex and time-sensitive medical process that plays a crucial role in determining patient treatment and survival outcomes. Magnetic Resonance Imaging (MRI) is the primary imaging technique used for brain tumor diagnosis due to its ability to provide detailed visualization of brain tissues. In most hospitals, MRI scans are analyzed manually by radiologists, who identify tumor regions based on experience and visual interpretation.Along with diagnosis, hospitals also manage patient records, medical reports, appointments, and follow-ups using separate systems or partially manual processes. Diagnosis, report handling, and appointment scheduling are often disconnected, leading to inefficiencies in healthcare delivery. The absence of a unified system makes it difficult for patients to track their medical progress and for doctors to manage diagnostic results and appointments effectively.
+
+2.2 Automated Tumor Detection and Deep Learning-Based Analysis
+  Recent advancements in artificial intelligence have introduced automated approaches for medical image analysis, particularly in brain tumor detection. Deep learning models such as Convolutional Neural Networks (CNNs) are capable of learning complex features from MRI scans and identifying tumor patterns without manual feature extraction. These models reduce dependency on human interpretation and improve consistency in diagnosis.
+		More advanced architectures like U-Net and Attention U-Net have been specifically designed for biomedical image segmentation. U-Net performs pixel-wise segmentation, allowing precise identification of tumor regions such as edema, tumor core, and enhancing tumor. Attention U-Net further improves segmentation accuracy by focusing on relevant tumor regions and suppressing background noise, which is especially useful for detecting small but critical regions like Enhancing Tumor (ET). These automated techniques significantly enhance diagnostic accuracy and reduce analysis time compared to traditional manual methods.
+
+		Despite advancements in deep learning-based tumor detection, many existing systems focus only on image analysis and lack integration with real-world hospital workflows. Conventional hospital systems suffer from fragmented data storage, absence of centralized dashboards, and limited automation in report generation and appointment management. Tumor detection results are often handled separately from patient portals, leading to communication gaps between patients, doctors, and administrators. There is a growing need for an integrated medical system that combines automated tumor detection with a Doctor–Patient–Admin portal. Such a system enables centralized data management, role-based access control, real-time report generation, appointment scheduling, and health recommendations within a single platform. An integrated solution improves healthcare efficiency, enhances transparency, reduces workload for medical professionals, and ensures timely diagnosis and treatment planning for patients.
+      
+       
+2.3 Limitations of Conventional Systems and Need for Integrated Medical Portals
+
+      The proposed system is designed to integrate an AI-based brain tumor detection model with a centralized Doctor–Patient portal. The system supports three user roles—Patient, Doctor, and Admin—each with specific access privileges. The main objective of the design is to provide automated tumor detection, efficient report generation, and streamlined healthcare workflow through a single platform.
+      The portal architecture follows a modular approach. Patients can upload MRI scans, view tumor detection results, download reports, and book appointments. Doctors can access patient data, review AI-generated segmentation results, manage appointments, and provide health tips. The Admin module oversees user management, appointment monitoring, and system maintenance. Role-based access control ensures data security and privacy.
+      The tumor detection system uses deep learning models such as CNN, U-Net, and Attention U-Net. MRI scans are preprocessed through normalization, resizing, and slice selection before being passed to the segmentation models. U-Net performs pixel-wise segmentation, while Attention U-Net improves accuracy by focusing on relevant tumor regions, especially the Enhancing Tumor.
+
+2.4 Evaluation Metrics for Tumor Segmentation
+  Evaluation metrics play a crucial role in assessing the performance of deep learning models used for brain tumor segmentation. These metrics help in determining how accurately the predicted tumor regions match the actual ground truth provided in the dataset. One of the most important metrics used in medical image segmentation is the Dice Score, which measures the overlap between the predicted segmentation and the ground truth. A Dice Score value closer to 1 indicates a high level of similarity and better segmentation performance, while a value closer to 0 indicates poor overlap. In addition to Dice Score, accuracy is also used to evaluate the overall correctness of the model’s predictions. However, in the case of medical image segmentation, accuracy alone may not be sufficient, as it does not consider the imbalance between tumor and non-tumor regions. Therefore, metrics such as precision and recall are also considered. Precision measures the proportion of correctly predicted tumor pixels out of all predicted tumor pixels, while recall measures the proportion of actual tumor pixels that are correctly identified by the model. These metrics provide a more detailed understanding of model performance and help in identifying strengths and weaknesses in segmentation. By using these evaluation techniques, the system ensures reliable, consistent, and clinically meaningful results, which are essential for accurate diagnosis and effective treatment planning in brain tumor detection systems.
+
+
+3 SYSTEM DESIGN
+      All data, including user details, MRI information, segmentation results, All     All data, including user details, MRI information, segmentation results, reports, and appointments, are stored in a centralized database. Secure integration between the portal and AI models enables automatic processing, report generation, and result visualization. Overall, the system design ensures accuracy, security, and efficient medical workflow management.
+3.1 System Architecture
+          The system architecture is designed using a multi-layer approach to ensure proper organization, scalability, and efficient communication between system components. Each layer performs a specific function, contributing to the overall performance and reliability of the system
+
+            Fig. 3.1 System Architecture
+3.2 Workflow of The Proposed System
+        The workflow of the proposed system describes the step-by-step process from MRI image upload to tumor detection and report generation. The system ensures a smooth and automated process, enabling efficient interaction between patients, doctors, and administrators.
+
+            Fig. 3.2 Workflow of the proposed system
+4 DATABASE DESIGN
+		The database design for the Brain Tumor Detection and Doctor–Patient Portal is structured to efficiently manage user authentication, medical data, MRI scans, tumor reports, appointments, and health tips. MySQL is used as the backend database due to its reliability, scalability, and suitability for web-based healthcare applications.The database follows a relational model, where the Users table acts as the core entity. Other tables such as Patients, Doctors, MRI Scans, Tumor Reports, Appointments, and Health Tips are linked using primary and foreign keys. This design ensures data integrity, secure access, and efficient retrieval of medical records, while supporting smooth interaction between patients, doctors, and administrators.
+4.1 Users Table
+Stores user registration details such as User ID, Name, Role, and Password for authentication and login management.       Table. 4.1 Users Table
+4.2 Doctors Table
+The Doctors table stores doctor-related details including doctor ID, specialization, contact information, and user credentials 
+Table. 4.2 Doctors Table
+4.3 Patients Table
+The Patients table maintains patient-specific information such as patient ID, personal details, contact information, and linked user ID.                                          Table. 4.3 Patient Table
+4.4 Tumor Report Table
+The Doctors table stores doctor-related details including doctor ID, specialization, contact information, and user credentials 
+Table. 4.4 Tumor Report Table
+
+
+
+
+4.5 Appointments Table
+                                         Table. 4.5 Appointments Table
+4.6 Health Tips Table
+
+Table. 4.6 Health Tips Table
+	5 MODULE DESIGN
+5.1 Authentication Module
+      The Authentication Module manages secure registration and login for Patients, Doctors, and Admin users. It verifies credentials using encrypted passwords stored in the MySQL database.
+      Role-based access control ensures that:
+* Patients access only their medical records
+* Doctors access assigned patient data
+* Admin manages system operations
+      This module protects sensitive medical information and ensures secure access to the portal.
+      
+5.2 Patient Module
+      The The Patient Module allows users to interact with the tumor detection system through a user-friendly web interface.
+      Patients can:
+* Register and login securely
+* Upload MRI brain scans
+* View AI-generated tumor segmentation results
+* Download detailed PDF reports
+* Book appointments with doctors
+* View health tips and recommendations
+* Track appointment status
+      This module connects patients directly with the AI detection system and medical professionals.
+5.3 AI Tumor Detection Module
+       The AI Tumor Detection Module is the core intelligence of the system. It processes uploaded MRI scans using deep learning models to detect and segment brain tumors.It includes:
+* MRI preprocessing (normalization, slice selection, resizing)
+* CNN-based feature extraction
+* U-Net for segmentation
+* Attention U-Net for improved Enhancing Tumor (ET) detection
+* Multiclass segmentation (Edema, Tumor Core, Enhancing Tumor)
+      This module performs pixel-wise classification and generates accurate tumor segmentation outputs.
+      
+5.4 Report Generation Module
+      The Report Generation Module automatically creates structured medical reports based on AI predictions.The report includes:
+* Patient details
+* MRI image
+* Segmented tumor output
+* Tumor type (Edema / Tumor Core / ET)
+* Dice score and accuracy metrics
+* Doctor recommendations
+      Reports are generated in PDF format using Python libraries and stored in the database for future reference.
+      
+5.5 Doctor Module
+      The Doctor Module enables medical professionals to monitor and manage patient cases.Doctors can:
+* Login securely
+* View patient appointments
+* Accept or reject appointment requests
+* View tumor segmentation results
+* Add treatment recommendations
+* Provide and update health tips
+      This module bridges AI-based diagnosis with clinical decision-making.
+      
+5.6 Admin Module
+
+      The Admin Module controls overall system management and monitoring.
+      Admin functionalities include:
+* Managing patient and doctor accounts
+* Monitoring MRI uploads and tumor reports
+* Managing appointment statuses
+* Adding or updating health tips
+* Ensuring system data integrity
+      This module ensures centralized control and smooth workflow management.
+      
+5.7 Database & Security Module
+
+      The Database Module stores all system data securely using MySQL.
+      It maintains:
+* User authentication data
+* MRI scan details
+* Tumor detection results
+* Appointment records
+* Health tips and reports
+      Data relationships are maintained using primary and foreign keys to ensure consistency and integrity.
+
+6 CODING
+
+6.1 Backend Coding
+6.1.1 Training.py
+*import os
+import cv2
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.layers import *
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+from sklearn.model_selection import train_test_split
+==============================
+PATHS (VERY IMPORTANT)
+==============================
+IMAGE_PATH = r"C:\wamp64\www\BrainTumorDetectionNew\brain_tumor_data\images"
+MASK_PATH = r"C:\wamp64\www\BrainTumorDetectionNew\brain_tumor_data\masks"
+==============================
+LOAD DATA
+==============================
+images = []
+masks = []
+files = sorted(os.listdir(IMAGE_PATH))
+for file in files:
+img_path = os.path.join(IMAGE_PATH, file)
+mask_path = os.path.join(MASK_PATH, file.replace("img", "mask"))
+if not os.path.exists(mask_path):
+continue
+img = cv2.imread(img_path, 0)
+mask = cv2.imread(mask_path, 0)
+if img is None or mask is None:
+continue
+img = cv2.resize(img, (128,128))
+mask = cv2.resize(mask, (128,128))
+img = img / 255.0
+mask = mask / 255.0
+images.append(img)
+masks.append(mask)
+X = np.array(images, dtype=np.float32)
+Y = np.array(masks, dtype=np.float32)
+X = np.expand_dims(X, -1)
+Y = np.expand_dims(Y, -1)
+print("Dataset shape:", X.shape)
+==============================
+SPLIT
+==============================
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.1)
+==============================
+ATTENTION BLOCK
+==============================
+def attention_gate(x, g, filters):
+theta_x = Conv2D(filters, 1, padding='same')(x)
+phi_g = Conv2D(filters, 1, padding='same')(g)
+add = Add()([theta_x, phi_g])
+act = Activation('relu')(add)
+psi = Conv2D(1, 1, padding='same')(act)
+psi = Activation('sigmoid')(psi)
+return Multiply()([x, psi])
+==============================
+MODEL
+==============================
+def build_model():
+inputs = Input((128,128,1))
+c1 = Conv2D(32,3,activation='relu',padding='same')(inputs)
+c1 = Conv2D(32,3,activation='relu',padding='same')(c1)
+p1 = MaxPooling2D()(c1)
+c2 = Conv2D(64,3,activation='relu',padding='same')(p1)
+c2 = Conv2D(64,3,activation='relu',padding='same')(c2)
+p2 = MaxPooling2D()(c2)
+c3 = Conv2D(128,3,activation='relu',padding='same')(p2)
+c3 = Conv2D(128,3,activation='relu',padding='same')(c3)
+u1 = UpSampling2D()(c3)
+att1 = attention_gate(c2, u1, 64)
+u1 = Concatenate()([u1, att1])
+c4 = Conv2D(64,3,activation='relu',padding='same')(u1)
+u2 = UpSampling2D()(c4)
+att2 = attention_gate(c1, u2, 32)
+u2 = Concatenate()([u2, att2])
+c5 = Conv2D(32,3,activation='relu',padding='same')(u2)
+output = Conv2D(1,1,activation='sigmoid')(c5)
+return Model(inputs, output)
+model = build_model()
+==============================
+LOSS (FIXED)
+==============================
+def dice_loss(y_true, y_pred):
+y_true = tf.cast(y_true, tf.float32)
+smooth = 1e-6
+intersection = tf.reduce_sum(y_true * y_pred)
+return 1 - (2. * intersection + smooth) / ( tf.reduce_sum(y_true) + tf.reduce_sum(y_pred) + smooth )
+model.compile(optimizer=Adam(1e-4), loss=dice_loss, metrics=['accuracy'])
+model.summary()
+==============================
+model.fit( X_train, Y_train, validation_data=(X_test, Y_test), epochs=10, batch_size=8 )
+model.save("attention_unet_model.h5")
+print("? MODEL TRAINED SUCCESSFULLY")
+6.1.2 Prediction.py (Times New Roman, 13)
+import cv2
+import numpy as np
+from tensorflow.keras.models import load_model
+from tkinter import filedialog, Tk
+==============================
+LOAD MODEL
+==============================
+model = load_model("attention_unet_model.h5", compile=False)
+print("? Model loaded")
+==============================
+SELECT IMAGE
+==============================
+root = Tk()
+root.withdraw()
+file_path = filedialog.askopenfilename(title="Select MRI Image")
+if not file_path:
+print("? No image selected")
+exit()
+orig = cv2.imread(file_path, 0)
+==============================
+PREPROCESS
+==============================
+img = cv2.resize(orig, (128, 128))
+img = img / 255.0
+img = np.expand_dims(img, axis=(0, -1))
+==============================
+PREDICT
+==============================
+pred = model.predict(img)[0]
+mask = (pred > 0.3).astype(np.uint8)
+mask = cv2.resize(mask, (orig.shape[1], orig.shape[0]))
+==============================
+ANALYSIS
+==============================
+coords = np.where(mask > 0)
+if len(coords[0]) == 0:
+status = "Not Detected"
+tumor_type = "-"
+area = 0
+location = "-"
+else:
+status = "Detected"
+ymin, ymax = np.min(coords[0]), np.max(coords[0])
+xmin, xmax = np.min(coords[1]), np.max(coords[1])
+area = np.sum(mask)
+if area < 500:
+tumor_type = "Tumor Core"
+elif area < 2000:
+tumor_type = "Edema"
+else:
+tumor_type = "Enhancing Tumor"
+location = f"X[{xmin}-{xmax}], Y[{ymin}-{ymax}]"
+==============================
+PRINT TABLE
+==============================
+print("\n" + "="*45)
+print(" ?? AI BRAIN TUMOR REPORT")
+print("="*45)
+print(f"{'Parameter':<20} | {'Value'}")
+print("-"*45)
+print(f"{'Status':<20} | {status}")
+print(f"{'Tumor Type':<20} | {tumor_type}")
+print(f"{'Area':<20} | {area}")
+print(f"{'Location':<20} | {location}")
+print("="*45)
+==============================
+VISUALIZATION (OPTIONAL)
+==============================
+output = cv2.cvtColor(orig, cv2.COLOR_GRAY2BGR)
+if status == "Detected":
+cv2.rectangle(output, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2)
+output[mask == 1] = [0, 255, 0]
+cv2.imshow("MRI", orig)
+cv2.imshow("Mask", mask * 255)
+cv2.imshow("Detection", output)
+cv2.waitKey(0)
+cv2.destroyAllWindows()*
+
+6.2.1 appointment.php
+<?php
+session_start();
+include '../db.php'; // DB connection
+// Handle deletion
+if(isset($_GET['delete'])){
+$delete_id = intval($_GET['delete']);
+$stmt = $conn->prepare("DELETE FROM appointments WHERE id=?");
+$stmt->bind_param("i", $delete_id);
+$stmt->execute();
+$stmt->close();
+header("Location: appointments.php");
+exit();
+}
+// Handle status update
+if(isset($_POST['update_status'])){
+$appt_id = intval($_POST['appt_id']);
+$new_status = $_POST['status'];
+$stmt = $conn->prepare("UPDATE appointments SET status=? WHERE id=?");
+$stmt->bind_param("si", $new_status, $appt_id);
+$stmt->execute();
+$stmt->close();
+header("Location: appointments.php");
+exit();
+}
+// Fetch all appointments with patient & doctor info
+$query = "
+SELECT
+a.id AS appointment_id,
+a.appointment_date,
+a.appointment_time,
+a.reason,
+a.status,
+p.id AS patient_id,
+p.name AS patient_name,
+p.email AS patient_email,
+p.mobile AS patient_mobile,
+d.id AS doctor_id,
+d.name AS doctor_name,
+d.email AS doctor_email,
+d.mobile AS doctor_mobile,
+d.specialization AS doctor_specialization
+FROM appointments a
+LEFT JOIN patients p ON a.patient_id = p.id
+LEFT JOIN doctors d ON a.doctor_id = d.id
+ORDER BY a.appointment_date DESC, a.appointment_time DESC
+";
+$result = $conn->query($query);
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin Appointments | Brain Tumor Detection</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+<style>
+body { font-family: 'Poppins', sans-serif; background:#f0f4f8; padding:20px;}
+h2 { text-align:center; margin-bottom:20px; color:#6b21a8;}
+table { width:100%; border-collapse:collapse; box-shadow:0 4px 15px rgba(0,0,0,0.05);}
+th, td { padding:10px; text-align:center; border-bottom:1px solid #ddd;}
+th { background: linear-gradient(135deg,#6b21a8,#9333ea); color:#fff; }
+tr:nth-child(even){ background:#f3f4f6; }
+tr:hover{ background:#ede9fe; }
+.status-pending{ color:#f59e0b; font-weight:bold; }
+.status-accepted{ color:#10b981; font-weight:bold; }
+button { padding:5px 10px; border:none; border-radius:6px; cursor:pointer; font-weight:bold; transition:0.3s; }
+.update-btn { background:#3b82f6; color:#fff; }
+.update-btn:hover { background:#2563eb; }
+.delete-btn { background:#ef4444; color:#fff; }
+.delete-btn:hover { background:#b91c1c; }
+form { margin:0; }
+</style>
+<meta http-equiv="refresh" content="10"> <!-- Auto-refresh every 10 sec -->
+</head>
+<body>
+<h2>All Booked Appointments</h2>
+<?php if($result->num_rows > 0){ ?>
+<table>
+<tr>
+<th>Appointment ID</th>
+<th>Patient Name</th>
+<th>Patient Email</th>
+<th>Patient Mobile</th>
+<th>Doctor Name</th>
+<th>Doctor Email</th>
+<th>Doctor Mobile</th>
+<th>Specialization</th>
+<th>Date</th>
+<th>Time</th>
+<th>Reason</th>
+<th>Status</th>
+<th>Actions</th>
+</tr>
+<?php while($row = $result->fetch_assoc()){ ?>
+<tr>
+<td><?php echo $row['appointment_id']; ?></td>
+<td><?php echo htmlspecialchars($row['patient_name'] ?? 'N/A'); ?></td>
+<td><?php echo htmlspecialchars($row['patient_email'] ?? 'N/A'); ?></td>
+<td><?php echo htmlspecialchars($row['patient_mobile'] ?? 'N/A'); ?></td>
+<td><?php echo htmlspecialchars($row['doctor_name'] ?? 'N/A'); ?></td>
+<td><?php echo htmlspecialchars($row['doctor_email'] ?? 'N/A'); ?></td>
+<td><?php echo htmlspecialchars($row['doctor_mobile'] ?? 'N/A'); ?></td>
+<td><?php echo htmlspecialchars($row['doctor_specialization'] ?? 'N/A'); ?></td>
+<td><?php echo $row['appointment_date']; ?></td>
+<td><?php echo $row['appointment_time']; ?></td>
+<td><?php echo htmlspecialchars($row['reason']); ?></td>
+<td class="<?php echo strtolower($row['status']) == 'accepted' ? 'status-accepted':'status-pending'; ?>">
+<?php echo $row['status']; ?>
+</td>
+<td>
+<!-- Update Status Form -->
+<form method="post" style="display:inline;">
+<input type="hidden" name="appt_id" value="<?php echo $row['appointment_id']; ?>">
+<select name="status" style="padding:4px;">
+<option value="Pending" <?php if($row['status']=='Pending') echo 'selected'; ?>>Pending</option>
+<option value="Accepted" <?php if($row['status']=='Accepted') echo 'selected'; ?>>Accepted</option>
+</select>
+<button type="submit" name="update_status" class="update-btn">Update</button>
+</form>
+<!-- Delete Button -->
+<a href="?delete=<?php echo $row['appointment_id']; ?>" onclick="return confirm('Are you sure?')" class="delete-btn">Delete</a>
+</td>
+</tr>
+<?php } ?>
+</table>
+<?php } else { ?>
+<p style="text-align:center; font-weight:bold;">No appointments found!</p>
+<?php } ?>
+</body>
+</html>
+
+6.2.2 Health_tips.php
+<?php
+session_start();
+include '../db.php';
+
+// Add new tip
+if(isset($_POST['add_tip'])){
+if(!empty($_POST['tip'])){
+$tip = trim($_POST['tip']);
+$created_at = date("Y-m-d H:i:s");
+
+$stmt = $conn->prepare("INSERT INTO health_tips (tip, created_at) VALUES (?, ?)");
+$stmt->bind_param("ss", $tip, $created_at);
+$stmt->execute();
+$stmt->close();
+}
+header("Location: health_tips_manage.php");
+exit();
+}
+
+// Update tip
+if(isset($_POST['update_tip'])){
+if(!empty($_POST['tip'])){
+$id = intval($_POST['id']);
+$tip = trim($_POST['tip']);
+
+$stmt = $conn->prepare("UPDATE health_tips SET tip=? WHERE id=?");
+$stmt->bind_param("si", $tip, $id);
+$stmt->execute();
+$stmt->close();
+}
+header("Location: health_tips_manage.php");
+exit();
+}
+
+// Delete tip
+if(isset($_GET['delete'])){
+$id = intval($_GET['delete']);
+$stmt = $conn->prepare("DELETE FROM health_tips WHERE id=?");
+$stmt->bind_param("i", $id);
+$stmt->execute();
+$stmt->close();
+header("Location: health_tips_manage.php");
+exit();
+}
+
+// Fetch all tips
+$result = $conn->query("SELECT * FROM health_tips ORDER BY created_at DESC");
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Health Tips Management</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
+body{background:linear-gradient(135deg,#f0f4f8,#e0f7fa);padding:15px;}
+.container{max-width:900px;margin:auto;}
+h2{text-align:center;color:#6b21a8;margin-bottom:20px;font-size:30px;}
+.card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,0.06);margin-bottom:20px;}
+input, textarea{width:100%;padding:10px;margin:5px 0;border-radius:6px;border:1px solid #cbd5e1;}
+input[type=submit]{background:linear-gradient(45deg,#facc15,#4f46e5,#3b82f6,#f472b6);color:#fff;font-weight:600;border:none;cursor:pointer;height:40px;}
+input[type=submit]:hover{opacity:0.9;}
+table{width:100%;border-collapse: collapse;margin-top:20px;}
+table th, table td{padding:10px;text-align:center;border-bottom:1px solid #ddd;}
+table th{background:linear-gradient(135deg,#6b21a8,#9333ea);color:#fff;font-weight:600;}
+button.update, button.delete{padding:5px 10px;border:none;border-radius:6px;color:#fff;cursor:pointer;}
+button.update{background:linear-gradient(135deg,#10b981,#3b82f6);}
+button.update:hover{background:linear-gradient(135deg,#059669,#2563eb);}
+button.delete{background:linear-gradient(135deg,#ef4444,#f87171);}
+button.delete:hover{background:linear-gradient(135deg,#b91c1c,#dc2626);}
+#updateForm{display:none;margin-top:15px;}
+</style>
+</head>
+<body>
+<div class="container">
+<h2>?? Health Tips Management</h2>
+
+<!-- Add Tip Form -->
+<div class="card">
+<form method="post">
+<h3>Add New Tip</h3>
+<textarea name="tip" placeholder="Example: Drink 8 glasses of water daily" rows="4" required></textarea>
+<input type="submit" name="add_tip" value="Add Tip">
+</form>
+</div>
+
+<!-- Tips Table -->
+<div class="card">
+<h3>All Health Tips</h3>
+<table>
+<tr><th>ID</th><th>Tip</th><th>Created At</th><th>Actions</th></tr>
+<?php while($row=$result->fetch_assoc()){ ?>
+<tr>
+<td><?php echo $row['id']; ?></td>
+<td><?php echo htmlspecialchars($row['tip']); ?></td>
+<td><?php echo $row['created_at']; ?></td>
+<td>
+<button class="update" onclick="editTip('<?php echo $row['id']; ?>','<?php echo htmlspecialchars($row['tip']); ?>')">Update</button>
+<button class="delete" onclick="if(confirm('Are you sure?')){ window.location='health_tips_manage.php?delete=<?php echo $row['id']; ?>'; }">Delete</button>
+</td>
+</tr>
+<?php } ?>
+</table>
+</div>
+
+<!-- Update Tip Form -->
+<div class="card" id="updateForm">
+<form method="post">
+<h3>Update Tip</h3>
+<input type="hidden" name="id" id="update_id">
+<textarea name="tip" id="update_tip" rows="4" required></textarea>
+<input type="submit" name="update_tip" value="Update Tip">
+</form>
+</div>
+</div>
+
+<script>
+function editTip(id, tip){
+document.getElementById('updateForm').style.display='block';
+document.getElementById('update_id').value=id;
+document.getElementById('update_tip').value=tip;
+window.scrollTo({top:document.body.scrollHeight, behavior:'smooth'});
+}
+</script>
+</body>
+</html>
+
+6.2. Frontend Coding
+6.2.2 Index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brain Tumor Detection Portal</title>
+<style>
+:root {
+  --primary: #1e3d59;
+  --secondary: #f5a623;
+  --accent: #caf0f8;
+  --dark: #03045e;
+  --light: #f8f9fa;
+  --radius: 16px;
+  --shadow: 0 10px 30px rgba(0,0,0,0.1);
+  font-family: 'Poppins', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; scroll-behavior:smooth; }
+body { color: var(--dark); overflow-x: hidden; background: var(--light); }
+/* Header */
+header {
+  position: fixed; top:0; left:0; right:0;
+  display:flex; justify-content:space-between; align-items:center;
+  padding:1rem 3rem; background: rgba(30,61,89,0.85); z-index:100;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+}
+header:hover { background: rgba(30,61,89,1); }
+.logo { color:#fff; font-size:1.6rem; font-weight:700; text-decoration:none; text-shadow:0 2px 8px rgba(0,0,0,0.4); }
+.logo span { color: var(--secondary); }
+/* Top Buttons */
+.nav-btns { display:flex; gap:1rem; }
+.nav-btns button {
+  background: var(--secondary); border:none; color:#fff;
+  padding:10px 18px; border-radius:8px; font-weight:600; cursor:pointer;
+  transition:0.3s;
+}
+.nav-btns button:hover { background: var(--primary); }
+/* Hero Section */
+.hero {
+  height:100vh; display:flex; align-items:center; justify-content:center; text-align:center;
+  color:white; background: linear-gradient(rgba(30,61,89,0.7), rgba(30,61,89,0.7)), 
+              url('images/brain.jpg') center/cover no-repeat;
+  padding: 6rem 2rem;
+}
+.hero-content { max-width:800px; animation: fadeIn 1.5s ease; }
+.hero-content h1 { font-size:3rem; line-height:1.3; margin-bottom:1rem; text-shadow:0 3px 10px rgba(0,0,0,0.4); }
+.hero-content h1 span { color: var(--secondary); }
+.hero-content p { font-size:1.1rem; color:#eaf6ff; margin-bottom:2rem; }
+.hero-content .btn { display:inline-block; background: var(--secondary); color:white; padding:0.9rem 1.8rem; margin-right:0.8rem; border-radius: 16px; font-weight:600; text-decoration:none; transition: all 0.3s; box-shadow: 0 6px 14px rgba(0,0,0,0.2); }
+.hero-content .btn:hover { background: var(--primary); transform: translateY(-3px); }
+/* Features */
+section.features { padding:5rem 1.5rem; text-align:center; background:#ffffff; }
+.features h2 { font-size:2rem; color: var(--dark); margin-bottom:2rem; position:relative; }
+.features h2::after { content:""; display:block; height:3px; width:80px; background: var(--primary); margin:1rem auto 0; border-radius:3px; }
+.features .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(250px,1fr)); gap:1.8rem; max-width:1100px; margin:0 auto; }
+.features .card { background: var(--accent); border-radius: var(--radius); padding:2rem; box-shadow: var(--shadow); transition: transform 0.3s, box-shadow 0.3s; }
+.features .card:hover { transform: translateY(-8px); box-shadow: 0 15px 25px rgba(0,0,0,0.15); }
+.features .card h3 { color: var(--primary); margin-bottom:0.8rem; font-size:1.2rem; }
+.features .card p { color:#333; font-size:0.95rem; }
+/* Footer */
+footer { background: var(--dark); color:#d4e4f7; text-align:center; padding:1.2rem; font-size:0.9rem; }
+/* Animations */
+@keyframes fadeIn { 0% { opacity:0; transform: translateY(30px); } 100% { opacity:1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+<header>
+  <a href="#" class="logo">?? <span>Brain Tumor</span> Portal</a>
+  <div class="nav-btns">
+    <button onclick="window.location='patient/patient.html'">Patient</button>
+    <button onclick="window.location='doctor/doctor_login.php'">Doctor</button>
+    <button onclick="window.location='admin/login.php'">Admin</button>
+  </div>
+</header>
+<section class="hero">
+  <div class="hero-content">
+    <h1>Welcome to the <span>Brain Tumor Detection Portal</span></h1>
+    <p>Experience AI-powered precision for early tumor detection and seamless healthcare connectivity.</p>
+    <a href="patient/patient.html" class="btn">Get Started</a>
+  </div>
+</section>
+<section id="features" class="features">
+  <h2>Our Key Features</h2>
+  <div class="grid">
+    <div class="card"><h3>?? AI Tumor Detection</h3><p>Upload MRI scans and get instant tumor analysis.</p></div>
+    <div class="card"><h3>????? Doctor Consultations</h3><p>Book appointments with verified neurologists easily.</p></div>
+    <div class="card"><h3>?? PDF Health Reports</h3><p>Generate, download, and securely store your medical reports.</p></div>
+    <div class="card"><h3>?? Admin Dashboard</h3><p>Admin can manage doctors, patients, and appointments efficiently.</p></div>
+  </div>
+</section>
+<footer>
+  © <span id="year"></span> Brain Tumor Detection Portal
+</footer>
+<script>
+// Set year
+document.getElementById("year").textContent = new Date().getFullYear();
+</script>
+</body>
+</html>
+6.2.3 db.php
+<?php
+$servername = "localhost";
+$username = "root"; // default WAMP MySQL username
+$password = "";     // default WAMP MySQL password is empty
+$dbname = "brain_tumor"; // your database name
+$conn = new mysqli($servername, $username, $password, $dbname);
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+
+7 RESULTS
+7.1 Home Page
+The Home page provides navigation to Login, Register, and Portal sections for users as shown in Fig. 7.1.
+
+Fig. 7.1 Home Page
+7.2 Signup Page
+The Signup page allows new users to create an account with role selection and secure authentication as shown in Fig. 7.2.
+                                                        
+      Fig. 7.2 Signup Page
+7.3 Patient Dashboard
+The Patient Dashboard allows MRI upload, result viewing, appointment booking, and health tips access as shown in Fig. 7.3
+Fig. 7.3 patient Dashboard Page
+
+7.4 Training Images
+       The BraTS 2020 dataset contains around 57,000 slices in total, but only tumor-relevant slices were selected, resulting in a few thousand images for training.
+
+
+
+7.4.1 U-Net 
+
+Fig. 7.4.1 U-Net
+7.4.2 ATTENTION U-Net – Detection 
+
+Fig. 7.4.2 Attention U-NET Detection
+7.5 Tumor Detection Result Page
+      Displays segmented tumor regions and performance metrics such as Dice Score as shown in Fig. 7.5.
+                                     
+      Fig. 7.5 Tumor Detection Result Page
+7.6 Report Generation Page
+      Generates and allows download of the tumor detection report in PDF format as shown in Fig. 7.6.
+
+Fig. 7.6 Report Generation Page
+7.7 Appointment Booking Page
+      The Patients can book appointments and track status as shown in Fig. 7.7.
+
+Fig. 7.7 Appointment Booking Page
+7.8 Doctor Dashboard
+Doctors can view appointments and tumor reports as shown in Fig. 7.8.
+               
+
+Fig. 7.8 Doctors Page
+
+
+
+
+
+8 CONCLUSION
+8.1 Scope of the Project
+            The scope of this project is to develop a web-based Doctor–Patient Portal integrated with an AI-powered Brain Tumor Detection system. The system allows patients to register, upload MRI brain scans, receive automated tumor segmentation results, download detailed reports, and book appointments with doctors. Doctors can review AI-generated tumor results, manage appointments, and provide health recommendations, while the admin manages users and system data securely.
+		The tumor detection module uses deep learning models such as CNN, U-Net, and Attention U-Net to perform pixel-wise segmentation of brain tumors from MRI scans. The system classifies tumor regions into Edema, Tumor Core, and Enhancing Tumor (ET). Performance is evaluated using Dice Score and accuracy metrics to ensure reliable predictions. Currently, the system works on 2D MRI slice-based segmentation using the BraTS dataset. However, the architecture is scalable and can be extended to advanced 3D models and real-time hospital integration in the future. 
+8.2 Future Enhancements
+* Implement 3D U-Net for full volumetric brain tumor segmentation. 
+* Integrate U-Net for automated model optimization and improved accuracy.
+* Deploy the system on cloud platforms for real-time hospital access. 
+* Develop a mobile application for patient and doctor accessibility. 
+* Improve Enhancing Tumor detection using advanced loss functions and attention mechanisms. 
+
+
+                                               2                                                       2401722037002
+   
+

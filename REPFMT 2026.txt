@@ -1,0 +1,195 @@
+MADRAS CHRISTIAN COLLEGE (Autonomous)
+Department of Computer Science
+A MANUAL FOR PREPARATION OF PROJECT REPORT - 2026
+1. Number of copies to be submitted
+    TWO copies (Department Library, Self)
+2. Paper used: A4 Executive Bond
+3. General typing instructions: Times New Roman, 12 point
+4. Margin specifications
+* Top Margin = 4.0 cm		Left Margin = 4.5 cm 
+* Bottom Margin = 3.0 cm	Right Margin = 2.5 cm
+* A subhead at the bottom of a page must have at least two full lines in it or else it should be carried over to the next page. Tables and figures should conform to the margin specifications.
+5. Page numbering
+* All page numbers should be without punctuation in the bottom center of the page.
+* In the preliminary pages of the report (Title page, Bonafide Certificate and Certificate page), page numbers should not be printed. 
+* However they should be counted as lower case numerals starting from page i for the Title page and the rest of the pages after Certificate are printed with the appropriate number.
+* All the pages starting from Chapter one should be numbered in Arabic numerals. The first page of Chapter one should be numbered as 1.
+* All pages should be numbered including appendices and reference.
+ 6. General Format and Spacing
+* One and half spacing should be used for typing the general text, Table of Contents, List of Tables and List of Figures.
+* Double spacing should be used for typing Bonafide Certificate, Acknowledgment, Synopsis and Bibliography.
+* Single spacing should be used for typing:
+> Long Tables
+> Long quotations
+> Foot notes
+> Multi-line captions
+> References
+* All quotations exceeding two lines should be typed in an indented space - indentation being 1.5 cm from either margin. 
+* There should be minimum 5 lines in a paragraph.
+7. Chapters, Divisions, and Subdivisions
+* Text is divided into chapters. Chapters are divided into divisions and divisions into sub-divisions. Chapter heading, division heading and sub-division heading should be in bold.
+* The numbering of chapters, divisions and sub-divisions should be done using Arabic numerals only. Further, decimal notation should be used for numbering the divisions and sub-divisions within a chapter. 
+Example: Sub-division 4 under division 5 belonging to chapter 2 should be numbered as 2.5.4. Do not divide sub-divisions to any further divisions. For eg., avoid having a division as 2.5.4.1. The caption for the sub-division should immediately follow the number assigned to it. The format for typing chapter headings, division headings and sub-division headings are explained through the following illustrative example.
+Chapter heading: centered 12 pt from top of page. 
+1 INTRODUCTION ==> (Upper case, Arial, 14 point bold, centered)
+The text should commence 42pt below the Chapter Heading.
+
+Division heading: 1.1 Outline of Report (Arial, 13 point, bold)
+
+Subdivision heading: 1.1.2 Literature Review (Arial, 12 point, bold)
+* Division heading or sub-division heading should be followed by at least five lines of text before beginning another heading.
+* The division and subdivision captions along with their numbering should be left justified. The typed material directly below the division or subdivision heading should commence 18pt below it and should be indented 1 cm from the left-hand margin. 
+* Within a division or subdivision, paragraphs are permitted. The first letter in a paragraph should be indented from the left-hand margin by 1cm.
+* A division or sub-division or paragraph should commence 18pt below the last line of the preceding text.
+
+
+
+8. Tables and Figures
+* Tables and figures of half page or less in length may appear on the same page along with the text. 
+* Two or more small tables or figures may be grouped if necessary, on a single page.
+* Tables and figures appearing anywhere in the report should bear appropriate numbers. 
+Example:   Fourth figure on chapter 3 is assigned Fig. 3.4
+       	Third table in chapter 5 is assigned Table 5.3
+* If figures appear in appendices then figure 3 in appendix 2 will be designated as Fig. A-2.3.
+* If a table extends to more than a page no line should be drawn underneath the unfinished table. The top line of the table continued in the next page should read, for example, Table 2.1 (continued) placed centrally.
+* Table number should be followed by a caption on the same line placed 30pt below the last line of the preceding text and 18pt above the top edge of the table. It should be centered with respect to the table. The text that follows should be 30 pt below the table.
+* Figure number should be followed by a caption on the same line placed 18pt below the bottom edge of the figure and 30pt above the last line of the text that follows. It should be centered with respect to the figure. The figure should be placed 30 pt below the preceding text.
+* All tables and figures must be referred to in the text as - Table 3.1 gives (or) Figure 2.5 illustrates.
+9. Binding Specifications
+Hard binding with white wrapper and plastic cover (uniformly in WHITE). Letters     should be printed in BLACK. Binding should be done in Students Xerox, Tambaram.
+10. Contents
+      The first chapter which is an Introductory Chapter should contain the Company Profile, an overview of the Project (If the project work is part of a bigger project, you should give the overview of the entire Project and your work in it), working environment and system specifications.
+The second chapter should give the background of your project and more details of the project work. If you have done any requirement analysis you can discuss them here. The analysis can be expressed using use case diagrams for any type of projects. For projects specific to OO Systems, the OO Analysis applied for the project, should be presented. You can also discuss the architecture of your system in this chapter. If you had an existing system and you have made a study in it then discuss them here and also give details why you chose the proposed system.
+The next one or more chapters can be used to explain the design and implementation of your system. If needed use necessary flow diagrams, class diagrams, DFDs and E-R diagrams to explain the design in detail. If you have used tables then give the table design. If you have used any classes give the class specifications. For OO Systems the design should be presented using Booch or UML notations.
+In the next chapter explain the various modules used in your project work. You can use flow diagrams or block diagrams to give clear explanation.
+If you have learnt a new domain or looked into certain useful web sites you can describe about them in a chapter called Literature Survey. Avoid discussing common languages or packages.
+If you have done testing with your software then you can have a chapter called Testing where you can describe the various testing methods used.
+The last chapter should be a conclusive chapter containing the scope of your project, future enhancements if any, limitations, the work yet to be completed etc.
+The Appendices must contain only Reports, Sample screens, Photographs, Graphs, Charts etc.
+11. Arrangement of Contents
+The sequence in which the report material should be arranged and bound is as follows:
+1. Title page (same as cover page and printed in art paper)
+2. Bonafide Certificate (from college, signed by internal and external guides)
+3. Certificate (from the company, signed by the external guide)
+4. Acknowledgment
+5. Table of Contents
+6. List of Tables
+7. List of Figures
+8. Synopsis
+9. Chapters of the report commencing with chapter 1
+10. Appendices (Reports, Sample screens, Photographs, graphs, etc.)
+11. References
+* Title Page - A sample copy of the title page is given. If your work is  part 
+   of  a larger project, the Project Title should include the general title and 
+   the specific part you have done. For eg.
+   
+COLLEGE ADMN SYSTEM – STUDENTS ATTENDANCE
+
+* Bonafide Certificate - Use double spacing for typing Bonafide Certificate. Refer to sample copy.
+* Acknowledgment - Double spacing should be adopted for typing acknowledgment. It should be brief and should not exceed one page.
+
+
+* Table of Contents - The Table of contents should list all material following it but not any material which precedes it. Thus title page, bonafide certificate and acknowledgment will not find a place among the items listed in the table of contents. One and half spacing should be adopted for typing the matter under this head. The contents should outline the divisions and subdivisions also with the page numbers. For an appendix, mention its title only, say Appendix 2 – Command Descriptions (no sub-division headings under Appendix). Refer to sample copies.
+* List of Tables - The list should use exactly the same captions as they appear above the tables in the text. One and half spacing should be adopted for typing the matter under this head.
+* List of Figures - The list should use exactly the same captions as they appear below the figures in the text. One and half spacing should be adopted for typing the matter under this head.
+* Synopsis - Synopsis should be a narrative essay not exceeding 600 words, outlining the problem, the methodology used for tackling it and the summary of the finding. It should be typed using double spacing.
+* Chapters - The chapters may be broadly divided into 3 parts 
+> Introductory chapter
+> Chapters developing the main theme of the project
+> Conclusion
+* Each chapter should be given an appropriate title.
+* The tables and figures in a chapter should be placed in the immediate vicinity of the reference where they are cited.
+* Footnotes should be used sparingly. They should be typed with single space and placed directly underneath the very same page which refers to the material they annotate.
+* Appendices - Appendices are provided to give supplementary information, which, if included in the main text may serve as a distraction and cloud the center theme under discussion. 
+* Appendices, Tables and references appearing in appendices should be numbered and referred to at appropriate places just as in the case of chapters.
+* References - Any work which makes use of the work of others either directly or indirectly should indicate the origin of the material referred to, at appropriate places in the report. For convenience in citation, the reference material should be serially numbered beginning with chapter 1 and ending with appendices. Thus a paper, manual or a book may be designated a number and this number placed inside a square bracket at appropriate places will serve as a reference. The information regarding a paper or a book to which the number refers to will be given in the list of references. The citation may assume any one of the following forms:
+Examples:
+i. It is shown in [3] that......
+ii. As derived in page 31 of Hardy and Little Wood [4], we have....
+12. Size of Project Work 
+Should not exceed 150 pages of typed matter reckoned from the first page of chapter 1 to the last page of the appendix and should not be less than 75 pages.
+Tips
+1. Enumerate items using Roman numerals.
+2. For enumeration within enumeration use lower case English letters.
+3. To list items, use bullets (star, filled circles, etc).
+ Instructions
+Dos 
+* Check for spelling and grammar after all the changes are made and before taking the final hardcopy.
+* Use italics to highlight any text.
+* Use passive voice in your document.
+* Read the entire document and check the ordering of contents, flow of information and correctness of technical details.
+* Give your entire document to be proofread by someone.
+Don’ts
+* Use bold or underline to emphasize or highlight.
+* Write about any work or study that you have not done.
+* Repeat the same concepts under various divisions.
+
+FORMAT FOR COVER PAGE & TITLE PAGE (To be printed in ART paper)
+ 
+ 
+<PROJECT TITLE> 
+ in the font of your choice
+ 
+  
+A Project Report
+submitted in partial fulfillment of the requirements 
+for the award of the degree of
+MASTER OF COMPUTER APPLICATIONS 
+of the University of Madras
+   
+by
+<Student Name>  In capitals
+   
+College Symbol
+ 
+Department of Computer Science
+Madras Christian College (Autonomous)
+Tambaram, Madras 600 059
+April 2026
+(Sample page)
+CUSTOMER SERVICES AND SUPPORT SYSTEM
+  
+ 
+A Project Report 
+submitted in partial fulfillment of the requirements 
+for the award of the degree of
+MASTER OF COMPUTER APPLICATIONS 
+of the University of Madras
+ 
+  
+by
+XXXXXXX  
+ 
+ 
+ 
+Department of Computer Science
+Madras Christian College (Autonomous)
+Tambaram, Madras 600 059
+April 2026
+CERTIFICATE (sample given separately)
+ 
+
+Table of Contents (Sample Copy 1)
+  Synopsisxi1Introduction11.1 Organization Profile11.1.1 Major Areas of Current Focus..….……………………………….21.1.2System Software..………………………………………………...21.2 The Project31.2.1 Implementation of the SNMP Agent..………….………………..31.2.3 Writing CGI Scripts and Web Pages …...…………...…………...41.2.4 A Simulator …………...…………………..……………………..41.2.5 Development Environment………..……………………………...41.3 An Overview of Report....….…………………………………………….42SNMP Architecture72.1 Managed Devices..………………..………………………………….…..82.2 Agent……………………………………………………………………..82.3 Network Management Station NMS)……………………….……………82.4 Management Information Base MIB)……………………………………83ASN.1 – Abstract Syntax Notation One………..……………….……………...104The UCD-SNMP 4.2.3 Package………………..……………….……………...125Extending The UCD SNMP Agent145.1 The MIB File …………………………………………………………….145.2 The C Code Header File175.2.1Function Prototypes…..……………..……………………………175.2.2 Magic Numbers.…………………………………….……………175.2.3 Header File Protection..…..………………………………………185.3Core Structure Of Implementation Code 185.3.1 Standard Includes..……………..…………...……………………195.3.2 Module Definition ……...…………………..……….…………...195.3.3 Module Initialization …...……………………...………………...215.4Non-table based Modules 235.4.1 Request Validation.………...…………..……….………………..245.4.2 Data Retrieval..…………..……………………………………….265.5Simple Tables 275.5.1 Request Validation..…………..…….……………………………285.5.2 Data Retrieval..……………..…………………………………….295.6Implementation a SET-able Object 305.6.1 Write Routine..…………………..……………………….………305.6.2 Actions..…………………..………………..………….…………315.6.3 Table Row Creation..……………..………………………………336ASN.1 Transfer Syntax – Basic Encoding Rules (BER)356.1Basic Encoding Rules..…………………………………………………...356.2Structure of Management Information..……….…………………………387Implementation Of Protocol Operations407.1SNMP Operations 417.1.1Get Request..……………………………………………………..417.1.2GetNext Request..………………………………………………...417.1.3Set Request..……………………………………………………...417.1.4Trap..……………………………………………………………...427.2SNMP Message Formats427.2.1SNMP Message Header.………………..………………………...427.2.2SNMP PDU Format………………………………………………428CGI Scripts……………………………….…………………………………….449Conclusion459.1Future Enhancements. ………………………..………..………………...459.2Scope of the Project……………..………………………………………..46Appendix 1………………………………………………………………………...60References…………………………………………………………………………78
+Table of Contents (Sample Copy 2)
+Synopsisxi1Introduction11.1Organization Profile 11.1.1Major Areas of Current Focus. ……………………………………...41.1.2Overview of the Project.………….………………………………….22System Study162.1Competency Center An Overview……………………………….………….162.2Need for the System..………………………………………………………..172.3Outline of the System………………...……………………………………...183System Analysis203.1System Objectives…………………………………………………………..213.2Scope of the System…………………………………………………….…..213.3Functional Requirements223.3.1Description of Inputs and Outputs…………………..……………..223.3.2System Functionality……………………………………………….233.4Design Constraints……………………...…………………………………...243.5Proposed System………………………………………………………….…243.6Environmental Model………………………………………………………..253.7Behavioral Model……………………………………………………………253.8Conceptual Data Model……………………………………………………...264System Design354.1Design Methodology..…..…………………………………………………..354.2Table Design………………………………………………………………...364.3Output Design…………………………………………………………….…445Module Design475.1Module Specification…...…………………………………………………..475.2Module Description515.2.1Home Page. …………………………………………………………515.2.2Online Training……..………………………………………….……525.2.3Discussion Forum……………………………………………………586Testing646.1Unit Testing…………..……………………………………………………..646.2Integration Testing…………………………………………………………..656.3System Testing………………………………………………………………657Conclusion677.1Future Enhancements……………………………………………………..…677.2Scope of the Project………………………………………………………….68Appendix 1……………………………………………………………………………69Appendix 2……………………………………………………………………………80References…………………………………………………………………………….96
+
+References (Sample)
+ 
+[1] Paquet  A  H,  Ward  Rk,  Pitas  I.  Wavelet  packets-based  digital  watermarking  for  image verification and authentication[C]. Signal  Processing, 2003,pp. 2117~2132. 
+[2] Xiao yun wu, JH Z G, Ji  wu huang. A secure semi-fragile watermarking for image  authentication  based on integer  transform  with  parameters[C]. Conferences in Research and Practice in Information Technology, 2005. 
+[3] B Zhou, J Chen. A geometric distortion resilient image watermarking algorithm based on SVD[J]. Image and Graphics, 2004, 9(41),pp.506~512. 
+[4] Tanenbaum A. S., Computer Networks, Fourth Edition, Prentice-Hall of India Pvt. Ltd., 2003
+[5] Rafael C. Gonzalez, Richard E. Woods, Digital Image Processing, Third Edition, Pearson Education, 2013
+[6]  Kent Tegels, Tony Baer, Understanding the .NET Framework, SPD, 2003
+[7]  https://en.wikipedia.org/wiki/Cloud_computing
+
+
+
+
+
+
+CHECK-LIST BEFORE SUBMISSION (? the boxes)
+
+ContentNumberingPresentationSpell checkPagesTitles, subtitlesGrammar checkTablesAlignmentTechnical correctnessFiguresTOC Language (Passive voice)ChaptersBibliographyFlow of detail (without repetitions)AppendicesProof reading
+

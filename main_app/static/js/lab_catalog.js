@@ -18,6 +18,7 @@ class LabCatalog {
       volumetric: [
         { id: 'beaker', name: 'Beaker', spriteKey: 'beaker' },
         { id: 'pipette', name: 'Pipette', spriteKey: 'pipette' },
+        { id: 'dropper', name: 'Glass Dropper', spriteKey: 'dropper' },
         { id: 'volumetric_flask', name: 'Vol. Flask', spriteKey: 'volumetric_flask' }
       ],
       titration: [
@@ -156,9 +157,8 @@ class LabCatalog {
           const sprite = this.sprites[item.spriteKey];
           if (sprite) {
             let iw = 22 * scale, ih = 28 * scale;
-            if (item.id === 'pipette') { iw *= 0.65; ih *= 2.0; }
-            if (item.id === 'burette') { iw *= 0.7; ih *= 2.4; }
-            if (item.id === 'burette_tube') { iw *= 0.7; ih *= 2.4; }
+            if (item.id === 'pipette' || item.id === 'dropper') { iw *= 0.65; ih *= 2.0; }
+            if (item.id === 'burette' || item.id === 'burette_tube') { iw *= 0.7; ih *= 2.4; }
             if (item.id === 'common_stand') { iw *= 0.8; ih *= 2.4; }
             if (item.id === 'liebig_condensor') { iw *= 0.8; ih *= 2.2; }
             if (item.id === 'separatory_funnel') { iw *= 0.75; ih *= 2.3; }

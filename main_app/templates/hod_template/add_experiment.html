@@ -50,6 +50,7 @@
                         <!-- DATA PASSED TO JS VIA JSON_SCRIPT -->
                         {{ apparatus_list|json_script:"apparatus-data" }}
                         {{ chemicals_list|json_script:"chemicals-data" }}
+                        {{ reaction_list|json_script:"reactions-data" }}
                         <div class="card-body">
                             <!-- Basic Info -->
                             <h4 class="text-primary mt-3 mb-3">Basic Information</h4>
@@ -359,6 +360,15 @@
                             name="milestone-instruction-${count}"
                             placeholder="💡 Lab Assistant instruction (optional)"></textarea>
                     </div>
+
+                    <div class="form-group mb-2">
+                        <label class="small font-weight-bold text-primary"><i class="fas fa-vial"></i> Trigger Reaction (Optional)</label>
+                        <select class="form-control form-control-sm" name="milestone-reaction-${count}">
+                            <option value="">-- No Reaction Linked --</option>
+                            ${reactionsData.map(r => `<option value="${r.id}">${r.a} + ${r.b} → ${r.p}</option>`).join('')}
+                        </select>
+                        <small class="text-muted">Linking a reaction ensures the exact color and product from your Reaction Builder are applied at this milestone.</small>
+                    </div>
                     
                     <div class="rules-container bg-light p-2 rounded" id="rules-container-${count}">
                         <h6 class="text-secondary mb-2"><i class="fas fa-code-branch"></i> Validation Rules (Optional)</h6>
@@ -386,35 +396,61 @@
         const container = document.getElementById(`rules-container-${milestoneIndex}`);
         const countInput = document.getElementById(`rule-count-${milestoneIndex}`);
         const ruleIndex = parseInt(countInput.value);
-        const options = getSceneApparatusOptions();
+        const apparatusOptions = getSceneApparatusOptions();
+        
+        let chemOptions = '<option value="">-- Select Chemical --</option>';
+        chemicalsData.forEach(c => {
+            chemOptions += `<option value="${c.name}">${c.name}</option>`;
+        });
 
         const html = `
-            <div class="rule-row form-row mb-1">
-                <div class="col-md-3">
-                    <select class="form-control form-control-sm" name="rule-vessel-${milestoneIndex}-${ruleIndex}">${options}</select>
+            <div class="rule-row card border-secondary mb-2 p-2 bg-white shadow-sm">
+                <div class="form-row">
+                    <div class="col-md-3">
+                        <label class="small font-weight-bold text-muted">Vessel</label>
+                        <select class="form-control form-control-sm" name="rule-vessel-${milestoneIndex}-${ruleIndex}">${apparatusOptions}</select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="small font-weight-bold text-muted">Property</label>
+                        <select class="form-control form-control-sm" name="rule-prop-${milestoneIndex}-${ruleIndex}" onchange="toggleRuleChemSelector(this, ${milestoneIndex}, ${ruleIndex})">
+                            <option value="reading">Reading (Burette)</option>
+                            <option value="volume">Total Volume (Any)</option>
+                            <option value="pH">pH Level</option>
+                            <option value="chemical">Chemical Volume</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3" id="rule-chem-col-${milestoneIndex}-${ruleIndex}" style="display:none;">
+                        <label class="small font-weight-bold text-muted">Which Chemical?</label>
+                        <select class="form-control form-control-sm" name="rule-chem-${milestoneIndex}-${ruleIndex}">${chemOptions}</select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="small font-weight-bold text-muted">Op</label>
+                        <select class="form-control form-control-sm" name="rule-op-${milestoneIndex}-${ruleIndex}">
+                            <option value=">=">>=</option><option value="<="><=</option><option value="==">==</option><option value="CONTAINS">Contains</option>
+                        </select>
+                    </div>
+                    <div class="col-md-1 d-flex flex-column justify-content-end">
+                        <button type="button" class="btn btn-sm btn-outline-danger btn-block py-0" onclick="this.parentElement.parentElement.parentElement.remove()">x</button>
+                    </div>
                 </div>
-                <div class="col-md-3">
-                    <select class="form-control form-control-sm" name="rule-prop-${milestoneIndex}-${ruleIndex}">
-                        <option value="reading">Reading (Burette)</option>
-                        <option value="volume">Total Volume</option>
-                        <option value="pH">pH Level</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select class="form-control form-control-sm" name="rule-op-${milestoneIndex}-${ruleIndex}">
-                        <option value=">=">>=</option><option value="<="><=</option><option value="==">==</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <input type="text" class="form-control form-control-sm" name="rule-val-${milestoneIndex}-${ruleIndex}" placeholder="Value">
-                </div>
-                <div class="col-md-1">
-                    <button type="button" class="btn btn-sm btn-outline-danger btn-block py-0" onclick="this.parentElement.parentElement.remove()">x</button>
+                <div class="form-row mt-1">
+                    <div class="col-md-12">
+                        <input type="number" step="0.01" class="form-control form-control-sm" name="rule-val-${milestoneIndex}-${ruleIndex}" placeholder="Threshold Value (e.g. 20.0)">
+                    </div>
                 </div>
             </div>
         `;
         container.insertAdjacentHTML('beforeend', html);
         countInput.value = ruleIndex + 1;
+    }
+
+    function toggleRuleChemSelector(select, mIdx, rIdx) {
+        const col = document.getElementById(`rule-chem-col-${mIdx}-${rIdx}`);
+        if (select.value === 'chemical') {
+            col.style.display = 'block';
+        } else {
+            col.style.display = 'none';
+        }
     }
 
     function addObservationPrompt(milestoneIndex) {
@@ -517,14 +553,15 @@
                     { type: 'bottle', location: 'shelfBottom', x: 300, chem: config.titrant, vol: 250 },
                     { type: 'bottle', location: 'shelfBottom', x: 450, chem: config.analyte, vol: 250 },
                     { type: 'bottle', location: 'shelfBottom', x: 600, chem: config.ind1, vol: 50 },
+                    { type: 'dropper', location: 'shelfTop', x: 300 },
                     { type: 'funnel', location: 'shelfTop', x: 400 }
                 ],
                 milestones: [
-                    { id: "fill_burette", desc: `Fill Burette (${config.titrant})`, pts: 5, instr: `Fill the burette with ${config.titrant} solution using a funnel.`, rules: [{ vessel: "burette", prop: config.titrant, op: ">=", val: 45.0 }] },
-                    { id: "zero_burette", desc: "Zero the Burette", pts: 5, instr: "Adjust the stopcock (Press 'S') until the reading is exactly 0.00 mL.", rules: [{ vessel: "burette", prop: "reading", op: "<=", val: 0.05 }] },
+                    { id: "fill_burette", desc: `Fill Burette (${config.titrant})`, pts: 5, instr: `Fill the burette with ${config.titrant} solution using a funnel.`, rules: [{ vessel: "burette_tube", prop: config.titrant, op: ">=", val: 45.0 }] },
+                    { id: "zero_burette", desc: "Zero the Burette", pts: 5, instr: "Adjust the stopcock (Press 'S') until the reading is exactly 0.00 mL.", rules: [{ vessel: "burette_tube", prop: "reading", op: "<=", val: 0.05 }] },
                     { id: "pipette_analyte", desc: `Pipette ${config.analyte}`, pts: 10, instr: `Pipette exactly 20.0 mL of ${config.analyte} into the conical flask.`, rules: [{ vessel: "conical_flask", prop: config.analyte, op: "==", val: 20.0 }] },
-                    { id: "add_indicator", desc: `Add Indicator (${config.ind1})`, pts: 10, instr: `Add 1-2 drops of ${config.ind1} to the flask.`, rules: [{ vessel: "conical_flask", prop: config.ind1, op: ">=", val: 1.0 }] },
-                    { id: "reach_v1", desc: "Titrate until Endpoint", pts: 40, instr: "Titrate cautiously until the color change is permanent. Record the reading.", rules: [{ vessel: "conical_flask", prop: "pH", op: ">=", val: 8.3 }], observations: [{ title: "V1", description: "Burette reading (V1):", target_vessel: "burette", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
+                    { id: "add_indicator", desc: `Add Indicator (${config.ind1})`, pts: 10, instr: `Use the dropper to add 1-2 drops of ${config.ind1} to the flask.`, rules: [{ vessel: "conical_flask", prop: config.ind1, op: ">=", val: 1.0 }] },
+                    { id: "reach_v1", desc: "Titrate until Endpoint", pts: 40, instr: "Titrate cautiously until the color change is permanent. Record the reading.", rules: [{ vessel: "conical_flask", prop: "pH", op: ">=", val: 8.3 }], observations: [{ title: "V1", description: "Burette reading (V1):", target_vessel: "burette_tube", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
                     { id: "submit_calc", desc: "Calculate Normality", pts: 30, instr: "Use N1V1 = N2V2 to calculate the normality of the titrant.", calculations: [{ title: "Normality", desc: "Enter calculated normality:", form: "(0.1 * 20) / V1", tolerance: 0.01, points: 30 }] }
                 ]
             };
@@ -542,16 +579,17 @@
                     { type: 'bottle', location: 'shelfBottom', x: 420, chem: config.analyte, vol: 250 },
                     { type: 'bottle', location: 'shelfBottom', x: 540, chem: config.ind1, vol: 50 },
                     { type: 'bottle', location: 'shelfBottom', x: 660, chem: config.ind2, vol: 50 },
+                    { type: 'dropper', location: 'shelfTop', x: 300 },
                     { type: 'funnel', location: 'shelfTop', x: 400 }
                 ],
                 milestones: [
-                    { id: "fill_burette", desc: `Fill Burette (${config.titrant})`, pts: 5, instr: `Fill the burette with standard ${config.titrant} solution.`, rules: [{ vessel: "burette", prop: config.titrant, op: ">=", val: 45.0 }] },
-                    { id: "zero_burette", desc: "Zero the Burette", pts: 5, instr: "Carefully adjust the liquid level to the 0.00 mL mark.", rules: [{ vessel: "burette", prop: "reading", op: "<=", val: 0.05 }] },
+                    { id: "fill_burette", desc: `Fill Burette (${config.titrant})`, pts: 5, instr: `Fill the burette with standard ${config.titrant} solution.`, rules: [{ vessel: "burette_tube", prop: config.titrant, op: ">=", val: 45.0 }] },
+                    { id: "zero_burette", desc: "Zero the Burette", pts: 5, instr: "Carefully adjust the liquid level to the 0.00 mL mark.", rules: [{ vessel: "burette_tube", prop: "reading", op: "<=", val: 0.05 }] },
                     { id: "pipette_mixture", desc: `Pipette ${config.analyte}`, pts: 10, instr: `Pipette 20.0 mL of the ${config.analyte} mixture into the conical flask.`, rules: [{ vessel: "conical_flask", prop: config.analyte, op: "==", val: 20.0 }] },
-                    { id: "add_ind1", desc: `Add ${config.ind1}`, pts: 10, instr: `Add 1-2 drops of ${config.ind1} indicator to the flask.`, rules: [{ vessel: "conical_flask", prop: config.ind1, op: ">=", val: 1.0 }] },
-                    { id: "endpoint_1", desc: "Titrate to 1st Endpoint (V1)", pts: 20, instr: `Titrate until the pink color just disappears. Record V1.`, rules: [{ vessel: "conical_flask", prop: "pH", op: "<=", val: 8.3 }], observations: [{ title: "V1", description: "Burette Reading 1 (V1):", target_vessel: "burette", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
-                    { id: "add_ind2", desc: `Add ${config.ind2}`, pts: 10, instr: `Add 1-2 drops of ${config.ind2} to the same flask.`, rules: [{ vessel: "conical_flask", prop: config.ind2, op: ">=", val: 1.0 }] },
-                    { id: "endpoint_2", desc: "Titrate to 2nd Endpoint (V2)", pts: 20, instr: `Continue titration until the solution turns pale pink/orange. Record V2.`, rules: [{ vessel: "conical_flask", prop: "pH", op: "<=", val: 4.0 }], observations: [{ title: "V2", description: "Total Burette Reading (V2):", target_vessel: "burette", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
+                    { id: "add_ind1", desc: `Add ${config.ind1}`, pts: 10, instr: `Use the dropper to add 1-2 drops of ${config.ind1} indicator to the flask.`, rules: [{ vessel: "conical_flask", prop: config.ind1, op: ">=", val: 1.0 }] },
+                    { id: "endpoint_1", desc: "Titrate to 1st Endpoint (V1)", pts: 20, instr: `Titrate until the pink color just disappears. Record V1.`, rules: [{ vessel: "conical_flask", prop: "pH", op: "<=", val: 8.3 }], observations: [{ title: "V1", description: "Burette Reading 1 (V1):", target_vessel: "burette_tube", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
+                    { id: "add_ind2", desc: `Add ${config.ind2}`, pts: 10, instr: `Add 1-2 drops of ${config.ind2} to the same flask using the dropper.`, rules: [{ vessel: "conical_flask", prop: config.ind2, op: ">=", val: 1.0 }] },
+                    { id: "endpoint_2", desc: "Titrate to 2nd Endpoint (V2)", pts: 20, instr: `Continue titration until the solution turns pale pink/orange. Record V2.`, rules: [{ vessel: "conical_flask", prop: "pH", op: "<=", val: 4.0 }], observations: [{ title: "V2", description: "Total Burette Reading (V2):", target_vessel: "burette_tube", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
                     { id: "calc_mass", desc: "Mass Calculation", pts: 20, instr: "Calculate the mass of carbonates in grams/liter.", calculations: [
                         { title: "Na2CO3 Mass", desc: "Mass of Na2CO3 (g):", form: "V1 * 2 * 0.053 * 50", tolerance: 0.05, points: 10 },
                         { title: "NaHCO3 Mass", desc: "Mass of NaHCO3 (g):", form: "(V2 - (2 * V1)) * 0.084 * 50", tolerance: 0.05, points: 10 }
@@ -573,6 +611,16 @@
           is_indicator: {{ chem.is_indicator|lower }}, 
           low_ph_color: "{{ chem.low_ph_color|default:'#FFFFFF00' }}", 
           high_ph_color: "{{ chem.high_ph_color|default:'#FFFFFF00' }}" 
+        },{% endfor %}
+    ];
+
+    const reactionsData = [
+        {% for rxn in reaction_list %}
+        { 
+          id: {{ rxn.id }}, 
+          a: "{{ rxn.chemical_a__name|escapejs }}", 
+          b: "{{ rxn.chemical_b__name|escapejs }}", 
+          p: "{{ rxn.product__name|default:'Color Change'|escapejs }}" 
         },{% endfor %}
     ];
 
@@ -608,12 +656,9 @@
         const chem2 = chemicalsData.find(c => c.name === config.ind2);
         
         if (chem1) {
-            // For simple/double titration, Ind 1 transition is the first milestone.
-            // Usually pink for PP (high_ph_color)
             bp.v1_color = chem1.high_ph_color || bp.v1_color; 
         }
         if (chem2) {
-            // Ind 2 (MO) usually turns yellow->orange at V2 (low_ph_color)
             bp.v2_color = chem2.low_ph_color || bp.v2_color;
         }
 
@@ -643,7 +688,7 @@
             document.querySelector(`[name="milestone-id-${idx}"]`).value = ms.id;
             document.querySelector(`[name="milestone-desc-${idx}"]`).value = ms.desc;
             document.querySelector(`[name="milestone-pts-${idx}"]`).value = ms.pts;
-            document.querySelector(`[name="milestone-instruction-${idx}"]`).value = ms.instr;
+            document.querySelector(`[name="milestone-instruction-${idx}"]`).value = ms.instr || "";
 
             // Injected Rules - ensuring they use the selected chemicals as targets
             if (ms.rules) ms.rules.forEach(r => addBlueprintRule(idx, r));
@@ -651,15 +696,26 @@
             if (ms.calculations) ms.calculations.forEach(c => addBlueprintCalc(idx, c));
         });
 
-        // Trigger material sync
         syncMaterialsFromScene();
     }
 
     function addBlueprintRule(mIdx, r) {
         addRule(mIdx);
         const rIdx = document.getElementById(`rule-count-${mIdx}`).value - 1;
+        
+        // Dynamic Mapping: If 'prop' is a chemical name, use the 'chemical' type
+        const knownChemicals = chemicalsData.map(c => c.name);
+        
+        if (knownChemicals.includes(r.prop)) {
+            const propSelect = document.querySelector(`[name="rule-prop-${mIdx}-${rIdx}"]`);
+            propSelect.value = "chemical";
+            toggleRuleChemSelector(propSelect, mIdx, rIdx);
+            document.querySelector(`[name="rule-chem-${mIdx}-${rIdx}"]`).value = r.prop;
+        } else {
+            document.querySelector(`[name="rule-prop-${mIdx}-${rIdx}"]`).value = r.prop;
+        }
+
         document.querySelector(`[name="rule-vessel-${mIdx}-${rIdx}"]`).value = r.vessel;
-        document.querySelector(`[name="rule-prop-${mIdx}-${rIdx}"]`).value = r.prop;
         document.querySelector(`[name="rule-op-${mIdx}-${rIdx}"]`).value = r.op;
         document.querySelector(`[name="rule-val-${mIdx}-${rIdx}"]`).value = r.val;
     }
@@ -671,6 +727,8 @@
         document.querySelector(`[name="obs-desc-${mIdx}-${oIdx}"]`).value = o.description;
         document.querySelector(`[name="obs-vessel-${mIdx}-${oIdx}"]`).value = o.target_vessel;
         document.querySelector(`[name="obs-prop-${mIdx}-${oIdx}"]`).value = o.target_property;
+        if (o.tolerance) document.querySelector(`[name="obs-tol-${mIdx}-${oIdx}"]`).value = o.tolerance;
+        if (o.penalty) document.querySelector(`[name="obs-penalty-${mIdx}-${oIdx}"]`).value = o.penalty;
     }
 
     function addBlueprintCalc(mIdx, c) {
@@ -679,6 +737,8 @@
         document.querySelector(`[name="calc-title-${mIdx}-${cIdx}"]`).value = c.title;
         document.querySelector(`[name="calc-desc-${mIdx}-${cIdx}"]`).value = c.desc || "";
         document.querySelector(`[name="calc-form-${mIdx}-${cIdx}"]`).value = c.form;
+        if (c.tolerance) document.querySelector(`[name="calc-tol-${mIdx}-${cIdx}"]`).value = c.tolerance;
+        if (c.points) document.querySelector(`[name="calc-pts-${mIdx}-${cIdx}"]`).value = c.points;
     }
 
     function clearForm() {
@@ -741,13 +801,18 @@
         document.querySelectorAll('.milestone-row').forEach(row => {
             const mIdx = row.querySelector('[name^="milestone-id-"]').name.split('-')[2];
             
-            // Scrape Rules
             const rules = [];
             row.querySelectorAll('.rule-row').forEach(rRow => {
                 const rIdx = rRow.querySelector('[name^="rule-vessel-"]').name.split('-')[3];
+                const propInput = rRow.querySelector(`[name="rule-prop-${mIdx}-${rIdx}"]`);
+                const chemInput = rRow.querySelector(`[name="rule-chem-${mIdx}-${rIdx}"]`);
+                
+                if (!propInput) return;
+                const propValue = propInput.value;
+                
                 rules.push({
                     target_vessel: rRow.querySelector(`[name="rule-vessel-${mIdx}-${rIdx}"]`).value,
-                    target_property: rRow.querySelector(`[name="rule-prop-${mIdx}-${rIdx}"]`).value,
+                    target_property: propValue === 'chemical' && chemInput ? chemInput.value : propValue,
                     operator: rRow.querySelector(`[name="rule-op-${mIdx}-${rIdx}"]`).value,
                     value: parseFloat(rRow.querySelector(`[name="rule-val-${mIdx}-${rIdx}"]`).value) || 0
                 });

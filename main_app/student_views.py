@@ -1020,8 +1020,11 @@ def lab_experiment_simulation(request, slug):
         {
             "id": r.id, 
             "chemical_a": r.chemical_a.id, 
+            "chemical_a_label": r.chemical_a.name,
             "chemical_b": r.chemical_b.id,
+            "chemical_b_label": r.chemical_b.name,
             "product": r.product.id if r.product else None,
+            "product_label": r.product.name if r.product else None,
             "reaction_color_hex": r.reaction_color_hex,
             "ph_change": r.ph_change
         } for r in ChemicalReaction.objects.all()

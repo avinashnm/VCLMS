@@ -1,0 +1,229 @@
+<html>
+<head>
+    <style>
+        table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            margin-bottom: 30px; 
+            font-family: "Times New Roman", Times, serif; 
+            font-size: 12pt;
+        }
+        th, td { 
+            border: 1px solid black; 
+            padding: 8px; 
+            text-align: left; 
+        }
+        th { 
+            background-color: #e0e0e0; 
+            font-weight: bold;
+        }
+        h2 {
+            font-family: "Times New Roman", Times, serif; 
+            font-size: 14pt;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Table 4.2: Users Table (Identity Gateway)</h2>
+    <table>
+        <tr>
+            <th>Column Name</th>
+            <th>Data Type</th>
+            <th>Constraints / Purpose</th>
+        </tr>
+        <tr>
+            <td>id</td>
+            <td>int</td>
+            <td>Primary Key Auto Increment. The absolute unique identifier.</td>
+        </tr>
+        <tr>
+            <td>email</td>
+            <td>varchar(254)</td>
+            <td>Required, Unique. Acts as the primary login credential.</td>
+        </tr>
+        <tr>
+            <td>password</td>
+            <td>varchar(128)</td>
+            <td>Stores precisely hashed passwords utilizing PBKDF2 algorithms.</td>
+        </tr>
+        <tr>
+            <td>first_name</td>
+            <td>varchar(150)</td>
+            <td>Required for formal PDF report generation.</td>
+        </tr>
+        <tr>
+            <td>last_name</td>
+            <td>varchar(150)</td>
+            <td>Required for formal PDF report generation.</td>
+        </tr>
+        <tr>
+            <td>user_type</td>
+            <td>varchar(1)</td>
+            <td>Required Role identifier (1: HOD, 2: Staff, 3: Student).</td>
+        </tr>
+        <tr>
+            <td>gender</td>
+            <td>varchar(1)</td>
+            <td>Required Demographics (M/F).</td>
+        </tr>
+        <tr>
+            <td>created_at</td>
+            <td>datetime</td>
+            <td>Default: Current timestamp.</td>
+        </tr>
+    </table>
+
+    <h2>Table 4.3: Experiment Configuration Table (No-Code Engine)</h2>
+    <table>
+        <tr>
+            <th>Column Name</th>
+            <th>Data Type</th>
+            <th>Constraints / Purpose</th>
+        </tr>
+        <tr>
+            <td>id</td>
+            <td>int</td>
+            <td>Primary Key Auto Increment.</td>
+        </tr>
+        <tr>
+            <td>faculty_id</td>
+            <td>int</td>
+            <td>Foreign Key (References Staff.id). Tracks the authoring source.</td>
+        </tr>
+        <tr>
+            <td>experiment_title</td>
+            <td>varchar(255)</td>
+            <td>Required. The formalized title visible in the LMS dashboard.</td>
+        </tr>
+        <tr>
+            <td>apparatus_config</td>
+            <td>jsonb</td>
+            <td>Required. Stores dynamic definitions like exact burette capacities, initial flask volumes, etc.</td>
+        </tr>
+        <tr>
+            <td>chemical_logic</td>
+            <td>jsonb</td>
+            <td>Required. Stores the exact catalog names of Titrants/Analytes and the hidden stoichiometric limits.</td>
+        </tr>
+        <tr>
+            <td>created_at</td>
+            <td>datetime</td>
+            <td>Default: Current timestamp. Tracks curriculum updates.</td>
+        </tr>
+    </table>
+
+    <h2>Table 4.4: Virtual Lab Submission Table (Telemetry & Grading)</h2>
+    <table>
+        <tr>
+            <th>Column Name</th>
+            <th>Data Type</th>
+            <th>Constraints / Purpose</th>
+        </tr>
+        <tr>
+            <td>id</td>
+            <td>int</td>
+            <td>Primary Key Auto Increment.</td>
+        </tr>
+        <tr>
+            <td>student_id</td>
+            <td>int</td>
+            <td>Foreign Key (References Student.id).</td>
+        </tr>
+        <tr>
+            <td>experiment_name</td>
+            <td>varchar(200)</td>
+            <td>Required. Maps to the specific curriculum module.</td>
+        </tr>
+        <tr>
+            <td>v1_observed</td>
+            <td>float</td>
+            <td>Required. The manually inputted initial observation.</td>
+        </tr>
+        <tr>
+            <td>v2_observed</td>
+            <td>float</td>
+            <td>Required. The manually inputted concordant observation.</td>
+        </tr>
+        <tr>
+            <td>calc_na2co3</td>
+            <td>float</td>
+            <td>Required. First algorithmic mass derivate.</td>
+        </tr>
+        <tr>
+            <td>calc_nahco3</td>
+            <td>float</td>
+            <td>Required. Second algorithmic mass derivate.</td>
+        </tr>
+        <tr>
+            <td>total_score</td>
+            <td>int</td>
+            <td>Required. Mathematical integer reflecting the finalized grade.</td>
+        </tr>
+        <tr>
+            <td>penalty_log</td>
+            <td>text</td>
+            <td>Required. Stores all hazardous or procedurally faulty actions caught by the telemetry engine.</td>
+        </tr>
+    </table>
+
+    <h2>Table 4.5: Attendance Table</h2>
+    <table>
+        <tr>
+            <th>Column Name</th>
+            <th>Data Type</th>
+            <th>Constraints / Purpose</th>
+        </tr>
+        <tr>
+            <td>id</td>
+            <td>int</td>
+            <td>Primary Key Auto Increment.</td>
+        </tr>
+        <tr>
+            <td>session_id</td>
+            <td>int</td>
+            <td>Foreign Key (References Session.id). Defines the academic year.</td>
+        </tr>
+        <tr>
+            <td>subject_id</td>
+            <td>int</td>
+            <td>Foreign Key (References Subject.id). Defines the curriculum context.</td>
+        </tr>
+        <tr>
+            <td>date</td>
+            <td>date</td>
+            <td>Required. Tracks temporal presence for internal assessment minimums.</td>
+        </tr>
+    </table>
+
+    <h2>Table 4.6: Feedback Table (Sentiment Analytics Base)</h2>
+    <table>
+        <tr>
+            <th>Column Name</th>
+            <th>Data Type</th>
+            <th>Constraints / Purpose</th>
+        </tr>
+        <tr>
+            <td>id</td>
+            <td>int</td>
+            <td>Primary Key Auto Increment.</td>
+        </tr>
+        <tr>
+            <td>student_id</td>
+            <td>int</td>
+            <td>Foreign Key (References Student.id).</td>
+        </tr>
+        <tr>
+            <td>feedback</td>
+            <td>text</td>
+            <td>Required. Qualitative unstructured text parsed by NLTK analytics.</td>
+        </tr>
+        <tr>
+            <td>reply</td>
+            <td>text</td>
+            <td>Optional. Allows closed-loop administrative grievance processing.</td>
+        </tr>
+    </table>
+
+</body>
+</html>
