@@ -209,10 +209,8 @@ else:
 import dj_database_url
 import os
 
-db_url = os.environ.get("DATABASE_URL", "postgresql://vclms_db_v2_user:N1DS2gtXI8Dueon68dyzfUVM01ARFVeb@dpg-d759rhnfte5s73893glg-a.singapore-postgres.render.com/vclms_db_v2")
-if "vclms_db_new" in db_url:
-    # Safely override the old environment variable if it's still cached on your machine
-    db_url = "postgresql://vclms_db_v2_user:N1DS2gtXI8Dueon68dyzfUVM01ARFVeb@dpg-d759rhnfte5s73893glg-a.singapore-postgres.render.com/vclms_db_v2"
+# Database configuration (Hardcoded for transition stability)
+db_url = "postgresql://vclms_final_production_user:xrnCGARZQJhq6u1r0dBzWIKjqHudGKNn@dpg-d7p41u67r5hc739adn50-a.singapore-postgres.render.com/vclms_final_production"
 
-db_from_env = dj_database_url.parse(db_url, conn_max_age=0, ssl_require=True)
+db_from_env = dj_database_url.parse(db_url, conn_max_age=600, ssl_require=True)
 DATABASES['default'].update(db_from_env)

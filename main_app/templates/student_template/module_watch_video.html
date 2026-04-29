@@ -3,54 +3,105 @@
 {% block page_title %}{{ video_course.title }}{% endblock page_title %}
 {% block content %}
 <script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
 <style>
-    .lab-bg {
-        background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
-        min-height: calc(100vh - 60px);
-        padding: 2rem;
-        color: white;
+    :root {
+        --primary-bg: #0b0f1a;
+        --card-bg: rgba(255, 255, 255, 0.03);
     }
-    .content-wrapper { background: #0f172a !important; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--primary-bg); }
+    .content-wrapper { background: var(--primary-bg) !important; }
+
+    .premium-bg {
+        background: radial-gradient(circle at 100% 0%, rgba(59, 130, 246, 0.1) 0%, transparent 40%),
+                    var(--primary-bg);
+        min-height: calc(100vh - 60px);
+        padding: 3rem 2rem;
+    }
+
+    .video-container {
+        box-shadow: 0 0 100px rgba(0, 0, 0, 0.8), 0 0 40px rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .glass-panel {
+        background: var(--card-bg);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .btn-gradient {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .btn-gradient:hover {
+        transform: translateY(-4px) scale(1.02);
+        box-shadow: 0 20px 40px rgba(16, 185, 129, 0.4);
+    }
 </style>
 
-<div class="lab-bg font-sans">
-    <div class="max-w-5xl mx-auto">
+<div class="premium-bg text-white">
+    <div class="max-w-6xl mx-auto">
         
-        <div class="mb-6 flex items-center justify-between">
-            <div>
-                <span class="text-blue-400 font-bold uppercase text-sm tracking-wider">{{ module.subject.name }} &bull; {{ module.title }}</span>
-                <h1 class="text-4xl font-extrabold tracking-tight mt-1 text-white">{{ video_course.title }}</h1>
+        <header class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div class="flex-1">
+                <nav class="flex items-center gap-2 text-blue-400 font-bold text-[0.7rem] uppercase tracking-widest mb-3">
+                    <span>{{ module.subject.name }}</span>
+                    <i class="fas fa-chevron-right text-[10px] opacity-40"></i>
+                    <span class="opacity-60">{{ module.title }}</span>
+                </nav>
+                <h1 class="text-5xl font-extrabold tracking-tight text-white leading-tight">{{ video_course.title }}</h1>
             </div>
-            <a href="{% url 'student_home' %}" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors border border-white/20 text-white font-medium">
-                <i class="fas fa-arrow-left mr-2"></i> Dashboard
+            <a href="{% url 'student_home' %}" class="inline-flex items-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all border border-white/10 text-white font-bold text-xs uppercase tracking-widest">
+                <i class="fas fa-grid-2 mr-1"></i> Dashboard
             </a>
-        </div>
+        </header>
         
-        <div class="bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative">
-            <video id="video-player" class="w-full aspect-video border-0 outline-none" controls>
+        <div class="video-container bg-black rounded-[32px] overflow-hidden relative group">
+            <video id="video-player" class="w-full aspect-video border-0 outline-none" controls poster="{% static 'images/video_poster.jpg' %}">
                 <source src="{{ video_course.video_upload.url }}" type="video/mp4"/>
                 Your browser does not support the video tag.
             </video>
+            <!-- Overlay Glow -->
+            <div class="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
         </div>
 
-        <div class="mt-8 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
-            <h3 class="text-xl font-bold mb-2 text-white">Description</h3>
-            <p class="text-blue-100/70">{{ video_course.description }}</p>
-            
-            <div class="mt-8 pt-6 border-t border-white/10 flex justify-end">
-                <form action="{% url 'module_mark_watched' module.id %}" method="POST">
-                    {% csrf_token %}
-                    <button type="submit" class="px-8 py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] flex items-center gap-3 text-lg">
-                        <i class="fas fa-check-circle text-2xl"></i> 
-                        {% if module.quiz %}
-                            Mark as Complete & Continue to Assessment
-                        {% elif module.experiment %}
-                            Mark as Complete & Continue to Lab
-                        {% else %}
-                            Mark as Complete
-                        {% endif %}
-                    </button>
-                </form>
+        <div class="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-10">
+            <div class="lg:col-span-2">
+                <div class="glass-panel rounded-[32px] p-10">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-1.5 h-8 bg-blue-500 rounded-full"></div>
+                        <h3 class="text-2xl font-extrabold text-white">Scientific Overview</h3>
+                    </div>
+                    <p class="text-white/60 text-lg leading-relaxed font-medium">
+                        {{ video_course.description }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="lg:col-span-1 flex flex-col justify-center">
+                <div class="glass-panel rounded-[32px] p-8 border-emerald-500/20">
+                    <div class="text-center mb-8">
+                        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/10 mb-4">
+                            <i class="fas fa-graduation-cap text-2xl text-emerald-400"></i>
+                        </div>
+                        <h4 class="text-xl font-bold text-white mb-2">Ready to proceed?</h4>
+                        <p class="text-white/40 text-sm font-medium leading-relaxed">Once you've mastered the theory, advance to the next phase of your learning path.</p>
+                    </div>
+
+                    <form action="{% url 'module_mark_watched' module.id %}" method="POST">
+                        {% csrf_token %}
+                        <button type="submit" class="w-full btn-gradient py-5 rounded-2xl text-white font-extrabold flex items-center justify-center gap-3 text-sm uppercase tracking-widest">
+                            <span>Proceed to 
+                                {% if module.quiz %}Assessment{% elif module.experiment %}Virtual Lab{% else %}Completion{% endif %}
+                            </span>
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
 

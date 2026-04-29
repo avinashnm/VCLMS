@@ -45,7 +45,7 @@
                     <div class="card-header">
                         <h3 class="card-title">Add Virtual Lab Experiment</h3>
                     </div>
-
+                    <form role="form" method="POST" action="{% url 'add_experiment' %}" enctype="multipart/form-data">
                         {% csrf_token %}
                         <!-- DATA PASSED TO JS VIA JSON_SCRIPT -->
                         {{ apparatus_list|json_script:"apparatus-data" }}
@@ -548,14 +548,23 @@
         });
         return options;
     }
-
     function generateBlueprint(pKey, config) {
         if (pKey === 'simple') {
             return {
                 title: `Standardization of ${config.titrant} with ${config.analyte}`,
                 objective: `To determine the exact normality of the given ${config.titrant} solution using a standard 0.1N ${config.analyte} solution.`,
+                principle: `Titration of a strong acid (like HCl) against a strong base (like NaOH) or vice-versa. At the equivalence point, the pH changes rapidly. Phenolphthalein is used as an indicator which changes from colorless to pink at pH 8.3-10.`,
                 type: "simple_titration",
                 v1: 20.0, v2: 0, v1_color: "#FFC0CB", v2_color: "#FFFFFF",
+                materials: ["50ml Burette", "250ml Conical Flask", "20ml Pipette", "Funnel", "Beaker", "Dropper"],
+                steps: [
+                    "Rinse the burette with distilled water and then with a small amount of the titrant.",
+                    "Fill the burette with the titrant using a funnel and zero it carefully.",
+                    "Pipette 20.0 mL of the analyte into a clean conical flask.",
+                    "Add 1-2 drops of the indicator to the flask.",
+                    "Titrate the solution by adding titrant dropwise until a permanent color change is observed.",
+                    "Record the final burette reading (V1)."
+                ],
                 initial_state: [
                     { type: 'common_stand', location: 'table', x: 400 },
                     { type: 'burette_tube', location: 'table', x: 400, chem: 'Empty', vol: 0 },
@@ -567,20 +576,30 @@
                     { type: 'funnel', location: 'shelfTop', x: 400 }
                 ],
                 milestones: [
-                    { id: "fill_burette", desc: `Fill Burette (${config.titrant})`, pts: 5, instr: `Fill the burette with ${config.titrant} solution using a funnel.`, rules: [{ vessel: "burette_tube", prop: config.titrant, op: ">=", val: 45.0 }] },
-                    { id: "zero_burette", desc: "Zero the Burette", pts: 5, instr: "Adjust the stopcock (Press 'S') until the reading is exactly 0.00 mL.", rules: [{ vessel: "burette_tube", prop: "reading", op: "<=", val: 0.05 }] },
-                    { id: "pipette_analyte", desc: `Pipette ${config.analyte}`, pts: 10, instr: `Pipette exactly 20.0 mL of ${config.analyte} into the conical flask.`, rules: [{ vessel: "conical_flask", prop: config.analyte, op: "==", val: 20.0 }] },
-                    { id: "add_indicator", desc: `Add Indicator (${config.ind1})`, pts: 10, instr: `Use the dropper to add 1-2 drops of ${config.ind1} to the flask.`, rules: [{ vessel: "conical_flask", prop: config.ind1, op: ">=", val: 1.0 }] },
-                    { id: "reach_v1", desc: "Titrate until Endpoint", pts: 40, instr: "Titrate cautiously until the color change is permanent. Record the reading.", rules: [{ vessel: "conical_flask", prop: "pH", op: ">=", val: 8.3 }], observations: [{ title: "V1", description: "Burette reading (V1):", target_vessel: "burette_tube", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
-                    { id: "submit_calc", desc: "Calculate Normality", pts: 30, instr: "Use N1V1 = N2V2 to calculate the normality of the titrant.", calculations: [{ title: "Normality", desc: "Enter calculated normality:", form: "(0.1 * 20) / V1", tolerance: 0.01, points: 30 }] }
+                    { id: "fill_burette", desc: `Fill Burette (${config.titrant})`, pts: 5, instr: `💡 INSTRUCTION: Fill the burette with ${config.titrant} solution using a funnel. Ensure there are no air bubbles in the tip.`, rules: [{ vessel: "burette_tube", prop: config.titrant, op: ">=", val: 45.0 }] },
+                    { id: "zero_burette", desc: "Zero the Burette", pts: 5, instr: "💡 INSTRUCTION: Adjust the stopcock (Press 'S') until the bottom of the meniscus is exactly at the 0.00 mL mark.", rules: [{ vessel: "burette_tube", prop: "reading", op: "<=", val: 0.05 }] },
+                    { id: "pipette_analyte", desc: `Pipette ${config.analyte}`, pts: 10, instr: `💡 INSTRUCTION: Use the pipette to transfer exactly 20.0 mL of ${config.analyte} into the conical flask.`, rules: [{ vessel: "conical_flask", prop: config.analyte, op: "==", val: 20.0 }] },
+                    { id: "add_indicator", desc: `Add Indicator (${config.ind1})`, pts: 10, instr: `💡 INSTRUCTION: Use the dropper to add 1-2 drops of ${config.ind1} to the flask. The solution may change color.`, rules: [{ vessel: "conical_flask", prop: config.ind1, op: ">=", val: 1.0 }] },
+                    { id: "reach_v1", desc: "Titrate until Endpoint", pts: 40, instr: "💡 INSTRUCTION: Titrate cautiously by pressing SPACE. Swirl the flask (Press 'W') constantly. Stop when the color change is permanent. Record V1.", rules: [{ vessel: "conical_flask", prop: "pH", op: ">=", val: 8.3 }], observations: [{ title: "V1", description: "Enter final burette reading (V1) in mL:", target_vessel: "burette_tube", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
+                    { id: "submit_calc", desc: "Calculate Normality", pts: 30, instr: "💡 INSTRUCTION: Use the formula N1V1 = N2V2 to calculate the normality of the titrant and enter it below.", calculations: [{ title: "Normality", desc: "Calculated Normality of Titrant:", form: "(0.1 * 20) / V1", tolerance: 0.01, points: 30 }] }
                 ]
             };
         } else if (pKey === 'double') {
             return {
                 title: `Estimation of Carbonates (Warder's Method) using ${config.titrant}`,
-                objective: `To estimate the amounts of Sodium Carbonate and Sodium Bicarbonate in the given mixture using standard ${config.titrant}.`,
+                objective: `To estimate the amounts of Sodium Carbonate (Na2CO3) and Sodium Bicarbonate (NaHCO3) in a mixture using standard ${config.titrant} with double indicators.`,
+                principle: `1. Phenolphthalein Endpoint (V1): Na2CO3 + HCl → NaHCO3 + NaCl (Half neutralization of Carbonate). \n2. Methyl Orange Endpoint (V2): NaHCO3 + HCl → NaCl + H2O + CO2 (Complete neutralization of Bicarbonate).`,
                 type: "double_indicator",
                 v1: 12.0, v2: 24.0, v1_color: "#FFC0CB", v2_color: "#FF4500",
+                materials: ["50ml Burette", "250ml Conical Flask", "20ml Pipette", "Funnel", "Beaker", "Dropper"],
+                steps: [
+                    "Fill and zero the burette with standard Hydrochloric Acid solution.",
+                    "Pipette 20.0 mL of the carbonate mixture into a conical flask.",
+                    "Add Phenolphthalein indicator; the solution turns pink.",
+                    "Titrate until the pink color disappears. Record this as V1.",
+                    "Add Methyl Orange indicator to the same flask; the solution turns yellow.",
+                    "Continue titration until the color changes from yellow to pale orange. Record total volume as V2."
+                ],
                 initial_state: [
                     { type: 'common_stand', location: 'table', x: 400 },
                     { type: 'burette_tube', location: 'table', x: 400, chem: 'Empty', vol: 0 },
@@ -593,16 +612,16 @@
                     { type: 'funnel', location: 'shelfTop', x: 400 }
                 ],
                 milestones: [
-                    { id: "fill_burette", desc: `Fill Burette (${config.titrant})`, pts: 5, instr: `Fill the burette with standard ${config.titrant} solution.`, rules: [{ vessel: "burette_tube", prop: config.titrant, op: ">=", val: 45.0 }] },
-                    { id: "zero_burette", desc: "Zero the Burette", pts: 5, instr: "Carefully adjust the liquid level to the 0.00 mL mark.", rules: [{ vessel: "burette_tube", prop: "reading", op: "<=", val: 0.05 }] },
-                    { id: "pipette_mixture", desc: `Pipette ${config.analyte}`, pts: 10, instr: `Pipette 20.0 mL of the ${config.analyte} mixture into the conical flask.`, rules: [{ vessel: "conical_flask", prop: config.analyte, op: "==", val: 20.0 }] },
-                    { id: "add_ind1", desc: `Add ${config.ind1}`, pts: 10, instr: `Use the dropper to add 1-2 drops of ${config.ind1} indicator to the flask.`, rules: [{ vessel: "conical_flask", prop: config.ind1, op: ">=", val: 1.0 }] },
-                    { id: "endpoint_1", desc: "Titrate to 1st Endpoint (V1)", pts: 20, instr: `Titrate until the pink color just disappears. Record V1.`, rules: [{ vessel: "conical_flask", prop: "pH", op: "<=", val: 8.3 }], observations: [{ title: "V1", description: "Burette Reading 1 (V1):", target_vessel: "burette_tube", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
-                    { id: "add_ind2", desc: `Add ${config.ind2}`, pts: 10, instr: `Add 1-2 drops of ${config.ind2} to the same flask using the dropper.`, rules: [{ vessel: "conical_flask", prop: config.ind2, op: ">=", val: 1.0 }] },
-                    { id: "endpoint_2", desc: "Titrate to 2nd Endpoint (V2)", pts: 20, instr: `Continue titration until the solution turns pale pink/orange. Record V2.`, rules: [{ vessel: "conical_flask", prop: "pH", op: "<=", val: 4.0 }], observations: [{ title: "V2", description: "Total Burette Reading (V2):", target_vessel: "burette_tube", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
-                    { id: "calc_mass", desc: "Mass Calculation", pts: 20, instr: "Calculate the mass of carbonates in grams/liter.", calculations: [
-                        { title: "Na2CO3 Mass", desc: "Mass of Na2CO3 (g):", form: "V1 * 2 * 0.053 * 50", tolerance: 0.05, points: 10 },
-                        { title: "NaHCO3 Mass", desc: "Mass of NaHCO3 (g):", form: "(V2 - (2 * V1)) * 0.084 * 50", tolerance: 0.05, points: 10 }
+                    { id: "fill_burette", desc: `Fill Burette (${config.titrant})`, pts: 5, instr: `💡 INSTRUCTION: Fill the burette with standard ${config.titrant} solution. Use a funnel to avoid spills.`, rules: [{ vessel: "burette_tube", prop: config.titrant, op: ">=", val: 45.0 }] },
+                    { id: "zero_burette", desc: "Zero the Burette", pts: 5, instr: "💡 INSTRUCTION: Carefully adjust the liquid level until the meniscus matches the 0.00 mL mark exactly.", rules: [{ vessel: "burette_tube", prop: "reading", op: "<=", val: 0.05 }] },
+                    { id: "pipette_mixture", desc: `Pipette ${config.analyte}`, pts: 10, instr: `💡 INSTRUCTION: Pipette exactly 20.0 mL of the mixture into the conical flask. Precise volume is critical.`, rules: [{ vessel: "conical_flask", prop: config.analyte, op: "==", val: 20.0 }] },
+                    { id: "add_ind1", desc: `Add ${config.ind1}`, pts: 10, instr: `💡 INSTRUCTION: Use the dropper to add 1-2 drops of ${config.ind1}. The mixture should turn pink.`, rules: [{ vessel: "conical_flask", prop: config.ind1, op: ">=", val: 1.0 }] },
+                    { id: "endpoint_1", desc: "Titrate to 1st Endpoint (V1)", pts: 20, instr: `💡 INSTRUCTION: Titrate until the pink color just disappears. This represents the half-neutralization of Na2CO3. Record V1.`, rules: [{ vessel: "conical_flask", prop: "pH", op: "<=", val: 8.3 }], observations: [{ title: "V1", description: "Burette Reading at 1st Endpoint (V1):", target_vessel: "burette_tube", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
+                    { id: "add_ind2", desc: `Add ${config.ind2}`, pts: 10, instr: `💡 INSTRUCTION: Add 1-2 drops of ${config.ind2} to the SAME flask. The solution will turn yellow.`, rules: [{ vessel: "conical_flask", prop: config.ind2, op: ">=", val: 1.0 }] },
+                    { id: "endpoint_2", desc: "Titrate to 2nd Endpoint (V2)", pts: 20, instr: `💡 INSTRUCTION: Continue titration until the solution turns pale orange. This represents complete neutralization. Record total V2.`, rules: [{ vessel: "conical_flask", prop: "pH", op: "<=", val: 4.0 }], observations: [{ title: "V2", description: "Total Burette Reading at 2nd Endpoint (V2):", target_vessel: "burette_tube", target_property: "reading", tolerance: 0.2, penalty: 10 }] },
+                    { id: "calc_mass", desc: "Mass Calculation", pts: 20, instr: "💡 INSTRUCTION: Use your recorded V1 and V2 to calculate the mass of Na2CO3 and NaHCO3 in g/L.", calculations: [
+                        { title: "Na2CO3 Mass", desc: "Mass of Sodium Carbonate (g/L):", form: "V1 * 2 * 0.053 * 50", tolerance: 0.05, points: 10 },
+                        { title: "NaHCO3 Mass", desc: "Mass of Sodium Bicarbonate (g/L):", form: "(V2 - (2 * V1)) * 0.084 * 50", tolerance: 0.05, points: 10 }
                     ]}
                 ]
             };
@@ -675,13 +694,36 @@
         // 1. Basic Info
         document.querySelector('[name="title"]').value = bp.title;
         document.querySelector('[name="objective"]').value = bp.objective;
+        document.querySelector('[name="principle"]').value = bp.principle || "";
         document.querySelector('[name="type"]').value = bp.type;
 
-        // 2. Scene
+        // 2. Materials
+        if (bp.materials) {
+            const matContainer = document.getElementById('materials-container');
+            matContainer.innerHTML = '';
+            materialCount = 0;
+            bp.materials.forEach(mName => {
+                addMaterial();
+                document.querySelector(`[name="material-${materialCount-1}"]`).value = mName;
+            });
+        }
+
+        // 3. Procedure Steps
+        if (bp.steps) {
+            const stepContainer = document.getElementById('steps-container');
+            stepContainer.innerHTML = '';
+            stepCount = 0;
+            bp.steps.forEach(sDesc => {
+                addStep();
+                document.querySelector(`[name="step-${stepCount-1}"]`).value = sDesc;
+            });
+        }
+
+        // 4. Scene
         document.getElementById('visual-canvas').innerHTML = '';
         bp.initial_state.forEach(item => renderCanvasNode(item.type, item.location, item.chem, item.vol, item.x));
 
-        // 3. Targets
+        // 5. Targets
         document.querySelector('[name="target_v1_min"]').value = bp.v1;
         document.querySelector('[name="target_v2_min"]').value = bp.v2;
         
@@ -689,7 +731,7 @@
         updatePickerFromHex('v1', bp.v1_color);
         updatePickerFromHex('v2', bp.v2_color);
 
-        // 4. Milestones
+        // 6. Milestones
         const container = document.getElementById('milestones-container');
         container.innerHTML = '';
         milestoneCount = 0;

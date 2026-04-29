@@ -5,8 +5,31 @@
     .main-sidebar {
         overflow-y: auto;
     }
+    /* Custom Sidebar Visibility Fixes */
+    .nav-sidebar .nav-link {
+        color: #ced4da !important; /* Default light gray */
+        transition: background-color 0.2s, color 0.2s;
+    }
+    .nav-sidebar .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        color: #ffffff !important;
+    }
+    .nav-sidebar .nav-link.active {
+        background-color: #007bff !important; /* Primary Blue */
+        color: #ffffff !important;
+    }
+    .nav-sidebar .nav-link i {
+        color: #ced4da;
+    }
+    .nav-sidebar .nav-link:hover i, 
+    .nav-sidebar .nav-link.active i {
+        color: #ffffff !important;
+    }
+    .brand-text {
+        color: #ffffff !important;
+    }
 </style>
-<aside class="main-sidebar sidebar-light-blue elevation-4">
+<aside class="main-sidebar sidebar-dark-primary elevation-4" style="background: #0b0f1a !important;">
     {% if request.user.user_type == '1' %}
 
 
@@ -32,7 +55,7 @@
 
 
     <!-- Sidebar Menu -->
-    <nav class="navbar navbar-light bg-white sidebar-scroll">
+    <nav class="sidebar-scroll">
         <!-- sidebar content here -->
 
         <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">

@@ -202,15 +202,17 @@ def save_lab_report(request):
             
             # --- START PROGRESSION UPDATE ---
             modules = LessonModule.objects.filter(experiment__title=data.get('name'), subject__course=student.course)
+            module_id = None
             for module in modules:
                 progress = StudentProgress.objects.filter(student=student, lesson_module=module).first()
                 if progress:
                     progress.lab_completed = True
                     progress.lab_score = float(data.get('totalScore', 0))
                     progress.save()
+                    module_id = module.id
             # --- END PROGRESSION UPDATE ---
 
-            return JsonResponse({"status": "success", "message": "Experiment saved!"})
+            return JsonResponse({"status": "success", "message": "Experiment saved!", "module_id": module_id})
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
@@ -1169,81 +1171,174 @@ def download_unified_report(request, module_id):
     elements = []
     
     styles = getSampleStyleSheet()
+    header_style = styles['Heading2']
+    header_style.textColor = HexColor('#1e3a8a')
     
-    # Title
-    elements.append(Paragraph(f"Unified Assessment Report: {module.title}", styles['Title']))
-    elements.append(Spacer(1, 0.4 * inch))
+    def clean_chem(text):
+        if not text: return ""
+        text = text.replace("₂", "<sub>2</sub>").replace("₃", "<sub>3</sub>")
+        text = text.replace("Na2CO3", "Na<sub>2</sub>CO<sub>3</sub>").replace("NaHCO3", "NaHCO<sub>3</sub>")
+        return text
 
-    # Student Details
+    table_cell_style = styles['Normal']
+    table_cell_style.fontSize = 9
+    table_cell_style.leading = 11
+
+    # Title
+    elements.append(Paragraph(f"Comprehensive Assessment Report", styles['Title']))
+    elements.append(Paragraph(clean_chem(f"Module: {module.title}"), styles['Heading3']))
+    elements.append(Spacer(1, 0.2 * inch))
+
+    # 1. Student Details Section
+    elements.append(Paragraph("Student Information", header_style))
     student_data = [
+        [Paragraph('<b>Field</b>', table_cell_style), Paragraph('<b>Detail</b>', table_cell_style)],
         ['Student Name:', f"{student.admin.first_name} {student.admin.last_name}"],
         ['Email:', student.admin.email],
         ['Course:', student.course.name],
         ['Subject:', module.subject.name],
+        ['Report Generated:', datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
     ]
-    t_student = Table(student_data, colWidths=[150, 300])
+    t_student = Table(student_data, colWidths=[150, 320])
     t_student.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), HexColor('#1e3a8a')),
-        ('TEXTCOLOR', (0, 0), (0, -1), colors.white),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('PADDING', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-    ]))
-    elements.append(t_student)
-    elements.append(Spacer(1, 0.4 * inch))
-
-    # Progression Status
-    prog_data = [
-        ['Component', 'Status / Score'],
-        ['1. Theory (Video)', 'Completed' if progress.video_watched else 'Incomplete'],
-        ['2. Assessment (Quiz)', f"Score: {progress.latest_quiz_score}% (Min {module.pass_percentage}%)"],
-        ['3. Practical (Virtual Lab)', f"Score: {progress.lab_score}" if progress.lab_completed else 'Incomplete'],
-    ]
-    t_prog = Table(prog_data, colWidths=[200, 250])
-    t_prog.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), HexColor('#1e3a8a')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('BACKGROUND', (0, 1), (0, -1), HexColor('#f1f5f9')),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('PADDING', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('PADDING', (0, 0), (-1, -1), 6),
     ]))
-    elements.append(t_prog)
-    elements.append(Spacer(1, 0.4 * inch))
+    elements.append(t_student)
+    elements.append(Spacer(1, 0.3 * inch))
 
-    # Lab Submission Details
+    # 2. Theory Section (Video)
+    elements.append(Paragraph("1. Theory Component (Video)", header_style))
+    video_status = "COMPLETED" if progress.video_watched else "NOT COMPLETED"
+    video_title = module.video_course.title if module.video_course else "N/A"
+    
+    theory_data = [
+        [Paragraph('<b>Metric</b>', table_cell_style), Paragraph('<b>Details</b>', table_cell_style)],
+        ['Tutorial Video:', Paragraph(video_title, table_cell_style)],
+        ['Status:', video_status],
+    ]
+    t_theory = Table(theory_data, colWidths=[150, 320])
+    t_theory.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#475569')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('PADDING', (0, 0), (-1, -1), 6),
+        ('TEXTCOLOR', (1, 2), (1, 2), colors.green if progress.video_watched else colors.red),
+    ]))
+    elements.append(t_theory)
+    elements.append(Spacer(1, 0.3 * inch))
+
+    # 3. Assessment Section (Quiz)
+    elements.append(Paragraph("2. Assessment Component (Quiz)", header_style))
+    quiz_title = module.quiz.title if module.quiz else "N/A"
+    quiz_result = QuizResult.objects.filter(student=student, quiz=module.quiz).last()
+    
+    quiz_data = [
+        [Paragraph('<b>Metric</b>', table_cell_style), Paragraph('<b>Details</b>', table_cell_style)],
+        ['Quiz Name:', Paragraph(quiz_title, table_cell_style)],
+        ['Pass Percentage:', f"{module.pass_percentage}%"],
+        ['Your Best Score:', f"{progress.latest_quiz_score}%"],
+        ['Status:', "PASSED" if progress.quiz_passed else "FAILED / INCOMPLETE"],
+    ]
+    if quiz_result:
+        quiz_data.append(['Last Attempt Date:', quiz_result.date_taken.strftime("%Y-%m-%d %H:%M")])
+
+    t_quiz = Table(quiz_data, colWidths=[150, 320])
+    t_quiz.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), HexColor('#475569')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('PADDING', (0, 0), (-1, -1), 6),
+        ('TEXTCOLOR', (1, 4), (1, 4), colors.green if progress.quiz_passed else colors.red),
+    ]))
+    elements.append(t_quiz)
+    elements.append(Spacer(1, 0.3 * inch))
+
+    # 4. Practical Section (Virtual Lab)
+    elements.append(Paragraph("3. Practical Component (Virtual Lab)", header_style))
     if progress.lab_completed and module.experiment:
         submission = VirtualLabSubmission.objects.filter(student=student, experiment_name=module.experiment.title).last()
         if submission:
-            elements.append(Paragraph("Virtual Lab Submission Log", styles['Heading3']))
-            elements.append(Spacer(1, 0.2 * inch))
-            sub_data = [['Metric', 'Value']]
+            elements.append(Paragraph(clean_chem(f"Experiment: {submission.experiment_name}"), styles['Normal']))
+            elements.append(Spacer(1, 0.1 * inch))
             
-            # Dynamic observations
+            # Observations & Calculations Combined
+            lab_metrics = [[Paragraph('<b>Type</b>', table_cell_style), Paragraph('<b>Metric</b>', table_cell_style), Paragraph('<b>Student Value</b>', table_cell_style)]]
             if submission.observations:
                 for key, val in submission.observations.items():
-                    sub_data.append([f"Observation: {key}", str(val)])
-            
-            # Dynamic calculations
+                    lab_metrics.append(['Observation', Paragraph(clean_chem(key), table_cell_style), str(val)])
             if submission.calculations:
                 for key, val in submission.calculations.items():
-                    sub_data.append([f"Calculation: {key}", str(val)])
+                    lab_metrics.append(['Calculation', Paragraph(clean_chem(key), table_cell_style), str(val)])
             
-            sub_data.append(['Total Score', str(submission.total_score)])
-            sub_data.append(['Penalty Log', submission.penalty_log or "No penalties"])
-            
-            t_sub = Table(sub_data, colWidths=[200, 250])
-            t_sub.setStyle(TableStyle([
+            t_lab = Table(lab_metrics, colWidths=[100, 220, 150])
+            t_lab.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), HexColor('#1e3a8a')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('PADDING', (0, 0), (-1, -1), 8),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('PADDING', (0, 0), (-1, -1), 6),
             ]))
-            elements.append(t_sub)
+            elements.append(t_lab)
+            elements.append(Spacer(1, 0.2 * inch))
+
+            # Penalty Log Breakdown
+            elements.append(Paragraph("Penalty & Mistakes Log", styles['Heading4']))
+            penalty_data = [[Paragraph('<b>Mistake Description</b>', table_cell_style), Paragraph('<b>Penalty Points</b>', table_cell_style)]]
+            
+            if submission.penalty_log:
+                logs = submission.penalty_log.split(" | ")
+                for log in logs:
+                    if ":" in log:
+                        reason = log.split(":", 1)[1].strip()
+                        # Remove points from reason if they are already being displayed in the points column
+                        reason_clean = reason.split("(-")[0].strip()
+                        pts = "Tracked"
+                        if "(-" in log and "pts)" in log:
+                            pts = log.split("(-")[1].split("pts)")[0].strip()
+                        penalty_data.append([Paragraph(reason_clean, table_cell_style), f"-{pts}"])
+            
+            if len(penalty_data) == 1:
+                penalty_data.append([Paragraph("No procedural mistakes recorded.", table_cell_style), "0"])
+
+            t_penalties = Table(penalty_data, colWidths=[370, 100])
+            t_penalties.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), HexColor('#991b1b')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+                ('PADDING', (0, 0), (-1, -1), 6),
+                ('TEXTCOLOR', (1, 1), (1, -1), colors.red),
+            ]))
+            elements.append(t_penalties)
+            elements.append(Spacer(1, 0.2 * inch))
+
+            # Final Score
+            score_data = [['Final Practical Score', f"{submission.total_score} / 100"]]
+            t_score = Table(score_data, colWidths=[370, 100])
+            t_score.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), HexColor('#166534')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+                ('PADDING', (0, 0), (-1, -1), 8),
+            ]))
+            elements.append(t_score)
+    else:
+        elements.append(Paragraph("Lab component not yet completed.", styles['Italic']))
 
     doc.build(elements)
     buffer.seek(0)
     
     response = HttpResponse(buffer, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="Report_{student.admin.first_name}_{module.title}.pdf"'
+    response['Content-Disposition'] = f'inline; filename="Report_{student.admin.first_name}_{module.title}.pdf"'
     return response

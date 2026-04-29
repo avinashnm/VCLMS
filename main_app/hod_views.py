@@ -1392,6 +1392,10 @@ def add_experiment(request):
                         val_str = request.POST.get(f"rule-val-{m_idx}-{r_idx}")
                         
                         if target_vessel and target_prop and operator and val_str:
+                            # If property is 'chemical', the actual property name is the selected chemical
+                            if target_prop == "chemical":
+                                target_prop = request.POST.get(f"rule-chem-{m_idx}-{r_idx}", "Unknown Chemical")
+
                             try:
                                 val = float(val_str)
                                 MilestoneRule.objects.create(
@@ -1575,6 +1579,9 @@ def edit_experiment(request, experiment_id):
                     val_str = request.POST.get(f"rule-val-{m_idx}-{r_idx}")
                     
                     if target_vessel and target_prop and operator and val_str:
+                        if target_prop == "chemical":
+                            target_prop = request.POST.get(f"rule-chem-{m_idx}-{r_idx}", "Unknown Chemical")
+                            
                         try:
                             val = float(val_str)
                             MilestoneRule.objects.create(

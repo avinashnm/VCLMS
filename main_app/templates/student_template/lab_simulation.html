@@ -84,21 +84,20 @@
 
 {{ config|json_script:"experiment-config-data" }}
 
-<div class="lab-root">
-  <div class="lab-header">
+<div class="lab-root" style="background: #0b0f1a !important;">
+  <div class="lab-header" style="background: #111827; border-bottom: 1px solid rgba(255,255,255,0.1);">
     <h2 class="lab-title">🧪 {{ experiment.name }}</h2>
 
     <div class="header-actions">
-      <!-- New Manual Toggles -->
       <button class="btn-lab-toggle" onclick="toggleCatalog()">📦 Apparatus Catalog</button>
       <button class="btn-lab-toggle" onclick="toggleControls()">⌨️ Controls Guide</button>
       <button class="btn-lab-toggle" onclick="toggleAssistant()">🧪 Lab Assistant</button>
       {% if is_test_mode %}
-      <a href="{% url 'manage_experiments' %}" class="btn btn-secondary btn-sm" style="font-weight: bold;">
+      <a href="{% url 'manage_experiments' %}" class="btn btn-secondary btn-sm" style="font-weight: bold; border-radius: 6px;">
         Close Preview
       </a>
       {% else %}
-      <a href="{% url 'lab_experiment' slug %}" class="btn btn-danger btn-sm" style="font-weight: bold;">
+      <a href="{% url 'lab_experiment' slug %}" class="btn btn-danger btn-sm" style="font-weight: bold; border-radius: 6px;">
         Exit Lab
       </a>
       {% endif %}
@@ -109,39 +108,25 @@
     <div id="simulation-canvas" data-experiment-slug="{{ slug }}"></div>
   </div>
 </div>
-<script>
-  // Link HTML buttons to p5.js engine variables
-  function toggleCatalog() {
-    if (typeof catalogVisible !== 'undefined') {
-      catalogVisible = !catalogVisible;
-    }
-  }
-
-  function toggleControls() {
-    if (typeof controlsVisible !== 'undefined') {
-      controlsVisible = !controlsVisible;
-    }
-  }
-
-  function toggleAssistant() {
-    if (typeof assistantVisible !== 'undefined') {
-      assistantVisible = !assistantVisible;
-    }
-  }
-</script>
 
 <script>
-
   // 1. Capture the rules from Django securely via the json_script tag
   const EXPERIMENT_CONFIG = JSON.parse(document.getElementById('experiment-config-data').textContent);
-
-  // 2. Set the theoretical targets in the global scope for the engine
-  const THEORETICAL_V1 = EXPERIMENT_CONFIG.targets?.v1 || 10.0;
-  const THEORETICAL_V2 = EXPERIMENT_CONFIG.targets?.v2 || 25.0;
+  
+  // 2. Define global variables expected by lab_engine.js
+  var experimentData = EXPERIMENT_CONFIG;
+  const THEORETICAL_V1 = EXPERIMENT_CONFIG.targets?.v1 || 12.0;
+  const THEORETICAL_V2 = EXPERIMENT_CONFIG.targets?.v2 || 24.0;
 
   console.log("Lab Config Loaded. Target V1:", THEORETICAL_V1);
+
+  // 3. UI Toggles for p5.js engine
+  function toggleCatalog() { if (typeof catalogVisible !== 'undefined') catalogVisible = !catalogVisible; }
+  function toggleControls() { if (typeof controlsVisible !== 'undefined') controlsVisible = !controlsVisible; }
+  function toggleAssistant() { if (typeof assistantVisible !== 'undefined') assistantVisible = !assistantVisible; }
 </script>
 
+<!-- p5.js is loaded here locally to avoid CDN blocking issues -->
 <script src="{% static 'js/p5.min.js' %}"></script>
 <script src="{% static 'js/lab_catalog.js' %}?v=2026_4"></script>
 <script src="{% static 'js/lab_engine.js' %}?v=2026_6"></script>

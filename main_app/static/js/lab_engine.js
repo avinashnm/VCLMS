@@ -39,7 +39,7 @@ let labSurfaces = null;
 const BURETTE_GLASS_X_OFFSET = -8;
 // Initialize from Django (passed via template)
 // Try finding the global variable first, then fallback to the script tag (json_script)
-let experimentData = typeof EXPERIMENT_CONFIG !== 'undefined' ? EXPERIMENT_CONFIG : null;
+var experimentData = typeof EXPERIMENT_CONFIG !== 'undefined' ? EXPERIMENT_CONFIG : null;
 if (!experimentData) {
   const configEl = document.getElementById('experiment-config-data');
   if (configEl) {
@@ -82,11 +82,13 @@ class MarkingManager {
     this.completedIds = new Set();
     this.mistakesMade = new Set();
     this.buretteProperlyZeroed = false;
-
-    // Stored observations for the calculation phase
     this.recordedV1 = 0;
     this.recordedV2 = 0;
-    this.swirlNeglectTimer = 0; // Track lack of swirling
+    this.swirlNeglectTimer = 0;
+    this.rulesValidated = false;
+    this.currentStepHint = "";
+
+    this.currentStepHint = "";
   }
 
   // This MUST be called inside the p5.js draw() loop
@@ -94,15 +96,11 @@ class MarkingManager {
     const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
     const burette = Object.values(vessels).find(v => (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)));
 
-    // GENERIC BURETTE PENALTIES (Apply to all titration experiments)
+    // GENERIC BURETTE PENALTIES
     if (burette && (this.config?.type === 'double_indicator' || this.config?.type === 'simple_titration')) {
       let reading = abs(burette.capacity - burette.targetVolume);
+      if (reading <= 0.3) this.buretteProperlyZeroed = true;
 
-      if (reading <= 0.3) {
-        this.buretteProperlyZeroed = true;
-      }
-
-      // Penalty: Titrating without Zeroing
       if (keyIsDown(32) && flask) {
         const snapX = burette.type === 'burette' ? (burette.x + BURETTE_GLASS_X_OFFSET) : burette.x;
         const dripTipY = burette.type === 'burette' ? (burette.y + 120) : (burette.y + burette.h * 0.4);
@@ -114,16 +112,15 @@ class MarkingManager {
         }
       }
 
-      // Penalty: Titrating without removing funnel
       if (keyIsDown(32) && !burette.hasFunnel) {
-        this.addPenalty("no_funnel", 5, "Started titration without using a funnel (or funnel is missing).");
+        // Only if it was recently filled? Or just checking if funnel is missing during titration
+        // Actually, you should REMOVE the funnel before titrating.
       }
 
-      // Penalty: Titrating without Swirling (Lack of Agitation)
       if (keyIsDown(32) && !keyIsDown(87)) {
         this.swirlNeglectTimer++;
-        if (this.swirlNeglectTimer > 180) { // ~3 seconds of neglect
-          this.addPenalty("no_swirl", 10, "Titrating without swirling the flask regularly.");
+        if (this.swirlNeglectTimer > 300) { // ~5 seconds
+          this.addPenalty("no_swirl", 10, "Titrating without swirling the flask (Hold 'W').");
         }
       } else {
         if (keyIsDown(87)) this.swirlNeglectTimer = 0;
@@ -146,7 +143,7 @@ class MarkingManager {
           
           if (!targetVessel) {
             allRulesPassed = false;
-            this.currentStepHint = `X Required apparatus (${rule.target_vessel}) not found. Check blueprint naming.`;
+            this.currentStepHint = `X Missing: ${rule.target_vessel.replace('_',' ')}`;
             break;
           }
 
@@ -159,17 +156,17 @@ class MarkingManager {
           } else if (rule.target_property === "pH") {
             propValue = targetVessel.contents ? (targetVessel.contents.pH || 7.0) : 7.0;
           } else if (targetVessel.contents) {
-            // Check if property is a chemical name
+            // Check if property is a chemical name or a special indicator tag
             const chemRef = targetVessel.contents.chemicals ? targetVessel.contents.chemicals[rule.target_property] : null;
             if (chemRef) {
               propValue = chemRef.volume;
             } else if (targetVessel.contents.indicators && targetVessel.contents.indicators[rule.target_property] !== undefined) {
+              // Indicators stored as drop counts
               propValue = targetVessel.contents.indicators[rule.target_property];
             } else {
-              // If we are looking for a chemical that ISN'T there, propValue is 0.
               propValue = 0;
               if (rule.operator !== "<" && rule.operator !== "<=") {
-                  this.currentStepHint = `Missing chemical: ${rule.target_property} in ${rule.target_vessel}.`;
+                  this.currentStepHint = `X Missing chemical: ${rule.target_property}`;
               }
             }
           }
@@ -181,18 +178,16 @@ class MarkingManager {
             case ">":  rulePassed = (propValue > rule.value); break;
             case "<=": rulePassed = (propValue <= rule.value); break;
             case "<":  rulePassed = (propValue < rule.value); break;
-            case "==": rulePassed = (abs(propValue - rule.value) < 0.1); break; // 0.1 tolerance for vol
-            case "!=": rulePassed = (abs(propValue - rule.value) > 0.1); break;
-            case "CONTAINS": rulePassed = (propValue > 0); break;
+            case "==": rulePassed = (abs(propValue - rule.value) < 0.2); break; // 0.2 tolerance for vol
+            case "!=": rulePassed = (abs(propValue - rule.value) > 0.2); break;
+            case "CONTAINS": rulePassed = (propValue > 0.01); break;
           }
 
           if (!rulePassed) {
             allRulesPassed = false;
-            if (propValue === 0 && (rule.operator === ">=" || rule.operator === "==" || rule.operator === "CONTAINS")) {
-                this.currentStepHint = `Missing chemical: ${rule.target_property} in ${rule.target_vessel}.`;
-            } else {
+            if (!this.currentStepHint) {
                 let opLabel = rule.operator === "==" ? "exactly" : (rule.operator === ">=" ? "at least" : rule.operator);
-                this.currentStepHint = `${rule.target_property} should be ${opLabel} ${rule.value}.`;
+                this.currentStepHint = `X ${rule.target_property} should be ${opLabel} ${rule.value}`;
             }
             break;
           }
@@ -201,20 +196,23 @@ class MarkingManager {
         allRulesPassed = true;
       }
 
-      // --- NEW ASSESSMENT LOGIC ---
+      // GLOBAL PENALTIES: Physical Mistakes
+      Object.values(vessels).forEach(v => {
+          // Overfill check
+          if (v.targetVolume > v.capacity * 1.05 && v.type !== 'burette' && v.type !== 'burette_tube') {
+              this.addPenalty("overfill_" + v.type, 10, `Overfilled ${v.type.replace('_',' ')}. Liquid spilled on workbench!`);
+          }
+      });
+
+      // --- ASSESSMENT PROGRESSION ---
       const hasPrompts = (m.observation_prompts && m.observation_prompts.length > 0) || 
                          (m.calculation_prompts && m.calculation_prompts.length > 0);
 
       if (hasPrompts) {
-          // Rule-based validation is now just a state for the Manual Button
           this.rulesValidated = allRulesPassed;
-          if (!allRulesPassed && this.currentStepHint) {
-              // Show hint in the drawer, but don't auto-complete
-          }
       } else {
-          // For non-prompt steps (like Fill Burette), keep automatic completion
           if (allRulesPassed) {
-            console.log(`[MarkingManager] Auto-completing milestone: ${m.title}`);
+            console.log(`[MarkingManager] Auto-advancing milestone: ${m.id}`);
             this.completeMilestone(m.id);
           }
       }
@@ -316,10 +314,10 @@ class MarkingManager {
   addPenalty(id, points, reason) {
     if (this.mistakesMade.has(id)) return;
     this.mistakesMade.add(id);
-    sessionMarks -= (points || 0);
+    sessionMarks = Math.max(0, sessionMarks - (points || 0));
+    if (typeof penalties !== 'undefined') penalties.push(`${id}: ${reason} (-${points} pts)`);
     console.warn(`[MarkingManager] PENALTY: -${points} pts. Reason: ${reason}`);
     
-    // Optional: Show a subtle warning toast or feedback
     if (typeof showToast !== 'undefined') showToast(`Mistake: ${reason} (-${points} pts)`, "warning");
   }
 
@@ -340,6 +338,11 @@ class MarkingManager {
       .then(res => res.json())
       .then(data => {
         alert(`Assessment Complete!\nFinal Score: ${sessionMarks}/100\nYour report has been submitted to the instructor.`);
+        if (data.module_id) {
+          window.location.href = `/student/report/download/${data.module_id}/`;
+        } else {
+          window.location.href = "/student/lab/";
+        }
       })
       .catch(err => console.error("Save error:", err));
   }
@@ -1612,7 +1615,7 @@ function draw() {
     if (frameCount % 60 === 0) console.error("GLOBAL DRAW CRASH:", e);
   }
   if (catalogVisible) drawCatalogPanel();
-  if (assistantVisible) drawDataPanel();
+  if (assistantVisible) drawAssistant();
   drawControlsPanel();
   drawClearShelfButton(); // Magic button on the shelf
 }
@@ -1904,19 +1907,20 @@ function drawDroplets(startX, startY, endX, endY, col) {
 function drawRealisticLiquid(v, col) {
   if (!v.volume || v.volume < 0.1 || !col) return;
   
-  // Safety: If p5.js color object creation failed due to NaN
-  if (!col.levels) return;
-
-  // --- BUG FIX: Prioritize the dynamic 'col' argument (the Titration Color) ---
-  // If 'col' is passed, it means the chemistry engine is overriding the visual property.
+  // --- BUG FIX: Handle both p5.js color objects and raw arrays ---
   let activeCol;
-  if (col) {
+  if (col && col.levels) {
     activeCol = col;
+  } else if (Array.isArray(col)) {
+    activeCol = color(...col);
   } else if (v.color) {
-    activeCol = color(...v.color);
+    activeCol = Array.isArray(v.color) ? color(...v.color) : color(v.color);
   } else {
     activeCol = color(200, 220, 255, 100); // Default water look
   }
+
+  // Safety: If p5.js color object creation failed
+  if (!activeCol.levels) return;
 
   // Visual safety: don't draw if basically empty
   if (v.volume <= 0.01) return;
@@ -2224,93 +2228,154 @@ function drawTooltip(v) {
 }
 
 
-// ======================================================
-// UI PANELS
-// ======================================================
-function drawDataPanel() {
-  const panelW = 280, margin = 20, panelX = width - panelW - margin;
+function drawAssistant() {
+  if (!assistantVisible) return;
 
-  // 1. Dynamic Background Panel (Increased height slightly to accommodate)
-  fill(15, 25, 45, 240); stroke(255, 30);
-  rect(panelX, 30, panelW, 580, 15);
+  push();
+  let x = width - 230;
+  let y = 100; 
+  let w = 210;
+  let h = 480;
 
-  // 2. Header
-  fill(255); textAlign(LEFT); textStyle(BOLD); textSize(16);
-  text("🧪 LAB ASSISTANT", panelX + 20, 60);
-  fill(100, 200, 255); textSize(14);
-  text(`Total Marks: ${sessionMarks}/100`, panelX + 20, 85);
+  // Glass background
+  fill(30, 45, 60, 230);
+  stroke(0, 120, 255, 120);
+  strokeWeight(2);
+  rect(x, y, w, h, 15);
 
-  // 3. Current Task Box
-  let currentTask = manager.milestones[currentStepIndex];
-  if (currentTask) {
-    fill(255, 230, 100); textSize(13);
-    let totalSteps = manager.milestones.length;
-    let stepNum = currentStepIndex + 1;
-    text(`Step ${stepNum}/${totalSteps}: CURRENT TASK`, panelX + 20, 115);
+  // Header
+  noStroke();
+  fill(0, 190, 255);
+  textAlign(CENTER);
+  textSize(15);
+  textStyle(BOLD);
+  text("LAB ASSISTANT", x + w/2, y + 25);
+  
+  stroke(0, 120, 255, 80);
+  line(x + 20, y + 35, x + w - 20, y + 35);
 
-    fill(255); textStyle(NORMAL);
-    rect(panelX + 20, 125, panelW - 40, 60, 8);
-    fill(0); textAlign(CENTER, TOP); textStyle(NORMAL); textSize(12);
-    text(currentTask.desc, panelX + 22, 129, panelW - 44, 56);
+  // Marks
+  noStroke();
+  fill(255);
+  textSize(13);
+  text(`Total Marks: ${sessionMarks}/100`, x + w/2, y + 55);
 
-    // 4. Instructions Box (Cleanly positioned)
-    fill(40, 180, 255, 40); noStroke();
-    rect(panelX + 20, 185, panelW - 40, 100, 8);
-    fill(140, 220, 255); textAlign(LEFT, TOP); textSize(11);
+  let currentY = y + 75;
+  let m = experimentData?.milestones?.[currentStepIndex];
 
-    // Completely dynamic UI relies only on admin configured instruction
-    let hintText = currentTask.instruction || "Follow the laboratory manual steps to complete this step.";
+  if (m) {
+    // Current Step Box
+    fill(255, 255, 255, 25);
+    rect(x + 10, currentY, w - 20, 130, 10);
     
-    // NEW: Inject rule failure hints if they exist
+    fill(255, 255, 0);
+    textSize(11);
+    textAlign(LEFT);
+    text(`STEP ${currentStepIndex + 1}/${experimentData.milestones.length}:`, x + 20, currentY + 18);
+    
+    fill(255);
+    textSize(12);
+    textStyle(BOLD);
+    let desc = m.description ? m.description.toUpperCase() : "";
+    let instrY = currentY + 70;
+    
+    if (desc) {
+        text(desc, x + 20, currentY + 38, w - 40);
+    } else {
+        instrY = currentY + 38; // Shift instruction up if no description is present
+    }
+    
+    textStyle(NORMAL);
+    fill(180, 220, 255);
+    textSize(11);
+    let instr = m.instruction || "Continue following procedure.";
+    
+    // Prevent duplicate prefix: only add it if the raw instruction doesn't already have it
+    let displayInstr = instr;
+    if (!displayInstr.includes("💡") && !displayInstr.toUpperCase().includes("INSTRUCTION")) {
+        displayInstr = "💡 INSTRUCTION: " + instr;
+    }
+    
+    text(displayInstr, x + 20, instrY, w - 40);
+    
+    currentY += 140;
+
+    // Diagnostic Feedback / Status
     if (manager.currentStepHint) {
         fill(255, 120, 120);
-        text("❌ " + manager.currentStepHint, panelX + 30, 245, panelW - 60);
-        fill(140, 220, 255);
+        textSize(10);
+        textStyle(BOLD);
+        text(manager.currentStepHint, x + 20, currentY + 10, w - 40);
+        currentY += 45;
+    } else if (manager.rulesValidated) {
+        fill(100, 255, 100);
+        textSize(11);
+        textStyle(BOLD);
+        text("✓ READY TO SUBMIT", x + 20, currentY + 15);
+        currentY += 35;
+    } else {
+        currentY += 15;
     }
-    
-    text("💡 INSTRUCTION:\n" + hintText, panelX + 30, 195, panelW - 60);
 
-    // --- MANUAL ASSESSMENT BUTTON ---
-    const hasPrompts = (currentTask.observation_prompts && currentTask.observation_prompts.length > 0) || 
-                       (currentTask.calculation_prompts && currentTask.calculation_prompts.length > 0);
-
+    // Action Button (Stored globally for mousePressed)
+    const hasPrompts = (m.observation_prompts && m.observation_prompts.length > 0) || 
+                       (m.calculation_prompts && m.calculation_prompts.length > 0);
     if (hasPrompts) {
-        const btnX = panelX + 30, btnY = 300, btnW = panelW - 60, btnH = 45;
-        let btnLabel = "ENTER READINGS";
-        if (currentTask.calculation_prompts && currentTask.calculation_prompts.length > 0) btnLabel = "SUBMIT CALCULATION";
-        
-        // Button Shadow
-        noStroke(); fill(0, 50);
-        rect(btnX + 2, btnY + 2, btnW, btnH, 8);
-        
-        // Button Body (Vibrant Action Color)
-        fill(40, 200, 100); 
-        if (dist(mouseX, mouseY, btnX + btnW/2, btnY + btnH/2) < 50) fill(50, 220, 110);
+        let btnX = x + 20, btnY = currentY + 10, btnW = w - 40, btnH = 35;
+        window.assistantButtonBounds = { x: btnX, y: btnY, w: btnW, h: btnH };
+
+        fill(0, 150, 255);
+        if (manager.rulesValidated) fill(0, 200, 80);
         rect(btnX, btnY, btnW, btnH, 8);
         
-        // Button Text
-        fill(0, 80, 0); textAlign(CENTER, CENTER); textStyle(BOLD); textSize(13);
-        text(btnLabel, btnX + btnW/2, btnY + btnH/2);
+        fill(255);
+        textAlign(CENTER);
+        textSize(13);
+        textStyle(BOLD);
+        text("Enter Readings", x + w/2, btnY + 22);
+        
+        textAlign(CENTER);
+        fill(180, 220, 255, 150);
+        textSize(10);
         textStyle(NORMAL);
+        text("(Click Button to Submit)", x + w/2, btnY + 48);
     }
-  } else if (manager.milestones.length > 0 && currentStepIndex >= manager.milestones.length) {
-    fill(100, 255, 100); textSize(13);
-    text("🎉 ALL STEPS COMPLETE", panelX + 20, 115);
+
+    // Penalties Section
+    if (penalties.length > 0) {
+        let penaltyY = y + h - 90;
+        fill(255, 80, 80);
+        textSize(11);
+        textStyle(BOLD);
+        textAlign(LEFT);
+        text("⚠️ PENALTIES:", x + 20, penaltyY);
+        
+        textSize(10);
+        textStyle(NORMAL);
+        fill(255, 150, 150);
+        let recentPenalties = penalties.slice(-2);
+        let penYOffset = penaltyY + 15;
+        recentPenalties.forEach((p) => {
+            let displayMsg = p.includes(":") ? p.split(":")[1].trim() : p;
+            text("- " + displayMsg, x + 20, penYOffset, w - 40);
+            penYOffset += 32; // More space for potential 2-line descriptions
+        });
+    }
+  } else {
+    fill(100, 255, 100);
+    textAlign(CENTER);
+    textSize(14);
+    textStyle(BOLD);
+    text("EXPERIMENT COMPLETE!", x + w/2, y + 150);
+    fill(255);
+    textSize(12);
+    textStyle(NORMAL);
+    text("You may exit the lab.", x + w/2, y + 175);
   }
 
-  // 5. Mistakes Log (Moved lower and limited to avoid overlap)
-  if (penalties.length > 0) {
-    fill(255, 100, 100); textStyle(BOLD); textSize(13);
-    text("⚠️ MISTAKES:", panelX + 20, 310);
-
-    // Use a smaller font and limit display to last 4 mistakes
-    textSize(10); textStyle(NORMAL);
-    let displayList = penalties.slice(-4);
-    displayList.forEach((p, i) => {
-      text(p, panelX + 20, 335 + (i * 18), panelW - 40);
-    });
-  }
+  pop();
 }
+
 
 
 
@@ -2500,9 +2565,8 @@ function mousePressed() {
   if (currentTask) {
     const hasPrompts = (currentTask.observation_prompts && currentTask.observation_prompts.length > 0) || 
                        (currentTask.calculation_prompts && currentTask.calculation_prompts.length > 0);
-    if (hasPrompts) {
-      const panelW = 280, margin = 20, panelX = width - panelW - margin;
-      const btnX = panelX + 30, btnY = 300, btnW = panelW - 60, btnH = 45;
+    if (hasPrompts && assistantVisible && window.assistantButtonBounds) {
+      const { x: btnX, y: btnY, w: btnW, h: btnH } = window.assistantButtonBounds;
       if (mouseX > btnX && mouseX < btnX + btnW && mouseY > btnY && mouseY < btnY + btnH) {
           manager.handleManualSubmit();
           return;

@@ -1,49 +1,137 @@
 {% extends 'main_app/base.html' %}
-
+{% load static %}
+{% block page_title %}Assessment: {{ quiz.title }}{% endblock page_title %}
 {% block content %}
-<div class="container">
-  <div class="row">
-    <div class="col-md-12">
-      <h3 class="my-3">Subject : {{ quiz.subject}}</h3>
-      <form method="post" action="{% url 'take_quiz' quiz_id=quiz.id %}">
-        {% csrf_token %}
-        {% if form.errors %}
-        <div class="alert alert-danger" role="alert">
-          Please correct the following errors:
-          <ul>
-            {% for field in form %}
-            {% for error in field.errors %}
-            <li>{{ field.label }}: {{ error }}</li>
-            {% endfor %}
-            {% endfor %}
-          </ul>
-        </div>
-        {% endif %}
-        <div class="card my-3">
-          <div class="card-header">
-            <h3 class="card-title">{{ quiz.title }}</h3>
-          </div>
-          <div class="card-body">
-            {% for question in questions %}
-            <h3>Question {{ forloop.counter }}. {{ question.text }}</h3>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-            {% for option in question.option_set.all %}
-            <div>
-              <input type="radio" id="{{ option.id }}" name="question-{{ question.id }}-options" value="{{ option.id }}">
+<style>
+    :root {
+        --primary-bg: #0b0f1a;
+        --card-bg: rgba(255, 255, 255, 0.03);
+    }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--primary-bg); }
+    .content-wrapper { background: var(--primary-bg) !important; }
 
-              <label for="{{ option.id }}">{{ option.text }}</label>
-              <input type="hidden" name="is_correct" value="{{ option.is_correct }}">
+    .premium-bg {
+        background: radial-gradient(circle at 0% 100%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                    var(--primary-bg);
+        min-height: calc(100vh - 60px);
+        padding: 4rem 2rem;
+    }
+
+    .glass-card {
+        background: var(--card-bg);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 32px;
+    }
+
+    .question-card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 24px;
+        transition: all 0.3s ease;
+    }
+
+    .option-label {
+        display: block;
+        padding: 1.25rem 1.5rem;
+        background: rgba(255, 255, 255, 0.03);
+        border: 2px solid rgba(255, 255, 255, 0.05);
+        border-radius: 16px;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    input[type="radio"]:checked + .option-label {
+        background: rgba(59, 130, 246, 0.1);
+        border-color: #3b82f6;
+        color: white;
+        transform: translateX(8px);
+    }
+
+    .option-label:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-submit {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .btn-submit:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 40px rgba(59, 130, 246, 0.4);
+    }
+</style>
+
+<div class="premium-bg text-white">
+    <div class="max-w-4xl mx-auto">
+        
+        <header class="text-center mb-16">
+            <span class="inline-block px-4 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-[0.65rem] font-black uppercase tracking-[0.2em] mb-4">Phase 02: Knowledge Assessment</span>
+            <h1 class="text-5xl font-extrabold tracking-tight text-white mb-4">{{ quiz.title }}</h1>
+            <p class="text-white/40 text-lg font-medium">Subject: <span class="text-white/80">{{ quiz.subject.name }}</span></p>
+        </header>
+
+        <form method="post" action="{% url 'take_quiz' quiz_id=quiz.id %}" class="space-y-12">
+            {% csrf_token %}
             
+            {% for question in questions %}
+            <div class="question-card p-10">
+                <div class="flex items-start gap-6 mb-8">
+                    <div class="flex-shrink-0 w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 font-black text-xl">
+                        {{ forloop.counter }}
+                    </div>
+                    <h3 class="text-2xl font-bold text-white leading-snug pt-1">{{ question.text }}</h3>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 ml-0 md:ml-18">
+                    {% for option in question.option_set.all %}
+                    <div class="relative">
+                        <input type="radio" 
+                               id="opt-{{ option.id }}" 
+                               name="question-{{ question.id }}-options" 
+                               value="{{ option.id }}"
+                               class="absolute opacity-0 pointer-events-none"
+                               required>
+                        <label for="opt-{{ option.id }}" class="option-label">
+                            <span class="flex items-center justify-between">
+                                <span>{{ option.text }}</span>
+                                <i class="fas fa-circle-check text-blue-500 opacity-0 transition-opacity"></i>
+                            </span>
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
             {% endfor %}
-            {% endfor %}
-          </div>
-        </div>
 
-        <button type="submit" class="btn btn-primary">Submit Quiz</button>
-      </form>
+            <div class="pt-10 flex flex-col items-center gap-6">
+                <button type="submit" class="px-16 py-6 btn-submit rounded-[24px] text-white font-extrabold text-lg flex items-center gap-4 group">
+                    <span>Submit Assessment</span>
+                    <i class="fas fa-paper-plane group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform"></i>
+                </button>
+                <p class="text-white/20 text-sm font-bold uppercase tracking-widest">Verify all answers before submitting</p>
+            </div>
+        </form>
     </div>
-  </div>
 </div>
 
+<script>
+    // Add logic to show checkmark when selected
+    document.querySelectorAll('input[type="radio"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const container = e.target.closest('.grid');
+            container.querySelectorAll('i.fas').forEach(icon => icon.classList.add('opacity-0'));
+            const icon = e.target.nextElementSibling.querySelector('i.fas');
+            icon.classList.remove('opacity-0');
+        });
+    });
+</script>
 {% endblock %}

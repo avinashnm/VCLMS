@@ -1,51 +1,142 @@
 {% extends 'main_app/base.html' %}
 {% load static %}
-
+{% block page_title %}{{ experiment.title }}{% endblock page_title %}
 {% block content %}
-<div class="container mt-4">
-  <h2 class="mb-3">{{ experiment.name }}</h2>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <p class="text-muted mb-4">{{ experiment.objective }}</p>
+<style>
+    :root {
+        --primary-bg: #0b0f1a;
+        --card-bg: rgba(255, 255, 255, 0.03);
+    }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--primary-bg); }
+    .content-wrapper { background: var(--primary-bg) !important; }
 
-  <div class="row">
-    <div class="col-md-6">
-      <div class="card mb-3">
-        <div class="card-header">Principle</div>
-        <div class="card-body">
-          <p class="mb-0">{{ experiment.principle }}</p>
+    .premium-bg {
+        background: radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                    var(--primary-bg);
+        min-height: calc(100vh - 60px);
+        padding: 4rem 2rem;
+    }
+
+    .glass-panel {
+        background: var(--card-bg);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 32px;
+    }
+
+    .info-card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 24px;
+        height: 100%;
+        transition: transform 0.3s ease;
+    }
+
+    .info-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.04);
+    }
+
+    .btn-action {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .btn-action:hover {
+        transform: translateY(-4px) scale(1.02);
+        box-shadow: 0 20px 40px rgba(59, 130, 246, 0.4);
+    }
+
+    .list-item-custom::before {
+        content: "•";
+        color: #3b82f6;
+        font-weight: bold;
+        display: inline-block;
+        width: 1em;
+        margin-left: -1em;
+    }
+</style>
+
+<div class="premium-bg text-white">
+    <div class="max-w-6xl mx-auto">
+        
+        <header class="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div class="flex-1">
+                <span class="inline-block px-4 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-[0.65rem] font-black uppercase tracking-[0.2em] mb-4">Phase 03: Virtual Lab Entry</span>
+                <h1 class="text-5xl font-extrabold tracking-tight text-white leading-tight mb-4">{{ experiment.title }}</h1>
+                <p class="text-white/40 text-lg font-medium italic max-w-3xl">"{{ experiment.objective }}"</p>
+            </div>
+            <a href="{% url 'student_home' %}" class="inline-flex items-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all border border-white/10 text-white font-bold text-xs uppercase tracking-widest">
+                <i class="fas fa-grid-2 mr-1"></i> Exit Path
+            </a>
+        </header>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+            <!-- Left Side: Principle & Materials -->
+            <div class="lg:col-span-1 space-y-8">
+                <div class="info-card p-8">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-1.5 h-6 bg-blue-500 rounded-full"></div>
+                        <h3 class="text-xl font-bold uppercase tracking-wider text-blue-400">Scientific Principle</h3>
+                    </div>
+                    <div class="text-white/60 leading-relaxed font-medium">
+                        {{ experiment.principle|linebreaks }}
+                    </div>
+                </div>
+
+                <div class="info-card p-8">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-1.5 h-6 bg-purple-500 rounded-full"></div>
+                        <h3 class="text-xl font-bold uppercase tracking-wider text-purple-400">Required Materials</h3>
+                    </div>
+                    <ul class="space-y-3">
+                        {% for m in experiment.materials.all %}
+                        <li class="text-white/60 font-medium flex items-center gap-3">
+                            <i class="fas fa-check-circle text-purple-500/40 text-xs"></i>
+                            {{ m.name }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Right Side: Procedure -->
+            <div class="lg:col-span-2">
+                <div class="info-card p-10 bg-white/[0.03] border-blue-500/10">
+                    <div class="flex items-center gap-4 mb-10">
+                        <div class="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                            <i class="fas fa-list-ol text-xl text-blue-400"></i>
+                        </div>
+                        <h3 class="text-3xl font-extrabold text-white">Experimental Procedure</h3>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        {% for step in experiment.steps.all %}
+                        <div class="flex gap-6 p-6 rounded-2xl hover:bg-white/5 transition-all group">
+                            <span class="flex-shrink-0 w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-black text-white/40 group-hover:bg-blue-500 group-hover:text-white group-hover:border-blue-500 transition-all">{{ forloop.counter }}</span>
+                            <p class="text-white/70 text-lg font-medium leading-relaxed pt-0.5">{{ step.description }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mt-12 pt-10 border-t border-white/5 flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin"></div>
+                            <span class="text-white/40 font-bold text-xs uppercase tracking-widest">Simulator Ready</span>
+                        </div>
+                        <a href="{% url 'lab_experiment_simulation' slug %}" class="btn-action px-12 py-6 rounded-2xl text-white font-extrabold flex items-center gap-4 group">
+                            <span class="text-lg">Enter Virtual Laboratory</span>
+                            <i class="fas fa-flask text-xl group-hover:rotate-12 transition-transform"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
 
-      <div class="card mb-3">
-        <div class="card-header">Materials</div>
-        <div class="card-body">
-          <ul class="mb-0">
-            {% for m in experiment.materials %}
-              <li>{{ m }}</li>
-            {% endfor %}
-          </ul>
-        </div>
-      </div>
     </div>
-
-    <div class="col-md-6">
-      <div class="card mb-3">
-        <div class="card-header">Procedure</div>
-        <div class="card-body">
-          <ol class="mb-0">
-            {% for step in experiment.procedure %}
-              <li>{{ step }}</li>
-            {% endfor %}
-          </ol>
-        </div>
-      </div>
-
-      <div class="text-end mt-3">
-        <a href="{% url 'lab_experiment_simulation' slug %}" class="btn btn-primary">
-          Start Experiment
-        </a>
-      </div>
-    </div>
-  </div>
 </div>
 {% endblock %}
