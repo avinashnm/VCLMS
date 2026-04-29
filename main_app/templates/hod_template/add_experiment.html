@@ -93,8 +93,13 @@
                                 </div>
                                 <div class="col-md-3">
                                     <label class="small">V₁ Alert Color</label>
-                                    <input type="color" class="form-control form-control-sm" name="target_v1_color"
-                                        value="#FF69B4" style="height: 38px;">
+                                    <div class="d-flex align-items-center">
+                                        <input type="color" class="form-control form-control-sm p-1" id="picker_v1" 
+                                            value="#FF69B4" style="height: 38px; width: 60px;" oninput="syncRGBA('v1')">
+                                        <input type="range" class="custom-range ml-2" id="alpha_v1" 
+                                            min="0" max="255" value="160" oninput="syncRGBA('v1')">
+                                    </div>
+                                    <input type="hidden" name="target_v1_color" id="hidden_v1" value="#FF69B4A0">
                                 </div>
                                 <div class="col-md-3">
                                     <label class="small">V₂ min</label>
@@ -108,8 +113,13 @@
                                 </div>
                                 <div class="col-md-3">
                                     <label class="small">V₂ Alert Color</label>
-                                    <input type="color" class="form-control form-control-sm" name="target_v2_color"
-                                        value="#FFD700" style="height: 38px;">
+                                    <div class="d-flex align-items-center">
+                                        <input type="color" class="form-control form-control-sm p-1" id="picker_v2" 
+                                            value="#FFD700" style="height: 38px; width: 60px;" oninput="syncRGBA('v2')">
+                                        <input type="range" class="custom-range ml-2" id="alpha_v2" 
+                                            min="0" max="255" value="180" oninput="syncRGBA('v2')">
+                                    </div>
+                                    <input type="hidden" name="target_v2_color" id="hidden_v2" value="#FFD700B4">
                                 </div>
                             </div>
 
@@ -674,8 +684,10 @@
         // 3. Targets
         document.querySelector('[name="target_v1_min"]').value = bp.v1;
         document.querySelector('[name="target_v2_min"]').value = bp.v2;
-        document.querySelector('[name="target_v1_color"]').value = bp.v1_color;
-        document.querySelector('[name="target_v2_color"]').value = bp.v2_color;
+        
+        // Dynamic picker updates
+        updatePickerFromHex('v1', bp.v1_color);
+        updatePickerFromHex('v2', bp.v2_color);
 
         // 4. Milestones
         const container = document.getElementById('milestones-container');
@@ -1019,6 +1031,26 @@
                 }
             });
         });
+    }
+
+    // === COLOR PICKER HELPERS ===
+    function syncRGBA(prefix) {
+        const color = document.getElementById('picker_' + prefix).value;
+        const alpha = parseInt(document.getElementById('alpha_' + prefix).value);
+        let alphaHex = alpha.toString(16).toUpperCase();
+        if (alphaHex.length === 1) alphaHex = '0' + alphaHex;
+        document.getElementById('hidden_' + prefix).value = color.toUpperCase() + alphaHex;
+    }
+
+    function updatePickerFromHex(prefix, hex9) {
+        if (!hex9 || hex9.length < 7) return;
+        const color = hex9.substring(0, 7);
+        const alphaHex = hex9.substring(7, 9) || "FF";
+        const alpha = parseInt(alphaHex, 16);
+        
+        document.getElementById('picker_' + prefix).value = color;
+        document.getElementById('alpha_' + prefix).value = alpha;
+        document.getElementById('hidden_' + prefix).value = hex9.toUpperCase();
     }
 
     // Form submission sync: scrape canvas state into JSON

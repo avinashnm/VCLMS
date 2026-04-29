@@ -435,7 +435,8 @@ function setup() {
         name: c.name,
         formula: c.formula,
         conc: c.molarity ? c.molarity + 'M' : '',
-        color: [r, g, b]
+        color: [r, g, b],
+        is_indicator: c.is_indicator
       };
     });
   } else {
@@ -777,36 +778,92 @@ function makeResponsiveVessel(id, type) {
 
 function getTitrationColor(v) {
   const c = v.contents;
-  const targetV1 = (typeof THEORETICAL_V1 !== 'undefined') ? THEORETICAL_V1 : 10.0;
-  const targetV2 = (typeof THEORETICAL_V2 !== 'undefined') ? THEORETICAL_V2 : 25.0;
+  let targetV1 = (typeof THEORETICAL_V1 !== 'undefined') ? THEORETICAL_V1 : 10.0;
+  let targetV2 = (typeof THEORETICAL_V2 !== 'undefined') ? THEORETICAL_V2 : 25.0;
 
   if (c.mixture_vol < 0.5) return [200, 220, 255, 100];
 
+  // Helper to parse Hex from config to RGBA array
+  let hexToRgb = (hex, defAlpha) => {
+    if (!hex) return null;
+    hex = hex.replace('#', '');
+    let r = parseInt(hex.substring(0,2), 16) || 200;
+    let g = parseInt(hex.substring(2,4), 16) || 200;
+    let b = parseInt(hex.substring(4,6), 16) || 200;
+    let a = hex.length >= 8 ? parseInt(hex.substring(6,8), 16) : defAlpha;
+    return [r, g, b, a];
+  };
+
+  // 1. Establish visual stages dynamically from config
+  let v1_color = [245, 245, 255, 100]; // clear default
+  let v2_color = [255, 80, 0, 220];    // red default
+  
+  if (typeof EXPERIMENT_CONFIG !== 'undefined' && EXPERIMENT_CONFIG.targets) {
+    let t = EXPERIMENT_CONFIG.targets;
+    if (t.v1_color) v1_color = hexToRgb(t.v1_color, 100) || v1_color;
+    if (t.v2_color) v2_color = hexToRgb(t.v2_color, 220) || v2_color;
+  }
+
+  const activeIndicators = Object.keys(c.indicators).filter(k => c.indicators[k] > 0);
+  if (activeIndicators.length === 0) return [235, 215, 160, 160];
+
+  let initialColor = [255, 200, 200, 180]; 
+  let titrantVol = 0; // NEW: Dynamically track titrant volume
+  
+  if (typeof window.CHEMICAL_REACTIONS !== 'undefined' && activeIndicators.length > 0) {
+      // Find the specific reaction where the indicator + the current analyte exist in the flask
+      let reaction = window.CHEMICAL_REACTIONS.find(r => 
+         (activeIndicators.includes(r.chemical_a_label) && c.chemicals && c.chemicals[r.chemical_b_label]) ||
+         (activeIndicators.includes(r.chemical_b_label) && c.chemicals && c.chemicals[r.chemical_a_label])
+      );
+      
+      if (reaction && reaction.reaction_color_hex) {
+          initialColor = hexToRgb(reaction.reaction_color_hex, 180) || initialColor;
+          
+          // DYNAMIC M1V1 STOICHIOMETRY
+          let analyteLabel = activeIndicators.includes(reaction.chemical_a_label) ? reaction.chemical_b_label : reaction.chemical_a_label;
+          let analyteVol = c.chemicals[analyteLabel] ? c.chemicals[analyteLabel].volume : 0;
+          
+          let titrantLabel = Object.keys(c.chemicals).find(k => k !== analyteLabel && !activeIndicators.includes(k));
+          if (titrantLabel && analyteVol > 0) {
+              titrantVol = c.chemicals[titrantLabel].volume; // Assign titrantVol properly!
+              
+              let analyteInfo = getChemicalInfo(analyteLabel);
+              let titrantInfo = getChemicalInfo(titrantLabel);
+              let mAnalyte = parseFloat(analyteInfo.conc) || 0.1;
+              let mTitrant = parseFloat(titrantInfo.conc) || 0.1;
+              
+              if (mTitrant > 0) {
+                 targetV1 = (mAnalyte * analyteVol) / mTitrant;
+                 targetV2 = targetV1 * 2; 
+              }
+          }
+      }
+  }
+
   const type = experimentData?.type || 'simple_titration';
 
-  if (type === 'double_indicator') {
-    const pp = c.indicators['Phenolphthalein'] || 0;
-    const mo = c.indicators['Methyl Orange'] || 0;
-
-    if (pp > 0 && mo === 0) {
-      if (c.titrant_vol < targetV1) {
-        let intensity = map(c.titrant_vol, targetV1 - 1.5, targetV1, 220, 30, true);
-        return [255, 105, 180, intensity];
+  if (type === 'double_indicator' || type === 'TITRATION_DOUBLE') {
+    if (activeIndicators.length === 1) { 
+      if (titrantVol < targetV1) {
+        // Linearly fade the initial color to v1_color right near the endpoint to show transition
+        let intensity = map(titrantVol, targetV1 - 1.5, targetV1, initialColor[3], v1_color[3], true);
+        return [initialColor[0], initialColor[1], initialColor[2], intensity];
       } else {
-        return [245, 245, 255, 100];
+        return v1_color; 
       }
     }
-    if (mo > 0) {
-      if (c.titrant_vol < targetV2) return [255, 210, 0, 180];
-      else return [255, 80, 0, 220];
+    if (activeIndicators.length > 1) { 
+      if (titrantVol < targetV2) {
+          return initialColor; 
+      } else {
+          return v2_color;
+      }
     }
   } else {
     // Basic Acid-Base for other titrations
-    const indicator = Object.keys(c.indicators).find(k => c.indicators[k] > 0);
-    if (indicator) {
-      if (c.titrant_vol < targetV1) return [255, 200, 200, 180]; // Before endpoint
-      else return [200, 255, 200, 180]; // At passed endpoint
-    }
+    if (titrantVol < targetV1) return initialColor; // Before endpoint
+    else return v1_color; // At passed endpoint
   }
 
   return [235, 215, 160, 160];
@@ -1111,8 +1168,10 @@ function handleIndicatorDrops() {
 
 function engineIsIndicator(id) {
   if (!id) return false;
-  let lower = id.toLowerCase();
-  return lower.includes('phenolphthalein') || lower.includes('methyl');
+  // Use DB data directly instead of hardcoding strings
+  let info = getChemicalInfo(id);
+  if (info && info.is_indicator) return true;
+  return false;
 }
 
 function handlePipetteInteraction() {
@@ -1316,22 +1375,12 @@ function draw() {
   drawClearShelfButton(); // Magic button on the shelf
 }
 function getChemicalInfo(chemicalId) {
-  // 1. Search DB-Driven Chemicals First
+  // Purely DB-Driven Search (No more hardcoded fallbacks like hcl_0_1m)
   if (typeof chemicalCatalog !== 'undefined' && chemicalCatalog && chemicalCatalog.chemicals) {
-    let found = chemicalCatalog.chemicals.find(c => c.id === chemicalId);
+    let found = chemicalCatalog.chemicals.find(c => c.id === chemicalId || c.name === chemicalId);
     if (found) return found;
   }
-
-  // 2. Fallback to hardcoded list
-  const catalog = [
-    { id: 'na2co3_nahco3', name: 'Sodium Carbonate + Bicarbonate', formula: 'Na₂CO₃ + NaHCO₃', conc: '25%' },
-    { id: 'hcl_0_1M', name: 'Hydrochloric Acid', formula: 'HCl', conc: '0.1M' },
-    { id: 'phenolphthalein', name: 'Phenolphthalein', formula: 'C₂₀H₁₄O₄', conc: '' },
-    { id: 'methyl_orange', name: 'Methyl Orange', formula: 'C₁₄H₁₄N₃NaO₃S', conc: '' },
-    { id: 'distilled_water', name: 'Distilled Water', formula: 'H₂O', conc: '' }
-  ];
-  return catalog.find(c => c.id === chemicalId) ||
-    { name: 'Unknown', formula: '—', conc: '' };
+  return { name: chemicalId || 'Unknown', formula: '—', conc: '', is_indicator: false };
 }
 
 // ======================================================
@@ -1785,7 +1834,12 @@ function drawDigitalDisplay(x, y, label) { // Change 'text' to 'label' here
 // TOOLTIP
 // ======================================================
 function drawTooltip(v) {
-  const boxW = 260, boxH = 140;  // Taller for more info
+  // Dynamic height based on chemical count
+  let chemicalCount = Object.keys(v.contents.chemicals || {}).length;
+  if (v.chemicalId && chemicalCount === 0) chemicalCount = 1; // Fallback for static bottles
+  
+  const boxW = 260;
+  const boxH = 100 + (chemicalCount * 18); 
   const x = constrain(mouseX + 15, 10, width - boxW - 10);
   const y = constrain(mouseY + 15, 10, height - boxH - 10);
 
@@ -1798,42 +1852,45 @@ function drawTooltip(v) {
 
   textSize(12); textStyle(NORMAL);
 
-  // CHEMICAL INFO SECTION (enhanced!)
-  if (v.chemicalId) {
+  // CHEMICAL MATRIX SECTION (The "Multi-Chemical" View)
+  let py = y + 42;
+  let components = Object.keys(v.contents.chemicals || {});
+  
+  if (components.length > 0) {
+    components.forEach(name => {
+      let data = v.contents.chemicals[name];
+      let info = getChemicalInfo(name);
+      
+      // Draw small color swatch
+      fill(...(data.color || [200,200,200]));
+      rect(x + 12, py - 10, 8, 8);
+      
+      fill(0); textSize(11);
+      text(`${name} (${nf(data.volume, 1, 2)} mL)`, x + 25, py);
+      py += 16;
+    });
+  } else if (v.chemicalId) {
+    // Fallback for static items (Bottles, etc.)
     const chemInfo = getChemicalInfo(v.chemicalId);
-
-    // Color indicator
     if (v.color) {
-      fill(...v.color); noStroke();
-      rect(x + 12, y + 38, 14, 14);
-      fill(0);
+      fill(...v.color); rect(x + 12, py - 10, 8, 8);
     }
-
-    // Full chemical details
-    textSize(11);
-    text(`${chemInfo.name}`, x + 32, y + 42);
-    textSize(10); fill(60);
-    text(`Formula: ${chemInfo.formula}`, x + 12, y + 58);
-
-    if (chemInfo.conc) {
-      text(`Concentration: ${chemInfo.conc}`, x + 12, y + 72);
-    }
-  } else {
-    textSize(12);
-    text('Chemical: ' + v.chem, x + 12, y + 42);
+    fill(0); textSize(11);
+    text(`${chemInfo.name}`, x + 25, py);
+    py += 16;
   }
 
-  // Volume & other info
-  textSize(12); fill(0);
-  text('Volume: ' + nf(v.volume || 0, 1, 2) + ' mL', x + 12, y + 92);
+  // Divider
+  stroke(220); line(x + 10, py, x + boxW - 10, py); py += 15; noStroke();
 
-  if (v.capacity) {
-    text(`Capacity: ${v.capacity} mL`, x + 12, y + 108);
-  }
-
+  // Stats
+  fill(80); textSize(10);
+  text('Total Volume: ' + nf(v.volume || 0, 1, 2) + ' mL', x + 12, py);
+  if (v.capacity) text(`Capacity: ${v.capacity} mL`, x + 140, py);
+  
   if (v.hint) {
-    fill(0, 150, 0); textSize(11);
-    text('💡 ' + v.hint, x + 12, y + 126);
+    fill(0, 150, 0); textSize(10);
+    text('💡 ' + v.hint, x + 12, py + 16);
   }
 }
 
@@ -2267,19 +2324,27 @@ function mouseReleased() {
 }
 
 function handleBuretteDrainage() {
-  if (!keyIsDown(83)) return;
+  if (!keyIsDown(83)) return; // 'S' key for stopcock
   const b = Object.values(vessels).find(v => (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)));
   if (!b || b.targetVolume <= 0) return;
 
-  const snapX = b.type === 'burette' ? (b.x + BURETTE_GLASS_X_OFFSET) : b.x;
-  const dripTipY = b.type === 'burette' ? (b.y + 120) : (b.y + b.h * 0.4);
+  const status = getBuretteHeightStatus(b);
+  const { snapX, dripTipY, receiver } = status;
 
-  const waste = Object.values(vessels).find(v => (v.type === 'beaker' || v.type === 'conical_flask') && dist(v.x, v.y, snapX, dripTipY) < 80);
   let rate = keyIsDown(SHIFT) ? 0.2 : 0.01;
   let amt = rate * (deltaTime / 100);
 
-  if (waste && waste.targetVolume < waste.capacity) {
-    b.hint = "Draining (Waste)";
+  if (receiver && receiver.targetVolume < receiver.capacity) {
+    if (typeof transferLiquid === "function") {
+        transferLiquid(b, receiver, amt);
+    }
+    receiver.turbulence = min((receiver.turbulence || 0) + 0.3, 2);
+    drawDroplets(snapX, dripTipY, receiver.x, receiver.y - 15, color(...(b.color || [255, 255, 255])));
+  } else {
+    // Draining to waste
+    b.targetVolume -= amt;
+    createParticles(snapX, dripTipY, 1, 'drip');
+    b.hint = "Draining to Waste";
   }
 }
 
@@ -2323,9 +2388,23 @@ function keyPressed() {
 
     if (target) {
       if (isDragging.isChemical) {
+        // Core Physics Add: Place into fluid mixture mathematically
+        if (!target.contents.chemicals) target.contents.chemicals = {};
+        if (!target.contents.chemicals[isDragging.chemicalId]) {
+           target.contents.chemicals[isDragging.chemicalId] = { volume: 0, color: isDragging.color || [255,255,255] };
+        }
+        let dropVol = 0.05; // 1 drop = 0.05 mL
+        target.contents.chemicals[isDragging.chemicalId].volume += dropVol;
+        target.targetVolume += dropVol;
+        
+        // Mark indicator presence for mapping engine
         target.contents.indicators[isDragging.chemicalId] = (target.contents.indicators[isDragging.chemicalId] || 0) + 1;
+        
+        // Dynamically compute the reaction the instant the drop hits!
+        if (typeof computeReaction === "function") computeReaction(target);
+
         createParticles(isDragging.x, isDragging.y + 30, 2, 'drip');
-        console.log("SUCCESS: " + isDragging.chemicalId + " drops added to Brain. Count:", target.contents.indicators[isDragging.chemicalId]);
+        console.log("SUCCESS: " + isDragging.chemicalId + " drop added. Vol:", target.contents.chemicals[isDragging.chemicalId].volume.toFixed(2));
       }
     } else {
       console.log("HINT: Move bottle closer to the flask center to drop.");
@@ -2818,15 +2897,24 @@ function transferLiquid(source, target, transferVol) {
   }
 
   for (let c in source.contents.chemicals) {
-    let transferAmount = (source.contents.chemicals[c].volume / totalSourceVol) * actualVol;
+    const sourceChem = source.contents.chemicals[c];
+    let transferAmount = (sourceChem.volume / totalSourceVol) * actualVol;
     
+    // SYNC INDICATORS BEFORE VOLUME REDUCTION
+    if (source.contents.indicators && source.contents.indicators[c] > 0) {
+       let fraction = transferAmount / sourceChem.volume;
+       let transferredCount = fraction * source.contents.indicators[c];
+       target.contents.indicators[c] = (target.contents.indicators[c] || 0) + transferredCount;
+       source.contents.indicators[c] -= transferredCount;
+    }
+
     // Remove from source
-    source.contents.chemicals[c].volume -= transferAmount;
-    if (source.contents.chemicals[c].volume <= 0.001) delete source.contents.chemicals[c];
+    sourceChem.volume -= transferAmount;
+    if (sourceChem.volume <= 0.001) delete source.contents.chemicals[c];
     
     // Add to target
     if (!target.contents.chemicals[c]) {
-      target.contents.chemicals[c] = { volume: 0, color: source.contents.chemicals[c].color };
+      target.contents.chemicals[c] = { volume: 0, color: sourceChem.color };
     }
     target.contents.chemicals[c].volume += transferAmount;
   }
@@ -2841,24 +2929,44 @@ function transferLiquid(source, target, transferVol) {
 }
 
 function computeReaction(vessel) {
-  // PHASE 5.A: Pure volumetric color averaging based on dictionary contents
-  // Overrides hardcoded titration colors
-  let r=0, g=0, b=0, total=0;
-  for (let c in vessel.contents.chemicals) {
-    let chem = vessel.contents.chemicals[c];
-    if (chem.volume > 0) {
-      r += chem.color[0] * chem.volume;
-      g += chem.color[1] * chem.volume;
-      b += chem.color[2] * chem.volume;
-      total += chem.volume;
+  const c = vessel.contents;
+  if (!vessel.contents.chemicals) return;
+
+  // 1. DYNAMIC TITRATION SOLVER (M1V1 Physics)
+  // If an indicator is present, getTitrationColor should dictate the state.
+  const activeIndicators = Object.keys(c.indicators || {}).filter(k => c.indicators[k] > 0);
+  if (activeIndicators.length > 0) {
+      vessel.color = getTitrationColor(vessel);
+      return; // Titration physics overrides static linkages
+  }
+
+  // 2. STATIC UI LINKAGE SOLVER
+  let components = Object.keys(vessel.contents.chemicals).filter(k => vessel.contents.chemicals[k].volume > 0.01);
+  if (typeof window.CHEMICAL_REACTIONS !== 'undefined' && window.CHEMICAL_REACTIONS.length > 0) {
+    for (let rxn of window.CHEMICAL_REACTIONS) {
+      if (components.includes(rxn.chemical_a_label) && components.includes(rxn.chemical_b_label)) {
+        let hc = rxn.reaction_color_hex;
+        if (hc) {
+          hc = hc.replace('#', '');
+          let rr = parseInt(hc.substring(0,2), 16) || 200;
+          let gg = parseInt(hc.substring(2,4), 16) || 200;
+          let bb = parseInt(hc.substring(4,6), 16) || 200;
+          let aa = hc.length >= 8 ? parseInt(hc.substring(6,8), 16) : 180;
+          vessel.color = [rr, gg, bb, aa];
+          return;
+        }
+      }
     }
   }
-  
-  if (total > 0 && typeof CHEMICAL_REACTIONS !== 'undefined' && CHEMICAL_REACTIONS.length > 0) {
-     // Active Stoichiometry Matrix checking
-     // TODO: Implement ReactionCatalog cross-referencing for Phase 5.B
-     vessel.color = [r/total, g/total, b/total, 180];
-  } else if (total > 0) {
-     vessel.color = [r/total, g/total, b/total, 180];
+
+  // 3. FALLBACK: Volumetric Color Averaging
+  let r=0, g=0, b=0, total=0;
+  for (let name of components) {
+    let chem = vessel.contents.chemicals[name];
+    r += chem.color[0] * chem.volume;
+    g += chem.color[1] * chem.volume;
+    b += chem.color[2] * chem.volume;
+    total += chem.volume;
   }
+  if (total > 0) vessel.color = [r/total, g/total, b/total, 180];
 }

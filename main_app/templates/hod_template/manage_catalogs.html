@@ -277,19 +277,60 @@ Manage Catalogs & Reactions
                                 value="1.0">
                         </div>
                         <div class="col-md-4 form-group">
-                            <label class="text-muted font-weight-bold">Color (Hex + Alpha)</label>
-                            <input type="text" class="form-control bg-light border-0 text-monospace fw-bold"
-                                name="default_color_hex" value="#FFFFFF80" placeholder="#RRGGBBAA">
+                            <label class="text-muted font-weight-bold">Base Liquid Color</label>
+                            <div class="d-flex align-items-center">
+                                <input type="color" class="form-control bg-light border-0 p-1" id="picker_default_color" 
+                                    value="#FFFFFF" style="height: 38px; width: 60px;" oninput="syncRGBA('default_color')">
+                                <input type="range" class="custom-range ml-2" id="alpha_default_color" 
+                                    min="0" max="255" value="128" oninput="syncRGBA('default_color')">
+                            </div>
+                            <input type="hidden" name="default_color_hex" id="hidden_default_color" value="#FFFFFF80">
+                            <small class="text-muted">Pick color and set transparency.</small>
                         </div>
                     </div>
                     <div class="p-3 bg-light rounded mt-3 border">
                         <div class="custom-control custom-switch">
                             <input type="checkbox" class="custom-control-input" id="isIndicatorSwitch"
-                                name="is_indicator">
+                                name="is_indicator" onchange="toggleIndicatorFields(this.checked)">
                             <label class="custom-control-label font-weight-bold" for="isIndicatorSwitch">Mark as an
                                 Indicator</label>
                             <small class="d-block text-muted">Indicators are used specifically for pH
                                 titrations.</small>
+                        </div>
+                    </div>
+
+                    <!-- Indicator Specific Fields (Hidden by Default) -->
+                    <div id="indicatorFields" class="p-3 bg-white border rounded mt-3 shadow-sm" style="display: none; border-left: 5px solid #ffc107 !important;">
+                        <h6 class="font-weight-bold text-warning mb-3"><i class="fas fa-vial mr-1"></i> Indicator Properties</h6>
+                        <div class="row">
+                            <div class="col-md-6 form-group">
+                                <label class="small font-weight-bold">Acidic State Color (Low pH)</label>
+                                <div class="d-flex align-items-center">
+                                    <input type="color" class="form-control form-control-sm p-1" id="picker_low_ph" 
+                                        value="#FFFF00" style="height: 30px; width: 50px;" oninput="syncRGBA('low_ph')">
+                                    <input type="range" class="custom-range ml-2" id="alpha_low_ph" 
+                                        min="0" max="255" value="160" oninput="syncRGBA('low_ph')">
+                                </div>
+                                <input type="hidden" name="low_ph_color" id="hidden_low_ph" value="#FFFF00A0">
+                            </div>
+                            <div class="col-md-6 form-group">
+                                <label class="small font-weight-bold">Basic State Color (High pH)</label>
+                                <div class="d-flex align-items-center">
+                                    <input type="color" class="form-control form-control-sm p-1" id="picker_high_ph" 
+                                        value="#FF00FF" style="height: 30px; width: 50px;" oninput="syncRGBA('high_ph')">
+                                    <input type="range" class="custom-range ml-2" id="alpha_high_ph" 
+                                        min="0" max="255" value="160" oninput="syncRGBA('high_ph')">
+                                </div>
+                                <input type="hidden" name="high_ph_color" id="hidden_high_ph" value="#FF00FFA0">
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-12 form-group mb-0">
+                                <label class="small font-weight-bold">Transition pH Range</label>
+                                <input type="text" class="form-control form-control-sm bg-light" name="transition_ph_range" 
+                                    value="8.2-10.0" placeholder="e.g. 8.2-10.0">
+                                <small class="text-muted">The pH bounds where the color shift occurs.</small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -441,9 +482,14 @@ Manage Catalogs & Reactions
                     </div>
                     <div class="row pt-3 mt-2 border-top">
                         <div class="col-md-6 form-group">
-                            <label class="text-muted font-weight-bold">Reaction Color (Hex + Alpha)</label>
-                            <input type="text" class="form-control bg-light border-0 text-monospace"
-                                name="reaction_color_hex" value="#FFFFFF80" placeholder="#RRGGBBAA">
+                            <label class="text-muted font-weight-bold">Reaction Result Color</label>
+                            <div class="d-flex align-items-center">
+                                <input type="color" class="form-control bg-light border-0 p-1" id="picker_reaction_color" 
+                                    value="#FFFFFF" style="height: 38px; width: 60px;" oninput="syncRGBA('reaction_color')">
+                                <input type="range" class="custom-range ml-2" id="alpha_reaction_color" 
+                                    min="0" max="255" value="128" oninput="syncRGBA('reaction_color')">
+                            </div>
+                            <input type="hidden" name="reaction_color_hex" id="hidden_reaction_color" value="#FFFFFF80">
                             <small class="text-muted">Color of solution when mixed.</small>
                         </div>
                         <div class="col-md-6 form-group">
@@ -463,5 +509,42 @@ Manage Catalogs & Reactions
         </div>
     </div>
 </div>
+
+<script>
+    /**
+     * Combines a 7-char Hex (#RRGGBB) and a 0-255 Alpha value
+     * into a 9-char Hex (#RRGGBBAA) for the simulation engine.
+     */
+    function syncRGBA(prefix) {
+        const color = document.getElementById('picker_' + prefix).value;
+        const alpha = parseInt(document.getElementById('alpha_' + prefix).value);
+        
+        // Convert alpha to 2-digit hex
+        let alphaHex = alpha.toString(16).toUpperCase();
+        if (alphaHex.length === 1) alphaHex = '0' + alphaHex;
+        
+        const rgba = color.toUpperCase() + alphaHex;
+        document.getElementById('hidden_' + prefix).value = rgba;
+        
+        console.log(`Synced ${prefix}: ${rgba}`);
+    }
+
+    function toggleIndicatorFields(show) {
+        const fields = document.getElementById('indicatorFields');
+        fields.style.display = show ? 'block' : 'none';
+        
+        // If showing, ensure the hidden fields are initialized from current picker/slider states
+        if (show) {
+            syncRGBA('low_ph');
+            syncRGBA('high_ph');
+        }
+    }
+
+    // Initialize sync for default colors on load if needed
+    window.addEventListener('DOMContentLoaded', () => {
+        syncRGBA('default_color');
+        syncRGBA('reaction_color');
+    });
+</script>
 
 {% endblock content %}

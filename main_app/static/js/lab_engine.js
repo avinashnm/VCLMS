@@ -214,7 +214,7 @@ class MarkingManager {
       } else {
           // For non-prompt steps (like Fill Burette), keep automatic completion
           if (allRulesPassed) {
-            this.currentStepHint = "";
+            console.log(`[MarkingManager] Auto-completing milestone: ${m.title}`);
             this.completeMilestone(m.id);
           }
       }
@@ -235,7 +235,11 @@ class MarkingManager {
   }
 
   completeMilestone(id) {
-    if (this.completedIds.has(id)) return;
+    console.log(`[MarkingManager] Attempting to complete milestone: ${id}`);
+    if (this.completedIds.has(id)) {
+        console.warn(`[MarkingManager] Milestone ${id} already completed.`);
+        return;
+    }
     let m = this.milestones.find(item => item.id === id);
     if (!m) return;
 
@@ -298,15 +302,25 @@ class MarkingManager {
     }
 
     this.completedIds.add(id);
-    sessionMarks += m.points;
+    sessionMarks += (m.points || 0);
     currentStepIndex = Math.min(this.milestones.length - 1, this.completedIds.size);
-    console.log("Milestone Achieved:", m.desc);
+    console.log(`[MarkingManager] SUCCESS: Completed ${m.title}. Next index: ${currentStepIndex}`);
     
     // Check if this was the last milestone in the sequence
     if (this.completedIds.size >= this.milestones.length && this.milestones.length > 0) {
       alert("All milestones complete! Committing final experiment results.");
       this.saveResults(); // Autonomous generic dispatch
     }
+  }
+
+  addPenalty(id, points, reason) {
+    if (this.mistakesMade.has(id)) return;
+    this.mistakesMade.add(id);
+    sessionMarks -= (points || 0);
+    console.warn(`[MarkingManager] PENALTY: -${points} pts. Reason: ${reason}`);
+    
+    // Optional: Show a subtle warning toast or feedback
+    if (typeof showToast !== 'undefined') showToast(`Mistake: ${reason} (-${points} pts)`, "warning");
   }
 
   saveResults() {
@@ -664,6 +678,9 @@ function spawnFromInitialState() {
 
       // Initialize dynamic chemical dictionary
       v.contents.chemicals[chemName] = { volume: chemVol, color: chemColor };
+      
+      // TRIGGER Reaction Engine for initial state
+      computeReaction(v);
     }
 
     vessels[v.id] = v;
@@ -888,6 +905,8 @@ function getTitrationColor(v) {
   const c = v.contents;
   if (!c) return v.color || [200, 220, 255, 100];
   
+  if (frameCount % 120 === 0) console.log(`getTitrationColor for ${v.type}: pH=${c.pH}, indicators=${c.indicatorsAdded}`);
+
   // ABORT: If no mixture detected via tracking or chemical search
   let hasAnalyte = (c.mixture_vol > 0.1);
   if (!hasAnalyte && c.chemicals) {
@@ -900,11 +919,10 @@ function getTitrationColor(v) {
   if (!hasAnalyte) return v.color || [200, 220, 255, 100];
 
   // --- 1. DYNAMIC UI-DRIVEN ENDPOINTS ---
-  // Default values if not defined in UI
   let v1_ph = 8.3; 
   let v2_ph = 4.0;
-  let v1_color = experimentData?.v1_color || "#FFC0CB"; // Default Pink
-  let v2_color = experimentData?.v2_color || "#FF4500"; // Default Orange
+  let v1_color = experimentData?.targets?.v1_color || "#FFFFFF00"; 
+  let v2_color = experimentData?.targets?.v2_color || "#FF4500";
   
   // Extract pH thresholds from milestone rules
   if (experimentData && experimentData.milestones) {
@@ -922,53 +940,55 @@ function getTitrationColor(v) {
 
   const isDouble = experimentData?.type === 'double_indicator' || (c.indicatorsAdded && c.indicatorsAdded.length > 1);
 
-  // --- 2. DYNAMIC pH APPROXIMATION ---
-  // Base (12) -> V1 (Target) -> V2 (Target)
-  let currentPH = 12.0;
-  const targetV1 = experimentData?.targets?.v1 || 10.0;
-  const targetV2 = experimentData?.targets?.v2 || 25.0;
-
-  if (c.titrant_vol < targetV1) {
-    currentPH = map(c.titrant_vol, 0, targetV1, 12.0, v1_ph);
-  } else if (!isDouble) {
-    currentPH = map(c.titrant_vol, targetV1, targetV1 + 2.0, v1_ph - 1.0, 2.0, true);
-  } else if (c.titrant_vol < targetV2) {
-    currentPH = map(c.titrant_vol, targetV1, targetV2, v1_ph - 0.3, v2_ph);
-  } else {
-    currentPH = map(c.titrant_vol, targetV2, targetV2 + 2.0, v2_ph - 0.2, 1.5, true);
-  }
+  // --- 2. Centralized pH (Calculated by computeReaction) ---
+  let currentPH = c.pH || 7.0;
 
   // --- 3. UI-DRIVEN COLOR INTERPOLATION ---
   let baseCol = [230, 230, 250, 100]; // Base liquid
+  // --- 3. UI-DRIVEN COLOR INTERPOLATION ---
   let r=baseCol[0], g=baseCol[1], b=baseCol[2], a=baseCol[3];
   
-  if (c.indicatorsAdded && c.indicatorsAdded.length > 0) {
-    c.indicatorsAdded.forEach(indName => {
-      const chem = chemicalCatalog.chemicals.find(ch => ch.name === indName || ch.id === indName);
-      if (!chem) return;
+  let totalR=0, totalG=0, totalB=0, totalA=0, count=0;
 
-      const lowTheme = hexToRgba(chem.low_ph_color || "#FFFFFF00");
-      const highTheme = hexToRgba(chem.high_ph_color || "#FFFFFF00");
-      
-      // Determine which target color to use based on which indicator was added
-      // Logic: If it's the first indicator, approach v1_color. If second, approach v2_color.
-      let targetRGB = hexToRgba(v1_color);
-      let thresholdPH = v1_ph;
-      
-      if (isDouble && c.indicatorsAdded.indexOf(indName) > 0) {
-          targetRGB = hexToRgba(v2_color);
-          thresholdPH = v2_ph;
-      }
+  for (let chemName in c.chemicals) {
+    const chemInfo = getChemicalInfo(chemName);
+    if (!chemInfo || !chemInfo.is_indicator) continue;
 
-      // Calculate factor (1.0 = Basic, 0.0 = Acidic/Endpoint)
-      let factor = map(currentPH, thresholdPH - 0.5, thresholdPH + 1.5, 0, 1, true);
-      
-      // Blend indicator high color (basic) with target endpoint color
-      r = lerp(targetRGB[0], highTheme[0], factor);
-      g = lerp(targetRGB[1], highTheme[1], factor);
-      b = lerp(targetRGB[2], highTheme[2], factor);
-      a = lerp(targetRGB[3], highTheme[3], factor);
-    });
+    const lowTheme = hexToRgba(chemInfo.low_ph_color || "#FFFFFF00");
+    const highTheme = hexToRgba(chemInfo.high_ph_color || "#FFFFFF00");
+    
+    // Logic: Indicators use their own internal colors by default.
+    // We only use experiment v1_color/v2_color if they are explicitly set to something else.
+    let targetRGB = lowTheme;
+    let thresholdPH = v1_ph;
+    
+    const lowerName = chemName.toLowerCase();
+    if (lowerName.includes('orange') || lowerName.includes('methyl') || lowerName.includes('brom')) {
+        thresholdPH = v2_ph;
+    }
+
+    // Calculate factor (1.0 = Basic/Starting, 0.0 = Acidic/Endpoint)
+    let factor = map(currentPH, thresholdPH - 0.5, thresholdPH + 1.5, 0, 1, true);
+    if (isNaN(factor)) factor = 0;
+    
+    // Accumulate weighted color (Blending High/Low of the indicator)
+    totalR += lerp(targetRGB[0], highTheme[0], factor);
+    totalG += lerp(targetRGB[1], highTheme[1], factor);
+    totalB += lerp(targetRGB[2], highTheme[2], factor);
+    totalA += lerp(targetRGB[3], highTheme[3], factor);
+    count++;
+  }
+
+  if (count > 0) {
+      r = totalR / count;
+      g = totalG / count;
+      b = totalB / count;
+      a = totalA / count;
+  }
+
+  // Final Safety Check for NaN
+  if (isNaN(r) || isNaN(g) || isNaN(b) || isNaN(a)) {
+      return [230, 230, 250, 100];
   }
 
   return [r, g, b, a];
@@ -1039,6 +1059,9 @@ function proximityCheck() {
         if (beaker) {
             v.glow = 1;
             v.hint = 'Hover to read pH';
+            v.reading = beaker.contents ? (beaker.contents.pH || 7.0) : 7.0;
+        } else {
+            v.reading = 7.0;
         }
     }
   });
@@ -1396,7 +1419,11 @@ function dropperAction() {
 
 function engineIsIndicator(id) {
   if (!id || !window.chemicalCatalog) return false;
-  const chem = chemicalCatalog.chemicals.find(ch => ch.name === id || ch.id === id);
+  const searchId = String(id).toLowerCase();
+  const chem = chemicalCatalog.chemicals.find(ch => 
+    String(ch.name).toLowerCase() === searchId || 
+    String(ch.id).toLowerCase() === searchId
+  );
   return chem ? (chem.is_indicator || false) : false;
 }
 
@@ -1505,106 +1532,99 @@ function draw() {
   // Background
   imageMode(CORNER);
   image(imgLabBg, 0, 0, width, height);
-  manager.update();
+  try {
+    manager.update();
+    updateLabSurfaces();
+    hoverVessel = null;
 
-  updateLabSurfaces();
+    // Core systems
+    proximityCheck();
+    Object.values(vessels).forEach(v => applyLabPhysics(v));
+    easeVolumes();
+    handlePipetteInteraction();
+    handleBuretteFilling();
+    handleBuretteDrainage();  // Draining from the bottom
+    handleIndicatorDrops();
+    handleDropperInteraction();
+    instrumentReadings();
 
-  hoverVessel = null;
-
-  // Core systems
-  proximityCheck();
-  Object.values(vessels).forEach(v => applyLabPhysics(v));
-  easeVolumes();
-  handlePipetteInteraction();
-  handleBuretteFilling();
-  handleBuretteDrainage();  // Draining from the bottom
-  handleIndicatorDrops();
-  handleDropperInteraction();
-  instrumentReadings();
-
-  // --- NEW: SWIRL FLASK (W Key) ---
-  if (keyIsDown(87)) { // 'W' Key
-    const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-    if (flask && flask.volume > 0) {
-      flask.turbulence = 6; // High turbulence
-      flask.tilt = sin(frameCount * 0.1) * 0.10; // Tilt (Slower)
-
-      // PHYSICAL ORBITAL SWIRL
-      //temporary render offset to simulate circular motion
-      flask.renderOffsetX = cos(frameCount * 0.4) * 4; // Slower orbit
-      flask.renderOffsetY = sin(frameCount * 0.4) * 2;
-
-      flask.hint = "Swirling...";
-    }
-  } else {
-    // Reset offsets when not swirling
-    const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
-    if (flask) {
-      flask.renderOffsetX = 0;
-      flask.renderOffsetY = 0;
-    }
-  }
-
-  // Draw shadows first, then vessels
-  Object.values(vessels).forEach(v => drawShadow(v));
-
-  Object.values(vessels).forEach(v => {
-    drawVessel(v);
-    if (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)) drawBuretteZoom(v); // Call the zoom here
-  });
-
-  // FIXED: Handle Keyboard Vertical Sliding AFTER drawVessel has set hoverVessel
-  if (hoverVessel && hoverVessel.type === 'burette_tube' && hoverVessel.mountedTo) {
-    const stand = vessels[hoverVessel.mountedTo];
-    // CONFLICT PREVENTION: Only slide if not currently pouring from a bottle
-    const isPouring = isDragging && isDragging.type === 'bottle';
-    if (stand && !isPouring) {
-      let moved = false;
-      if (keyIsDown(UP_ARROW)) {
-        hoverVessel.clampOffset = constrain(hoverVessel.clampOffset - 3, -stand.h * 0.45, stand.h * 0.25);
-        moved = true;
+    // --- NEW: SWIRL FLASK (W Key) ---
+    if (keyIsDown(87)) { // 'W' Key
+      const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
+      if (flask && flask.volume > 0) {
+        flask.turbulence = 6; // High turbulence
+        flask.tilt = sin(frameCount * 0.1) * 0.10; // Tilt (Slower)
+        flask.renderOffsetX = cos(frameCount * 0.4) * 4; // Slower orbit
+        flask.renderOffsetY = sin(frameCount * 0.4) * 2;
+        flask.hint = "Swirling...";
       }
-      if (keyIsDown(DOWN_ARROW)) {
-        hoverVessel.clampOffset = constrain(hoverVessel.clampOffset + 3, -stand.h * 0.45, stand.h * 0.25);
-        moved = true;
-      }
+    } else {
+      const flask = Object.values(vessels).find(v => v.type === 'conical_flask');
+      if (flask) { flask.renderOffsetX = 0; flask.renderOffsetY = 0; }
+    }
 
-      if (moved) {
-        // AUTO-UNSNAP: If sliding down pushes tip into the flask
-        const dripTipY = hoverVessel.y + hoverVessel.h * 0.4;
-        Object.values(vessels).forEach(v => {
-          if ((v.type === 'beaker' || v.type === 'conical_flask') && abs(v.x - hoverVessel.x) < 10) {
-            const flaskTopY = v.y - v.h / 2;
-            if (dripTipY > flaskTopY + 10) { // Must actually overlap by 10px to eject
-              // Unsnap: nudge the flask away from the center alignment
-              v.x += 100; // Move far enough to break the snap
-              v.vy = 0;
-              console.log("Flask pushed away to avoid collision");
+    // Draw shadows first, then vessels
+    Object.values(vessels).forEach(v => {
+      try { drawShadow(v); } catch(e) {}
+    });
+
+    Object.values(vessels).forEach(v => {
+      try {
+        drawVessel(v);
+        if (v.type === 'burette' || (v.type === 'burette_tube' && v.mountedTo)) drawBuretteZoom(v);
+      } catch (e) {
+        if (frameCount % 120 === 0) console.error("Crash in drawVessel for " + v.id, e);
+      }
+    });
+
+    // FIXED: Handle Keyboard Vertical Sliding
+    if (hoverVessel && hoverVessel.type === 'burette_tube' && hoverVessel.mountedTo) {
+      const stand = vessels[hoverVessel.mountedTo];
+      const isPouring = isDragging && isDragging.type === 'bottle';
+      if (stand && !isPouring) {
+        let moved = false;
+        if (keyIsDown(UP_ARROW)) {
+          hoverVessel.clampOffset = constrain(hoverVessel.clampOffset - 3, -stand.h * 0.45, stand.h * 0.25);
+          moved = true;
+        }
+        if (keyIsDown(DOWN_ARROW)) {
+          hoverVessel.clampOffset = constrain(hoverVessel.clampOffset + 3, -stand.h * 0.45, stand.h * 0.25);
+          moved = true;
+        }
+        if (moved) {
+          const dripTipY = hoverVessel.y + hoverVessel.h * 0.4;
+          Object.values(vessels).forEach(v => {
+            if ((v.type === 'beaker' || v.type === 'conical_flask') && abs(v.x - hoverVessel.x) < 10) {
+              const flaskTopY = v.y - v.h / 2;
+              if (dripTipY > flaskTopY + 10) { v.x += 100; v.vy = 0; }
             }
-          }
-        });
+          });
+        }
       }
     }
+
+    drawTitrationZone();
+    drawSnapGuides();  
+    drawParticles();
+
+    if (hoverVessel) drawTooltip(hoverVessel);
+  } catch (e) {
+    if (frameCount % 60 === 0) console.error("GLOBAL DRAW CRASH:", e);
   }
-
-  drawTitrationZone();
-  drawSnapGuides();  // ✨ Visual feedback!
-
-  // Particles
-  drawParticles();
-
-  // UI
-
-  if (hoverVessel) drawTooltip(hoverVessel);
   if (catalogVisible) drawCatalogPanel();
   if (assistantVisible) drawDataPanel();
   drawControlsPanel();
   drawClearShelfButton(); // Magic button on the shelf
 }
 function getChemicalInfo(chemicalId) {
+  const searchId = String(chemicalId).toLowerCase();
+  
   // 1. Search DB-Driven Chemicals First
   if (typeof chemicalCatalog !== 'undefined' && chemicalCatalog && chemicalCatalog.chemicals) {
-    let found = chemicalCatalog.chemicals.find(c => c.id === chemicalId);
+    let found = chemicalCatalog.chemicals.find(c => 
+      String(c.id).toLowerCase() === searchId || 
+      String(c.name).toLowerCase() === searchId
+    );
     if (found) return found;
   }
 
@@ -1683,7 +1703,10 @@ function drawVessel(v) {
   // --- SPRITE RENDERING ---
   else if (v.type === 'beaker') {
     image(imgBeaker, 0, 0, v.w, v.h);
-    drawRealisticLiquid(v, color(100, 200, 255));
+    
+    // NEW: Calculate dynamic titration color (Fallback to v.color or blue)
+    let titrationCol = getTitrationColor(v);
+    drawRealisticLiquid(v, color(...titrationCol));
   }
   else if (v.type === 'burette') {
     image(imgBurette, 0, 0, v.w, v.h);
@@ -1741,7 +1764,8 @@ function drawVessel(v) {
     image(imgConical, 0, 0, v.w, v.h);
 
     // NEW: Calculate dynamic titration color
-    drawRealisticLiquid(v, v.color ? color(...v.color) : color(200, 220, 255, 100));
+    let titrationCol = getTitrationColor(v);
+    drawRealisticLiquid(v, color(...titrationCol));
   }
   else if (v.type === 'volumetric_flask') image(imgVolumetric, 0, 0, v.w, v.h);
   else if (v.type === 'funnel') image(imgFunnel, 0, 0, v.w, v.h);
@@ -1878,6 +1902,11 @@ function drawDroplets(startX, startY, endX, endY, col) {
 
 // APPARATUS-SPECIFIC REALISTIC LIQUIDS
 function drawRealisticLiquid(v, col) {
+  if (!v.volume || v.volume < 0.1 || !col) return;
+  
+  // Safety: If p5.js color object creation failed due to NaN
+  if (!col.levels) return;
+
   // --- BUG FIX: Prioritize the dynamic 'col' argument (the Titration Color) ---
   // If 'col' is passed, it means the chemistry engine is overriding the visual property.
   let activeCol;
@@ -2116,60 +2145,81 @@ function drawDigitalDisplay(x, y, label) { // Change 'text' to 'label' here
 // TOOLTIP
 // ======================================================
 function drawTooltip(v) {
-  const boxW = 260, boxH = 140; 
+  const boxW = 280;
+  // Dynamic height based on number of chemicals
+  let chemCount = 0;
+  if (v.contents && v.contents.chemicals) {
+    for (let c in v.contents.chemicals) {
+      if (v.contents.chemicals[c].volume > 0.005) chemCount++;
+    }
+  }
+  
+  const boxH = 120 + (chemCount > 1 ? (chemCount * 18) : 40); 
   const x = constrain(mouseX + 15, 10, width - boxW - 10);
   const y = constrain(mouseY + 15, 10, height - boxH - 10);
 
-  fill(255, 255, 255, 240); stroke(180);
-  rect(x, y, boxW, boxH, 8);
+  fill(255, 255, 255, 245); stroke(180); strokeWeight(1);
+  rect(x, y, boxW, boxH, 12);
 
-  noStroke(); fill(0); textAlign(LEFT);
+  // Header
+  noStroke(); fill(20, 40, 80); textAlign(LEFT);
   textSize(14); textStyle(BOLD);
-  text(v.title, x + 12, y + 22);
+  text(v.title || v.type, x + 12, y + 25);
 
-  textSize(12); textStyle(NORMAL);
-
-  // CHEMICAL INFO SECTION (Identity Sync Fix)
-  let mainChem = v.chemicalId || v.chem;
+  // Content Section
+  textSize(11); textStyle(BOLD); fill(100);
+  text("CONTENTS:", x + 12, y + 45);
   
-  // Mix support: If no ID but has contents, find the dominant chemical
-  if ((!mainChem || mainChem === 'Empty' || mainChem === 'Unknown') && v.contents && v.contents.chemicals) {
-    let maxV = -0.001;
+  let currentY = y + 62;
+  let hasItems = false;
+
+  if (v.contents && v.contents.chemicals) {
     for (let c in v.contents.chemicals) {
-       if (v.contents.chemicals[c].volume > maxV) {
-          maxV = v.contents.chemicals[c].volume;
-          mainChem = c;
-       }
+      let data = v.contents.chemicals[c];
+      if (data.volume > 0.005) {
+        hasItems = true;
+        const info = getChemicalInfo(c);
+        
+        // Color dot
+        fill(data.color ? color(...data.color) : [200, 200, 200]);
+        ellipse(x + 18, currentY - 4, 10, 10);
+        
+        // Name & Vol
+        fill(40); textStyle(BOLD); textSize(11);
+        text(info.name, x + 32, currentY);
+        fill(80); textStyle(NORMAL); textSize(10);
+        text(`${nf(data.volume, 1, 2)} mL`, x + boxW - 60, currentY);
+        
+        currentY += 18;
+      }
     }
   }
 
-  if (mainChem && mainChem !== 'Empty' && mainChem !== 'Unknown') {
-    const chemInfo = getChemicalInfo(mainChem);
-    if (v.color) {
-      fill(...v.color); noStroke();
-      rect(x + 12, y + 38, 14, 14);
-      fill(0);
-    }
-    textSize(11);
-    text(`${chemInfo.name}`, x + 32, y + 42);
-    textSize(10); fill(60);
-    text(`Formula: ${chemInfo.formula}`, x + 12, y + 58);
-    if (chemInfo.conc) {
-      text(`Concentration: ${chemInfo.conc}`, x + 12, y + 72);
-    }
+  if (!hasItems) {
+    fill(150); textStyle(ITALIC);
+    text("Empty", x + 12, currentY);
+    currentY += 20;
   }
 
-  // Volume & other info
-  textSize(12); fill(0);
-  text('Volume: ' + nf(v.volume || 0, 1, 2) + ' mL', x + 12, y + 92);
-
+  // Stats Footer
+  stroke(240); line(x + 10, currentY, x + boxW - 10, currentY);
+  noStroke(); fill(60); textStyle(NORMAL); textSize(11);
+  currentY += 18;
+  text(`Total Volume: ${nf(v.volume || 0, 1, 2)} mL`, x + 12, currentY);
   if (v.capacity) {
-    text(`Capacity: ${v.capacity} mL`, x + 12, y + 108);
+    text(`Capacity: ${v.capacity} mL`, x + 150, currentY);
+  }
+
+  if (v.contents && v.contents.pH !== undefined) {
+    currentY += 18;
+    fill(0, 100, 200); textStyle(BOLD);
+    text(`Solution pH: ${v.contents.pH.toFixed(2)}`, x + 12, currentY);
   }
 
   if (v.hint) {
-    fill(0, 150, 0); textSize(11);
-    text('💡 ' + v.hint, x + 12, y + 126);
+    currentY += 20;
+    fill(0, 150, 0); textStyle(NORMAL); textSize(11);
+    text('💡 ' + v.hint, x + 12, currentY);
   }
 }
 
@@ -3292,141 +3342,153 @@ function transferLiquid(source, target, transferVol) {
 }
 
 function computeReaction(vessel) {
-    if (typeof window.CHEMICAL_REACTIONS === 'undefined' || !experimentData) return;
+    if (!window.CHEMICAL_REACTIONS || !experimentData) return;
 
-    // -- HARDCODED WARDER'S METHOD LOGIC (Estimation of Carbonates) --
-    let hasAnalyte = vessel.contents.chemicals['Sodium Carbonate Mixture'] || vessel.contents.chemicals['Sodium Carbonate + Bicarbonate'];
-    let volHCl = vessel.contents.titrant_vol || 0; // Using titrant_vol tracked in transferLiquid
-    let hasPhenol = vessel.contents.indicatorsAdded && vessel.contents.indicatorsAdded.includes('Phenolphthalein');
-    let hasMethyl = vessel.contents.indicatorsAdded && vessel.contents.indicatorsAdded.includes('Methyl Orange');
+    // 1. DYNAMIC pH TRACKING (Based on Stoichiometric Linkages)
+    // Find if the latest added chemical has a pH effect
+    let totalPHChange = 0;
     
-    if (hasAnalyte) {
-        // Calculate fake pH to satisfy simulation milestones (V1 at 8.3, V2 at 4.0)
-        let calculated_pH = 11.0 - (volHCl * 0.3);
-        if (calculated_pH < 2.0) calculated_pH = 2.0;
-        vessel.contents.pH = calculated_pH;
-
-        // Base color of the mixture
-        let rc = hasAnalyte.color || [220, 180, 100, 180];
+    // Simple iterative solver for multi-chemical mixtures
+    window.CHEMICAL_REACTIONS.forEach(rxn => {
+        // Find matching chemicals in the vessel using robust lookup
+        let volA = 0;
+        let volB = 0;
         
-        // Phenolphthalein phase
-        if (hasPhenol && !hasMethyl) {
-            if (volHCl < 12.0) {
-                // Pink
-                rc = [255, 105, 180, 180]; 
-            } else if (volHCl >= 12.0 && volHCl < 12.5) {
-                // Pale pink (transition)
-                rc = [255, 192, 203, 180];
-            } else {
-                // Colorless
-                rc = [200, 220, 255, 180];
+        for (let chemName in vessel.contents.chemicals) {
+            const lowerChem = chemName.toLowerCase();
+            if (lowerChem.includes(String(rxn.chemical_a_label).toLowerCase()) || String(rxn.chemical_a_label).toLowerCase().includes(lowerChem)) {
+                volA += vessel.contents.chemicals[chemName].volume;
+            }
+            if (lowerChem.includes(String(rxn.chemical_b_label).toLowerCase()) || String(rxn.chemical_b_label).toLowerCase().includes(lowerChem)) {
+                volB += vessel.contents.chemicals[chemName].volume;
             }
         }
         
-        // Methyl Orange phase
-        if (hasMethyl) {
-            if (volHCl < 24.5) {
-                // Yellow
-                rc = [255, 255, 0, 180];
-            } else if (volHCl >= 24.5 && volHCl < 25.5) {
-                // Pale Orange (transition)
-                rc = [255, 165, 0, 180];
-            } else {
-                // Orange-Red / Pink
-                rc = [255, 69, 0, 180];
-            }
+        // If both reactants are present, calculate the effect
+        if (volA > 0.05 && volB > 0.05) {
+            // Apply ph_change periodically based on titrant volume
+            totalPHChange += rxn.ph_change * (Math.min(volA, volB) / 10); 
         }
-        
-        vessel.color = rc;
-        return; // Override generic logic entirely for the presentation demo
-    }
-    // -- END HARDCODED LOGIC --
+    });
 
-    // 1. MILESTONE-LINKED REACTION (Priority)
-    const currentMS = (experimentData && experimentData.milestones) ? experimentData.milestones[currentStepIndex] : null;
-    if (currentMS && currentMS.linked_reaction_id && window.CHEMICAL_REACTIONS) {
-        const rxnId = parseInt(currentMS.linked_reaction_id);
-        const linkedRxn = window.CHEMICAL_REACTIONS.find(r => r.id == rxnId);
-        
-        if (linkedRxn) {
-            let nameA = linkedRxn.chemical_a_label || linkedRxn.chemical_a__name;
-            let nameB = linkedRxn.chemical_b_label || linkedRxn.chemical_b__name;
-            
-            let volA = vessel.contents.chemicals[nameA] ? vessel.contents.chemicals[nameA].volume : 0;
-            let volB = vessel.contents.chemicals[nameB] ? vessel.contents.chemicals[nameB].volume : 0;
-
-            if (volA > 0.001 && volB > 0.001) {
-                const hex = linkedRxn.reaction_color_hex || "#FFFFFF";
-                const rc = [parseInt(hex.substr(1,2),16)||255, parseInt(hex.substr(3,2),16)||255, parseInt(hex.substr(5,2),16)||255, 180];
-                vessel.color = rc;
-                
-                let nameProd = linkedRxn.product_label || linkedRxn.product__name;
-                if (nameProd) {
-                    let limiting = Math.min(volA, volB);
-                    vessel.contents.chemicals[nameA].volume -= limiting;
-                    vessel.contents.chemicals[nameB].volume -= limiting;
-                    if (!vessel.contents.chemicals[nameProd]) vessel.contents.chemicals[nameProd] = { volume: 0, color: rc };
-                    vessel.contents.chemicals[nameProd].volume += limiting * 2;
-                }
-                return; 
-            }
-        }
-    }
-
-    // 2. Generic Stoichiometry Loop (Fallback)
-    if (window.CHEMICAL_REACTIONS.length > 0 && experimentData.catalogs) {
-        let getChemName = (id) => {
-            let f = experimentData.catalogs.chemicals.find(c => c.id === id);
-            return f ? f.name : id; 
-        };
-
-        let reacted = false;
-        let safetyCounter = 0;
-        do {
-            reacted = false;
-            for (let rxn of window.CHEMICAL_REACTIONS) {
-                let nameA = rxn.chemical_a_label || getChemName(rxn.chemical_a);
-                let nameB = rxn.chemical_b_label || getChemName(rxn.chemical_b);
-                let nameProd = rxn.product_label || getChemName(rxn.product);
-
-                let volA = vessel.contents.chemicals[nameA] ? vessel.contents.chemicals[nameA].volume : 0;
-                let volB = vessel.contents.chemicals[nameB] ? vessel.contents.chemicals[nameB].volume : 0;
-
-                if (volA > 0.01 && volB > 0.01) {
-                    let limitingVol = Math.min(volA, volB);
-                    vessel.contents.chemicals[nameA].volume -= limitingVol;
-                    vessel.contents.chemicals[nameB].volume -= limitingVol;
-                    
-                    if (nameProd) {
-                        if (!vessel.contents.chemicals[nameProd]) {
-                            let hex = rxn.reaction_color_hex || "#FADADD";
-                            let rc = [parseInt(hex.substr(1,2),16)||255, parseInt(hex.substr(3,2),16)||255, parseInt(hex.substr(5,2),16)||255, 180];
-                            vessel.contents.chemicals[nameProd] = { volume: 0, color: rc };
-                        }
-                        vessel.contents.chemicals[nameProd].volume += limitingVol * 2.0; 
-                    }
-                    reacted = true;
-                }
-            }
-            safetyCounter++;
-        } while(reacted && safetyCounter < 100);
-    }
-    
-    // Compute blended color
-    let r=0, g=0, b=0, total=0;
+    // Update vessel pH
+    let basePH = 7.0;
+    // Analyte detection (Find chemical with highest volume that isn't a titrant)
+    let maxV = 0;
+    let hasAnalyte = false;
     for (let c in vessel.contents.chemicals) {
-        let chem = vessel.contents.chemicals[c];
-        if (chem.volume > 0.01) {
-            r += chem.color[0] * chem.volume;
-            g += chem.color[1] * chem.volume;
-            b += chem.color[2] * chem.volume;
-            total += chem.volume;
+        if (vessel.contents.chemicals[c].volume > maxV) {
+            maxV = vessel.contents.chemicals[c].volume;
+            // High level logic: Carbonates start at pH 11.5
+            if (c.toLowerCase().includes('carbonate') || c.toLowerCase().includes('mixture')) {
+                basePH = 11.5;
+                hasAnalyte = true;
+            }
+            else if (c.toLowerCase().includes('acid')) basePH = 2.0;
         }
     }
 
-    if (total > 0) {
-        vessel.color = [r/total, g/total, b/total, 180];
+    // --- TITRATION OVERRIDE ---
+    const isTitration = experimentData?.type === 'double_indicator' || experimentData?.type === 'simple_titration';
+    if (isTitration && (hasAnalyte || vessel.contents.mixture_vol > 0.1)) {
+        const targetV1 = experimentData?.targets?.v1 || 10.0;
+        const targetV2 = experimentData?.targets?.v2 || 25.0;
+        const isDouble = experimentData?.type === 'double_indicator';
+        const titrantVol = vessel.contents.titrant_vol || 0;
+        const safeV1 = Math.max(0.1, targetV1);
+        const safeV2 = Math.max(safeV1 + 0.1, targetV2);
+
+        // Smooth Transition: Target the calculated pH but move towards it gradually
+        let targetPH = 7.0;
+        if (titrantVol < safeV1) {
+            targetPH = map(titrantVol, 0, safeV1, basePH, 8.3);
+        } else if (!isDouble) {
+            targetPH = map(titrantVol, safeV1, safeV1 + 2.0, 7.3, 2.0, true);
+        } else if (titrantVol < safeV2) {
+            targetPH = map(titrantVol, safeV1, safeV2, 8.0, 4.0);
+        } else {
+            targetPH = map(titrantVol, safeV2, safeV2 + 2.0, 3.8, 1.5, true);
+        }
+        
+        if (isNaN(targetPH)) targetPH = 7.0;
+        vessel.contents.pH = lerp(vessel.contents.pH || basePH, targetPH, 0.1);
+    } else {
+        let finalPH = basePH + totalPHChange;
+        if (isNaN(finalPH)) finalPH = 7.0;
+        vessel.contents.pH = lerp(vessel.contents.pH || basePH, Math.max(1.0, Math.min(14.0, finalPH)), 0.05);
     }
+
+    // 2. GENERIC INDICATOR COLOR SOLVER
+    let indicatorColors = [];
+    for (let c in vessel.contents.chemicals) {
+        const info = getChemicalInfo(c);
+        if (info && info.is_indicator) {
+            const indColor = getIndicatorColor(info, vessel.contents.pH);
+            if (indColor) indicatorColors.push({ color: indColor, vol: vessel.contents.chemicals[c].volume });
+        }
+    }
+
+    // 3. COLOR BLENDING
+    if (indicatorColors.length > 0) {
+        // If indicators are present, they dominate the visual result
+        let r=0, g=0, b=0, a=0, totalVolIdx = 0;
+        indicatorColors.forEach(ic => {
+            r += ic.color[0]; g += ic.color[1]; b += ic.color[2]; a += ic.color[3];
+            totalVolIdx++;
+        });
+        vessel.color = [r/totalVolIdx, g/totalVolIdx, b/totalVolIdx, a/totalVolIdx];
+    } else {
+        // Fallback to average of chemical base colors or reaction product color
+        let r=0, g=0, b=0, total=0;
+        let reactedHex = null;
+        
+        // Check for specific reaction product color
+        window.CHEMICAL_REACTIONS.forEach(rxn => {
+            if (vessel.contents.chemicals[rxn.chemical_a_label] && vessel.contents.chemicals[rxn.chemical_b_label]) {
+                reactedHex = rxn.reaction_color_hex;
+            }
+        });
+
+        if (reactedHex) {
+            vessel.color = hexToRgba(reactedHex);
+        } else {
+            for (let c in vessel.contents.chemicals) {
+                let chem = vessel.contents.chemicals[c];
+                if (chem.volume > 0.01) {
+                    let cCol = chem.color || [200, 220, 255, 180];
+                    r += cCol[0] * chem.volume;
+                    g += cCol[1] * chem.volume;
+                    b += cCol[2] * chem.volume;
+                    total += chem.volume;
+                }
+            }
+            if (total > 0) vessel.color = [r/total, g/total, b/total, 180];
+        }
+    }
+}
+
+// Helper: Calculate indicator color based on pH
+function getIndicatorColor(chemInfo, currentPH) {
+    if (!chemInfo.low_ph_color || !chemInfo.high_ph_color || !chemInfo.transition_ph_range) return null;
+    
+    const range = chemInfo.transition_ph_range.split('-').map(v => parseFloat(v));
+    const lowBound = range[0];
+    const highBound = range[1];
+    
+    const lowCol = hexToRgba(chemInfo.low_ph_color);
+    const highCol = hexToRgba(chemInfo.high_ph_color);
+    
+    if (currentPH <= lowBound) return lowCol;
+    if (currentPH >= highBound) return highCol;
+    
+    // Interpolate in the transition zone
+    const t = (currentPH - lowBound) / (highBound - lowBound);
+    return [
+        lerp(lowCol[0], highCol[0], t),
+        lerp(lowCol[1], highCol[1], t),
+        lerp(lowCol[2], highCol[2], t),
+        lerp(lowCol[3], highCol[3], t)
+    ];
 }
 function hexToRgba(hex) {
   if (!hex) return [255, 255, 255, 255];

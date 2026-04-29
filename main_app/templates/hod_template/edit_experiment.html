@@ -114,8 +114,14 @@
                                 </div>
                                 <div class="col-md-3">
                                     <label class="small">V₁ Alert Color</label>
-                                    <input type="color" class="form-control form-control-sm" name="target_v1_color"
-                                        value="{% if target_config %}{{ target_config.v1_color }}{% else %}#FF69B4{% endif %}" style="height: 38px;">
+                                    <div class="d-flex align-items-center">
+                                        <input type="color" class="form-control form-control-sm p-1" id="picker_v1" 
+                                            value="#FF69B4" style="height: 38px; width: 60px;" oninput="syncRGBA('v1')">
+                                        <input type="range" class="custom-range ml-2" id="alpha_v1" 
+                                            min="0" max="255" value="160" oninput="syncRGBA('v1')">
+                                    </div>
+                                    <input type="hidden" name="target_v1_color" id="hidden_v1" 
+                                        value="{% if target_config %}{{ target_config.v1_color }}{% else %}#FF69B4A0{% endif %}">
                                 </div>
                                 <div class="col-md-3">
                                     <label class="small">V₂ min</label>
@@ -129,8 +135,14 @@
                                 </div>
                                 <div class="col-md-3">
                                     <label class="small">V₂ Alert Color</label>
-                                    <input type="color" class="form-control form-control-sm" name="target_v2_color"
-                                        value="{% if target_config %}{{ target_config.v2_color }}{% else %}#FFD700{% endif %}" style="height: 38px;">
+                                    <div class="d-flex align-items-center">
+                                        <input type="color" class="form-control form-control-sm p-1" id="picker_v2" 
+                                            value="#FFD700" style="height: 38px; width: 60px;" oninput="syncRGBA('v2')">
+                                        <input type="range" class="custom-range ml-2" id="alpha_v2" 
+                                            min="0" max="255" value="180" oninput="syncRGBA('v2')">
+                                    </div>
+                                    <input type="hidden" name="target_v2_color" id="hidden_v2" 
+                                        value="{% if target_config %}{{ target_config.v2_color }}{% else %}#FFD700B4{% endif %}">
                                 </div>
                             </div>
 
@@ -1246,6 +1258,10 @@
     }
 
     function loadExistingState() {
+        // Initialize Color Pickers from DB values
+        updatePickerFromHex('v1', document.getElementById('hidden_v1').value);
+        updatePickerFromHex('v2', document.getElementById('hidden_v2').value);
+
         try {
             const rawJson = document.getElementById('initial_state_json_input').value;
             if (rawJson && rawJson !== 'None' && rawJson.trim() !== '') {
@@ -1260,6 +1276,29 @@
             console.error("Error parsing initial scene JSON:", e);
         }
     }
+
+    // === COLOR PICKER HELPERS ===
+    function syncRGBA(prefix) {
+        const color = document.getElementById('picker_' + prefix).value;
+        const alpha = parseInt(document.getElementById('alpha_' + prefix).value);
+        let alphaHex = alpha.toString(16).toUpperCase();
+        if (alphaHex.length === 1) alphaHex = '0' + alphaHex;
+        document.getElementById('hidden_' + prefix).value = color.toUpperCase() + alphaHex;
+    }
+
+    function updatePickerFromHex(prefix, hex9) {
+        if (!hex9 || hex9.length < 7) return;
+        const color = hex9.substring(0, 7);
+        const alphaHex = hex9.substring(7, 9) || "FF";
+        const alpha = parseInt(alphaHex, 16);
+        
+        document.getElementById('picker_' + prefix).value = color;
+        document.getElementById('alpha_' + prefix).value = alpha;
+        document.getElementById('hidden_' + prefix).value = hex9.toUpperCase();
+    }
+
+    // Initialize everything on load
+    window.addEventListener('DOMContentLoaded', loadExistingState);
 </script>
 
 <!-- Blueprint Selection Modal -->
