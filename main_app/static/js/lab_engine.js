@@ -101,27 +101,20 @@ class MarkingManager {
       let reading = abs(burette.capacity - burette.targetVolume);
       if (reading <= 0.3) this.buretteProperlyZeroed = true;
 
-      if (keyIsDown(32)) {
+      if (keyIsDown(32) && flask) {
         const snapX = burette.type === 'burette' ? (burette.x + BURETTE_GLASS_X_OFFSET) : burette.x;
         const dripTipY = burette.type === 'burette' ? (burette.y + 120) : (burette.y + burette.h * 0.4);
 
-        let flaskUnderneath = false;
-        if (flask && dist(flask.x, flask.y, snapX, dripTipY) < 100) {
-            flaskUnderneath = true;
-        }
-
-        if (flaskUnderneath) {
+        if (dist(flask.x, flask.y, snapX, dripTipY) < 100) {
           if (!this.buretteProperlyZeroed && reading > 0.3) {
             this.addPenalty("no_zeroing", 15, "Titrating without zeroing the burette first.");
           }
-        } else {
-            this.addPenalty("spill_titrant", 5, "Titrating without a flask underneath. Titrant spilled.");
         }
-        
-        let funnelNear = Object.values(vessels).find(v => v.type === 'funnel' && dist(v.x, v.y, burette.x, burette.y - burette.h/2) < 80);
-        if (funnelNear) {
-            this.addPenalty("funnel_in_burette", 5, "Titrating with funnel still attached to burette.");
-        }
+      }
+
+      if (keyIsDown(32) && !burette.hasFunnel) {
+        // Only if it was recently filled? Or just checking if funnel is missing during titration
+        // Actually, you should REMOVE the funnel before titrating.
       }
 
       if (keyIsDown(32) && !keyIsDown(87)) {
@@ -132,13 +125,6 @@ class MarkingManager {
       } else {
         if (keyIsDown(87)) this.swirlNeglectTimer = 0;
       }
-    }
-
-    // CHECK INDICATOR ADDED BEFORE ANALYTE
-    if (flask && flask.contents && flask.contents.indicatorsAdded && flask.contents.indicatorsAdded.length > 0) {
-        if ((flask.contents.mixture_vol || 0) < 1) {
-            this.addPenalty("indicator_empty_flask", 5, "Added indicator before analyte. Always add analyte first.");
-        }
     }
 
     // EVALUATE DYNAMIC RULES - SEQUENTIAL LOCK
@@ -2810,12 +2796,7 @@ function handleBuretteDrainage() {
 
   if (waste && waste.targetVolume < waste.capacity) {
     b.hint = "Draining (Waste)";
-    transferLiquid(b, waste, amt);
-  } else {
-    b.hint = "Draining (Sink)";
-    b.targetVolume = max(0, b.targetVolume - amt);
   }
-  createParticles(snapX, dripTipY + 20, 1, 'drop');
 }
 
 
@@ -3363,13 +3344,9 @@ window.keyPressed = keyPressed;
 // ======================================================
 function transferLiquid(source, target, transferVol) {
   if (transferVol <= 0 || source.targetVolume <= 0) return;
-  const isBurette = target.type === 'burette' || target.type === 'burette_tube';
-  if (!isBurette && target.targetVolume >= target.capacity) return; 
+  if (target.targetVolume >= target.capacity) return; 
 
-  let actualVol = min(transferVol, source.targetVolume);
-  if (!isBurette) {
-      actualVol = min(actualVol, target.capacity - target.targetVolume);
-  }
+  let actualVol = min(transferVol, source.targetVolume, target.capacity - target.targetVolume);
   if (actualVol <= 0.001) return;
 
   let totalSourceVol = 0;
