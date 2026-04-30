@@ -17,7 +17,7 @@
         background: radial-gradient(circle at 0% 100%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
                     var(--primary-bg);
         min-height: calc(100vh - 60px);
-        padding: 4rem 2rem;
+        padding: 2rem 1rem;
     }
 
     .glass-card {
@@ -36,10 +36,10 @@
 
     .option-label {
         display: block;
-        padding: 1.25rem 1.5rem;
+        padding: 1rem 1.25rem;
         background: rgba(255, 255, 255, 0.03);
         border: 2px solid rgba(255, 255, 255, 0.05);
-        border-radius: 16px;
+        border-radius: 12px;
         cursor: pointer;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         font-weight: 600;
@@ -73,25 +73,25 @@
 <div class="premium-bg text-white">
     <div class="max-w-4xl mx-auto">
         
-        <header class="text-center mb-16">
-            <span class="inline-block px-4 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-[0.65rem] font-black uppercase tracking-[0.2em] mb-4">Phase 02: Knowledge Assessment</span>
-            <h1 class="text-5xl font-extrabold tracking-tight text-white mb-4">{{ quiz.title }}</h1>
-            <p class="text-white/40 text-lg font-medium">Subject: <span class="text-white/80">{{ quiz.subject.name }}</span></p>
+        <header class="text-center mb-8">
+            <span class="inline-block px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-[0.6rem] font-black uppercase tracking-[0.1em] mb-2">Phase 02: Knowledge Assessment</span>
+            <h1 class="text-3xl font-extrabold tracking-tight text-white mb-2">{{ quiz.title }}</h1>
+            <p class="text-white/40 text-sm font-medium">Subject: <span class="text-white/80">{{ quiz.subject.name }}</span></p>
         </header>
 
-        <form method="post" action="{% url 'take_quiz' quiz_id=quiz.id %}" class="space-y-12">
+        <form method="post" action="{% url 'take_quiz' quiz_id=quiz.id %}" class="space-y-6">
             {% csrf_token %}
             
             {% for question in questions %}
-            <div class="question-card p-10">
-                <div class="flex items-start gap-6 mb-8">
-                    <div class="flex-shrink-0 w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 font-black text-xl">
+            <div class="question-card p-6">
+                <div class="flex items-start gap-4 mb-4">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 font-black text-lg">
                         {{ forloop.counter }}
                     </div>
-                    <h3 class="text-2xl font-bold text-white leading-snug pt-1">{{ question.text }}</h3>
+                    <h3 class="text-xl font-bold text-white leading-snug pt-1">{{ question.text }}</h3>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 ml-0 md:ml-18">
+                <div class="grid grid-cols-1 gap-3 ml-0 md:ml-14">
                     {% for option in question.option_set.all %}
                     <div class="relative">
                         <input type="radio" 
@@ -100,7 +100,7 @@
                                value="{{ option.id }}"
                                class="absolute opacity-0 pointer-events-none"
                                required>
-                        <label for="opt-{{ option.id }}" class="option-label">
+                        <label for="opt-{{ option.id }}" class="option-label text-sm">
                             <span class="flex items-center justify-between">
                                 <span>{{ option.text }}</span>
                                 <i class="fas fa-circle-check text-blue-500 opacity-0 transition-opacity"></i>
@@ -112,12 +112,12 @@
             </div>
             {% endfor %}
 
-            <div class="pt-10 flex flex-col items-center gap-6">
-                <button type="submit" class="px-16 py-6 btn-submit rounded-[24px] text-white font-extrabold text-lg flex items-center gap-4 group">
+            <div class="pt-6 flex flex-col items-center gap-4">
+                <button type="submit" class="px-10 py-4 btn-submit rounded-[16px] text-white font-extrabold text-sm flex items-center gap-3 group">
                     <span>Submit Assessment</span>
                     <i class="fas fa-paper-plane group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform"></i>
                 </button>
-                <p class="text-white/20 text-sm font-bold uppercase tracking-widest">Verify all answers before submitting</p>
+                <p class="text-white/20 text-[0.65rem] font-bold uppercase tracking-widest">Verify all answers before submitting</p>
             </div>
         </form>
     </div>

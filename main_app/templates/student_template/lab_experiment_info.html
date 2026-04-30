@@ -17,7 +17,7 @@
         background: radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
                     var(--primary-bg);
         min-height: calc(100vh - 60px);
-        padding: 4rem 2rem;
+        padding: 2rem 1rem;
     }
 
     .glass-panel {
@@ -59,45 +59,59 @@
         width: 1em;
         margin-left: -1em;
     }
+
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.02);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(59, 130, 246, 0.2);
+        border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(59, 130, 246, 0.4);
+    }
 </style>
 
 <div class="premium-bg text-white">
     <div class="max-w-6xl mx-auto">
         
-        <header class="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <header class="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div class="flex-1">
-                <span class="inline-block px-4 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-[0.65rem] font-black uppercase tracking-[0.2em] mb-4">Phase 03: Virtual Lab Entry</span>
-                <h1 class="text-5xl font-extrabold tracking-tight text-white leading-tight mb-4">{{ experiment.title }}</h1>
-                <p class="text-white/40 text-lg font-medium italic max-w-3xl">"{{ experiment.objective }}"</p>
+                <span class="inline-block px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-[0.6rem] font-black uppercase tracking-[0.1em] mb-2">Phase 03: Virtual Lab Entry</span>
+                <h1 class="text-3xl font-extrabold tracking-tight text-white leading-tight mb-2">{{ experiment.name }}</h1>
+                <p class="text-white/40 text-sm font-medium italic max-w-3xl">"{{ experiment.objective }}"</p>
             </div>
-            <a href="{% url 'student_home' %}" class="inline-flex items-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all border border-white/10 text-white font-bold text-xs uppercase tracking-widest">
+            <a href="{% url 'student_home' %}" class="inline-flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl transition-all border border-white/10 text-white font-bold text-[0.7rem] uppercase tracking-wider">
                 <i class="fas fa-grid-2 mr-1"></i> Exit Path
             </a>
         </header>
         
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             <!-- Left Side: Principle & Materials -->
-            <div class="lg:col-span-1 space-y-8">
-                <div class="info-card p-8">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-1.5 h-6 bg-blue-500 rounded-full"></div>
-                        <h3 class="text-xl font-bold uppercase tracking-wider text-blue-400">Scientific Principle</h3>
+            <div class="lg:col-span-1 space-y-6">
+                <div class="info-card p-6">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-1.5 h-5 bg-blue-500 rounded-full"></div>
+                        <h3 class="text-lg font-bold uppercase tracking-wider text-blue-400">Scientific Principle</h3>
                     </div>
-                    <div class="text-white/60 leading-relaxed font-medium">
+                    <div class="text-white/60 text-sm leading-relaxed font-medium">
                         {{ experiment.principle|linebreaks }}
                     </div>
                 </div>
 
-                <div class="info-card p-8">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-1.5 h-6 bg-purple-500 rounded-full"></div>
-                        <h3 class="text-xl font-bold uppercase tracking-wider text-purple-400">Required Materials</h3>
+                <div class="info-card p-6">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-1.5 h-5 bg-purple-500 rounded-full"></div>
+                        <h3 class="text-lg font-bold uppercase tracking-wider text-purple-400">Required Materials</h3>
                     </div>
-                    <ul class="space-y-3">
-                        {% for m in experiment.materials.all %}
-                        <li class="text-white/60 font-medium flex items-center gap-3">
-                            <i class="fas fa-check-circle text-purple-500/40 text-xs"></i>
-                            {{ m.name }}
+                    <ul class="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                        {% for m in experiment.materials %}
+                        <li class="text-white/60 text-sm font-medium flex items-center gap-2">
+                            <i class="fas fa-check-circle text-purple-500/40 text-[0.6rem]"></i>
+                            {{ m }}
                         </li>
                         {% endfor %}
                     </ul>
@@ -106,31 +120,31 @@
 
             <!-- Right Side: Procedure -->
             <div class="lg:col-span-2">
-                <div class="info-card p-10 bg-white/[0.03] border-blue-500/10">
-                    <div class="flex items-center gap-4 mb-10">
-                        <div class="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                            <i class="fas fa-list-ol text-xl text-blue-400"></i>
+                <div class="info-card p-6 bg-white/[0.03] border-blue-500/10 flex flex-col h-full">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                            <i class="fas fa-list-ol text-lg text-blue-400"></i>
                         </div>
-                        <h3 class="text-3xl font-extrabold text-white">Experimental Procedure</h3>
+                        <h3 class="text-2xl font-extrabold text-white">Experimental Procedure</h3>
                     </div>
                     
-                    <div class="space-y-6">
-                        {% for step in experiment.steps.all %}
-                        <div class="flex gap-6 p-6 rounded-2xl hover:bg-white/5 transition-all group">
-                            <span class="flex-shrink-0 w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-black text-white/40 group-hover:bg-blue-500 group-hover:text-white group-hover:border-blue-500 transition-all">{{ forloop.counter }}</span>
-                            <p class="text-white/70 text-lg font-medium leading-relaxed pt-0.5">{{ step.description }}</p>
+                    <div class="space-y-3 overflow-y-auto max-h-[35vh] pr-2 custom-scrollbar flex-grow">
+                        {% for step in experiment.procedure %}
+                        <div class="flex gap-4 p-4 rounded-xl hover:bg-white/5 transition-all group">
+                            <span class="flex-shrink-0 w-6 h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[0.6rem] font-black text-white/40 group-hover:bg-blue-500 group-hover:text-white group-hover:border-blue-500 transition-all">{{ forloop.counter }}</span>
+                            <p class="text-white/70 text-sm font-medium leading-relaxed pt-0.5">{{ step }}</p>
                         </div>
                         {% endfor %}
                     </div>
 
-                    <div class="mt-12 pt-10 border-t border-white/5 flex items-center justify-between">
-                        <div class="flex items-center gap-4">
-                            <div class="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin"></div>
-                            <span class="text-white/40 font-bold text-xs uppercase tracking-widest">Simulator Ready</span>
+                    <div class="mt-6 pt-6 border-t border-white/5 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-check-circle text-emerald-500 text-lg"></i>
+                            <span class="text-white/40 font-bold text-[0.65rem] uppercase tracking-wider">Simulator Ready</span>
                         </div>
-                        <a href="{% url 'lab_experiment_simulation' slug %}" class="btn-action px-12 py-6 rounded-2xl text-white font-extrabold flex items-center gap-4 group">
-                            <span class="text-lg">Enter Virtual Laboratory</span>
-                            <i class="fas fa-flask text-xl group-hover:rotate-12 transition-transform"></i>
+                        <a href="{% url 'lab_experiment_simulation' slug %}" class="btn-action px-8 py-3 rounded-xl text-white font-extrabold flex items-center gap-3 group">
+                            <span class="text-sm">Enter Virtual Laboratory</span>
+                            <i class="fas fa-flask text-lg group-hover:rotate-12 transition-transform"></i>
                         </a>
                     </div>
                 </div>

@@ -48,8 +48,8 @@ def populate_chemicals():
     chemicals = [
         {"name": "Hydrochloric Acid (0.1N)", "formula": "HCl", "molarity": 0.1, "density": 1.0, "default_color_hex": "#FFFFFF40", "is_indicator": False},
         {"name": "Sodium Carbonate Mixture", "formula": "Na2CO3+NaHCO3", "molarity": 0.1, "density": 1.0, "default_color_hex": "#FFFFFF40", "is_indicator": False},
-        {"name": "Phenolphthalein", "formula": "C20H14O4", "molarity": 0.0, "density": 1.0, "default_color_hex": "#FAFAFA80", "is_indicator": True},
-        {"name": "Methyl Orange", "formula": "MO", "molarity": 0.0, "density": 1.0, "default_color_hex": "#FFA50080", "is_indicator": True},
+        {"name": "Phenolphthalein", "formula": "C20H14O4", "molarity": 0.0, "density": 1.0, "default_color_hex": "#FAFAFA80", "is_indicator": True, "low_ph_color": "#FFFFFF00", "high_ph_color": "#FF1493A0"},
+        {"name": "Methyl Orange", "formula": "MO", "molarity": 0.0, "density": 1.0, "default_color_hex": "#FFA50080", "is_indicator": True, "low_ph_color": "#FF0000A0", "high_ph_color": "#FFD700A0"},
     ]
 
     for chem in chemicals:
@@ -60,7 +60,9 @@ def populate_chemicals():
                 'molarity': chem['molarity'],
                 'density': chem['density'],
                 'default_color_hex': chem['default_color_hex'],
-                'is_indicator': chem['is_indicator']
+                'is_indicator': chem['is_indicator'],
+                'low_ph_color': chem.get('low_ph_color', '#FFFF00A0'),
+                'high_ph_color': chem.get('high_ph_color', '#FF00FFA0')
             }
         )
         if created:
